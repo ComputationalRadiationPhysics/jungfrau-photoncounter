@@ -1,0 +1,74 @@
+
+Betreff:
+Re: Jungfrau Gain Switching Data-Algorithmus Status
+Von:
+Martin Brückner <martin.brueckner@psi.ch>
+Datum:
+02.12.2016 17:54
+An:
+"Bussmann, Dr. Michael (FWKT) - 4167" <m.bussmann@hzdr.de>
+
+Hallo Michael,
+
+anbei ein Entwurf. Im Prinzip ist's:
+
+Pixel=Corr*(ADC-Pedestal) / Beamenergy
+
+
+if Gain[x,y]==High
+	Pixel[x,y]=Corr[x,y,High]  *(ADC[x,y]-Pedestal[x,y,High])   / Beamenergy
+
+if Gain[x,y]==Medium
+	Pixel[x,y]=Corr[x,y,Medium]*(Pedestal[x,y,Medium]-ADC[x,y]) / Beamenergy
+
+if Gain[x,y]==High
+	Pixel[x,y]=Corr[x,y,Low]   *(Pedestal[x,y,Low]-ADC[x,y])    / Beamenergy
+
+
+Außerdem steht noch drin, wie man den Pedestalwert berechnet.
+
+Beispieldaten folgen am Montag.
+
+Schönes Wochenende
+
+Martin Brückner
+
+
+
+Am 02.12.2016 um 16:19 schrieb Bussmann, Dr. Michael (FWKT) - 4167:
+> > Super! Danke!
+> > Schönes Wochenende!
+> > 
+> > Am 02.12.2016 um 16:18 schrieb Martin Brückner:
+>> >> Ja tun wir. Gerade heute wurde noch dran geschrieben.
+>> >>
+>> >> Ich frag mal durch. Dann kriegst schon einen Draft.
+>> >>
+>> >> Gruß
+>> >> Martin
+>> >>
+>> >>
+>> >> Am 02.12.2016 um 16:16 schrieb Bussmann, Dr. Michael (FWKT) - 4167:
+>>> >>> Hallo Martin,
+>>> >>>
+>>> >>> Denkt Ihr noch an mich? Am Dienstag ist die Vorlesung...
+>>> >>>
+>>> >>> Gruss, Micha
+>>> >>>
+>>> >>> Am 28.11.2016 um 13:55 schrieb Martin Brückner:
+>>>> >>>> Hallo Michael,
+>>>> >>>>
+>>>> >>>> ich wollte mich mal melden und Dir sagen, dass wir an einer
+>>>> >>>> Beschreibung
+>>>> >>>> des Algorithmus arbeiten. Wir sind also dran und werden demnächst was
+>>>> >>>> schicken können.
+>>>> >>>>
+>>>> >>>> Gibt es bei Dir eine Deadline?
+>>>> >>>>
+>>>> >>>> Gruß
+>>>> >>>> Martin
+>> >>
+
+
+Anhänge:
+Jungfrau_GPU.pdf	527 KB
