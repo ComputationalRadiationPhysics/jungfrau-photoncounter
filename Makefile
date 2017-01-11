@@ -6,8 +6,8 @@ APP := photoncounter
 # CXX: Compiler. Choose between g++, clang++, nvcc
 CXX := g++
 # CXXFLAGS: Compiler flags. Required: c++11, MMD
-CXXFLAGS = -std=c++11 -MMD -Wall -Wextra -pedantic
-NVCCFLAGS := -std=c++11 --compiler-options -Wall,-Wextra,-pedantic,-MMD
+CXXFLAGS = -std=c++11 -MMD -Wall -Wextra -pedantic -g3
+NVCCFLAGS := -std=c++11 --compiler-options -Wall,-Wextra,-pedantic,-MMD,-g3
 ifeq ($(CXX),nvcc)
 	CXXFLAGS = $(NVCCFLAGS)
 endif
