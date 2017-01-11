@@ -34,7 +34,7 @@ clean:
 .PHONY: all clean
 
 $(APP): $(OBJ)
-	$(LINK) $< -o $@
+	$(LINK) $^ -o $@
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp Makefile
 	$(COMPILE) $< -o $@
