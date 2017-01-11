@@ -1,5 +1,4 @@
-#ifndef __RINGBUFFER_H__
-#define __RINGBUFFER_H__
+#pragma once
 
 #include <atomic>
 #include <cstring>
@@ -100,4 +99,3 @@ private:
     size_t increment(size_t n) const { return (n + 1) % size; }
 };
 
-#endif //__RINGBUFFER_H__
