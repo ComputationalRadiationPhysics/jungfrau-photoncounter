@@ -3,6 +3,7 @@
 
 #include <atomic>
 #include <cstring>
+#include <memory>
 
 /**
  * This class implements a generic, thread-safe and lock-free ringbuffer.
@@ -15,11 +16,10 @@ public:
      * @param highest possible number of elements
      * @throws bad_alloc if a memory error occurs
      */
-    RingBuffer(size_t size) : size(size)
+    RingBuffer(size_t size) : size(size), data(new T[size])
     {
         head.store(0);
         tail.store(0);
-        data = new T[size];
     }
 
     /**
@@ -27,24 +27,18 @@ public:
      * @param another RingBuffer object
      * @throws bad_alloc if a memory error occurs
      */
-    RingBuffer(const RingBuffer& other) : size(other.size)
+    RingBuffer(const RingBuffer& other) : size(other.size), data(new T[size])
     {
         head.store(other.head.load());
         tail.store(other.tail.load());
-        data = new T[size];
         memcpy(other.data, data, size * sizeof(T));
     }
 
     /**
-     * The assignment operator was removed because it could
-     * cause problems in a multithreaded environment!
+     * The assignment operator was removed because it could cause problems in a
+     * multithreaded environment!
      */
     RingBuffer& operator=(const RingBuffer& other) = delete;
-
-    /**
-     * RingBuffer destructor
-     */
-    ~RingBuffer() { delete data; }
 
     /**
      * Getter for size
@@ -97,12 +91,11 @@ public:
 protected:
 private:
     size_t size;
-    T* data;
+    std::unique_ptr<T[]> data;
     std::atomic<size_t> head, tail;
 
     /**
-     * Increments the given value inside the range
-     * of the RingBuffer size
+     * Increments the given value inside the range of the RingBuffer size
      */
     size_t increment(size_t n) const { return (n + 1) % size; }
 };
