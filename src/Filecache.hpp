@@ -1,5 +1,5 @@
 #pragma once
-#include "Pixelmap.h"
+#include "Pixelmap.hpp"
 #include <fstream>
 #include <memory>
 

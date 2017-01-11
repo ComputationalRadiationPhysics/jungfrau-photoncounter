@@ -1,5 +1,5 @@
-#include "Filecache.h"
-#include "Pixelmap.h"
+#include "Filecache.hpp"
+#include "Pixelmap.hpp"
 #include <iostream>
 #include <iomanip>
 
