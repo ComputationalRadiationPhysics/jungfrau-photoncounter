@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 #include <vector>
 
 template <typename T> class Pixelmap {
@@ -16,3 +17,6 @@ public:
     T& operator()(std::size_t x, std::size_t y) { return buffer[y * dimX + x]; }
     std::size_t getSizeBytes() const { return buffer.size() * sizeof(T); }
 };
+
+using Gainmap = Pixelmap<double>;
+using Pedestalmap = Pixelmap<uint16_t>;

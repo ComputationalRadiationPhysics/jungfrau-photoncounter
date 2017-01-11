@@ -1,5 +1,4 @@
-#include "Gainmap.h"
-#include "Pedestalmap.h"
+#include "Pixelmap.h"
 #include <cassert>
 #include <iostream>
 
