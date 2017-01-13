@@ -2,6 +2,7 @@
 
 #include "RingBuffer.hpp"
 #include "Pixelmap.hpp"
+#include "Kernel.hpp"
 
 #define HANDLE_CUDA_ERROR(err) (handleCudaError(err, __FILE__, __LINE__))
 
@@ -28,13 +29,13 @@ private:
 	Gainmap* gain;
 	Pedestalmap* pedestal;
 
-	//TODO: use a dynamic number instead of 2
-	cudaStream_t streams[2];
+	std::vector<cudaStream_t> streams;
 
 	//device vars
 	double* gain_device;
 	uint16_t* pedestal_device;
 	uint16_t* data_device;
+	float* photons_device;
 
 	void uploadGainmap();
 	void uploadPedestalmap();
