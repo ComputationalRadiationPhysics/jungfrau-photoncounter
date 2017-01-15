@@ -23,3 +23,4 @@ public:
 using Datamap = Pixelmap<uint16_t>;
 using Gainmap = Pixelmap<double>;
 using Pedestalmap = Pixelmap<uint16_t>;
+using Photonmap = Pixelmap<float>;

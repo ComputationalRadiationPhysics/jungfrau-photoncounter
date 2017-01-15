@@ -6,43 +6,55 @@
 
 #define HANDLE_CUDA_ERROR(err) (handleCudaError(err, __FILE__, __LINE__))
 
-const size_t RINGBUFFER_SIZE = 1000;
-const size_t GPU_FRAMES = 2000000;
+const std::size_t RINGBUFFER_SIZE = 1000;
+const std::size_t GPU_FRAMES = 2000000;
 
 static void handleCudaError(cudaError_t error, const char* file, int line);
 
+struct deviceData {
+	int device;
+	cudaStream_t str;
+	double* gain;
+	uint16_t* pedestal;
+	uint16_t* data;
+	float* photons;
+};
+
 class Uploader {
 public:
-	Uploader(Gainmap& gain, Pedestalmap& pedastel);
+	Uploader(Gainmap gain, Pedestalmap pedestal, std::size_t dimX, std::size_t dimY);
 	Uploader(const Uploader& other) = delete;
 	Uploader& operator=(const Uploader& other) = delete;
 	~Uploader();
 
-	void upload(std::vector<Datamap> data);
+	bool upload(std::vector<Datamap> data);
 	std::vector<Datamap> download();
 protected:
 private:
-	RingBuffer<std::vector<Datamap> > output_buffer;
-	//TODO: use correct map here!!
-	RingBuffer<std::vector<Datamap> > input_buffer;
-	std::vector<Datamap> current_block;
-	Gainmap* gain;
-	Pedestalmap* pedestal;
+	RingBuffer<std::vector<Photonmap> > dataBuffer;
+	RingBuffer<deviceData&> resources;
+	RingBuffer<std::vector<Photonmap> > photonBuffer;
+	std::vector<Datamap> currentBlock;
+	Gainmap gain;
+	Pedestalmap pedestal;
+	std::size_t dimX, dimY;
+	std::vector<deviceData> devices;
 
-	std::vector<cudaStream_t> streams;
+	void initGPUs();
+	void freeGPUs();
 
-	//device vars
-	double* gain_device;
-	uint16_t* pedestal_device;
-	uint16_t* data_device;
-	float* photons_device;
+	void uploadGainmap(struct device stream);
+	void uploadPedestalmap(struct device stream);
 
-	void uploadGainmap();
-	void uploadPedestalmap();
+	void downloadGainmap(struct device stream);
+	void downloadPedestalmap(struct device stream);
 
-	void downloadGainmap();
-	void downloadPedestalmap();
+	//OPTIONAL: add function to completely download and reassamble pedestal and Gainmaps
+	//OPTIONAL: implement memory counter to prevent too much data in memory
+	//OPTIONAL: implement error handling
+	//OPTIONAL: make GPU_FRAMES dynamic
 
-	void uploadToGPU();
-	void downloadFromGPU();
+	bool Uploader::calcFrames(std::vector<Datamap>& data);
+	bool uploadToGPU(std::vector<Datamap>& data, struct deviceData& dev);
+	std::vector<Photonmap>& downloadFromGPU(struct deviceData& dev);
 }
