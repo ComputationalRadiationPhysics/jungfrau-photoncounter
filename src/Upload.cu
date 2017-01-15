@@ -106,7 +106,7 @@ bool Uploader::calcFrames(std::vector<Datamap>& data) {
 	if(!uploadToGPU(*dev, *data))
 		return false;
 	//TODO: use barrier or something similar here
-	calculate<<<dimX, dimY, 0, dev.str>>>(dev.pedestal, dev.gain, dev.data, GPU_FRAMES, dev.photon);
+	CHECK_CUDA_KERNEL(calculate<<<dimX, dimY, 0, dev.str>>>(dev.pedestal, dev.gain, dev.data, GPU_FRAMES, dev.photon));
 	photonMaps = downlodFromGPU(*dev);
 
 	if(resources.push(dev)) {

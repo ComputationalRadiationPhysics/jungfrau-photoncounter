@@ -5,6 +5,7 @@
 #include "Kernel.hpp"
 
 #define HANDLE_CUDA_ERROR(err) (handleCudaError(err, __FILE__, __LINE__))
+#define CHECK_CUDA_KERNEL() (HANDLE_CUDA_ERROR(cudaGetLastError())
 
 const std::size_t RINGBUFFER_SIZE = 1000;
 const std::size_t GPU_FRAMES = 2000000;
