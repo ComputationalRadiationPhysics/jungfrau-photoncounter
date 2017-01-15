@@ -35,19 +35,24 @@ __global__ void calculate(uint16_t* pede, double* gain, uint16_t* data, uint16_t
     } 
 }
 
-void calibrate(uint16_t* data, uint16_t num, uint16_t* pede) {
-    /*TODO
-    const uint16_t arraysize = sizeof(pede) / 16;
-    __shared__ uint16_t map[arraysize];
+__global__ void calibrate(uint16_t* data, uint16_t num, uint16_t* pede) {
+    const uint16_t mapsize = sizeof(pede) / sizeof(pede[0]);
 
     uint16_t id = blockIdx.x * blockDim.x + threadIdx.x;
-    
-    map[0] = 0;
-    pede[0] = 0;
-    for(int i = 1; i < num; i++) {
-        pede[id] = (map[id] + data[i]&0x3fff - (map[id-1] / i)) / i;
+
+    for(int i = 0; i < 1000; i++) {
+        if(i == 0) {
+            pede[id] = data[(mapsize*i)+id]&0x3fff;
+        } else {
+            pede[id] += data[(mapsize*i)+id]&0x3fff;
+        }
     }
-    */
+
+    for(int i = 1000; i < num; i++) {
+        pede[id] = (pede[id] + data[(mapsize*i)+id]&0x3fff) - (pede[id] / i);      
+    }
+
+    pede[id] = round((double)pede[id] / 1000);
 }
 
 //delete this, it's just so it compiles with nvcc
