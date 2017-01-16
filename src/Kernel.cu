@@ -11,7 +11,11 @@ __global__ void calculate(uint16_t* pede, double* gain, uint16_t* data,
     uint16_t id = blockIdx.x * blockDim.x + threadIdx.x;
 
     sPede[id] = pede[id];
+    sPede[mapsize + id] = pede[mapsize + id];
+    sPede[(mapsize * 2) + id] = pede[(mapsize * 2) + id];
     sGain[id] = gain[id];
+    sGain[mapsize + id] = gain[mapsize + id];
+    sGain[(mapsize * 2) + id] = gain[(mapsize * 2) + id];
 
     __syncthreads();
 
@@ -61,6 +65,3 @@ __global__ void calibrate(uint16_t* data, uint16_t num, uint16_t* pede)
 
     pede[id] = round((double)pede[id] / 1000);
 }
-
-// delete this, it's just so it compiles with nvcc
-int main() { return 0; }
