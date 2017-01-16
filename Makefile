@@ -37,13 +37,13 @@ endif
 COMPILE = $(CXX) $(CXXFLAGS_ALL) -c
 LINK := $(LD)
 
+all: $(APP)
+
 debug:
 	@echo $(CXXFLAGS_ALL)
 	@echo $(CUDA_SRC)
 	@echo $(CUDA_OBJ)
 	@echo $(CUDA_DEP)
-
-all: $(APP)
 
 clean:
 	rm -f $(APP) $(OBJ) $(DEP)
