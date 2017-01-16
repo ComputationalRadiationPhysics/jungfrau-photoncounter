@@ -1,12 +1,10 @@
 #include "Kernel.hpp"
 
-__global__ void calculate(uint16_t* pede, double* gain, uint16_t* data,
-                          uint16_t num, float* energy)
+__global__ void calculate(uint16_t mapsize, uint16_t* pede, double* gain,
+                          uint16_t* data, uint16_t num, float* energy)
 {
-    const uint16_t arraysize = sizeof(pede) / sizeof(pede[0]);
-    const uint16_t mapsize = arraysize / 3;
-    __shared__ uint16_t sPede[arraysize];
-    __shared__ uint16_t sGain[arraysize];
+    __shared__ uint16_t sPede[3 * mapsize];
+    __shared__ uint16_t sGain[3 * mapsize];
 
     uint16_t id = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -43,10 +41,9 @@ __global__ void calculate(uint16_t* pede, double* gain, uint16_t* data,
     }
 }
 
-__global__ void calibrate(uint16_t* data, uint16_t num, uint16_t* pede)
+__global__ void calibrate(uint16_t mapsize, uint16_t* data, uint16_t num,
+                          uint16_t* pede)
 {
-    const uint16_t mapsize = sizeof(pede) / sizeof(pede[0]);
-
     uint16_t id = blockIdx.x * blockDim.x + threadIdx.x;
 
     for (int i = 0; i < 1000; i++) {
