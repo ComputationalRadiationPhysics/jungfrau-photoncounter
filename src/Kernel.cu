@@ -61,6 +61,3 @@ __global__ void calibrate(uint16_t* data, uint16_t num, uint16_t* pede)
 
     pede[id] = round((double)pede[id] / 1000);
 }
-
-// delete this, it's just so it compiles with nvcc
-int main() { return 0; }
