@@ -25,7 +25,7 @@ __global__ void calculate(uint16_t* pede, double* gain, uint16_t* data,
             break;
         case 1:
             energy[(mapsize * i) + id] =
-                (sPede[mapsize + id] - dataword & 0x3fff) * sGain[mapsize * id];
+                (sPede[mapsize + id] - dataword & 0x3fff) * sGain[mapsize + id];
             break;
         case 3:
             energy[(mapsize * i) + id] =
