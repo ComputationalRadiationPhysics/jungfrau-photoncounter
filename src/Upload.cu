@@ -42,7 +42,7 @@ bool Uploader::upload(std::vector<Datamap> data) {
 
 std::vector<Photonmap> Uploader::download() {
 	std::vector<Photonmap> ret;
-	photonBuffer.pop(ret);
+	//photonBuffer.pop(ret);
 	return ret;
 }
 
@@ -70,7 +70,7 @@ void Uploader::initGPUs() {
 		HANDLE_CUDA_ERROR(cudaMalloc((void**)&devices[i].gain, dimX * dimY * sizeof(double)));
 		HANDLE_CUDA_ERROR(cudaMalloc((void**)&devices[i].pedestal, dimX * dimY * sizeof(uint16_t)));
 		HANDLE_CUDA_ERROR(cudaMalloc((void**)&devices[i].data, dimX * dimY * sizeof(uint16_t)));
-		HANDLE_CUDA_ERROR(cudaMalloc((void**)&devices[i].photons, dimX * dimY * sizeof(float)));
+		HANDLE_CUDA_ERROR(cudaMalloc((void**)&devices[i].photons, dimX * dimY * sizeof(uint16_t)));
 		HANDLE_CUDA_ERROR(cudaStreamCreate(&devices[i].str));
 
 		uploadGainmap(devices[i]);
@@ -128,7 +128,7 @@ bool Uploader::calcFrames(std::vector<Datamap>& data) {
 	for(std::size_t i = 0; i < devices.size(); ++i) {
 		if(!uploadToGPU(devices[i], data_splitted[i]))
 			return false;
-		calculate<<<devices.size() / 128, 128, (3 * sizeof(uint16_t) + 3 * sizeof(double)) * 128, devices[i].str>>>(dimX * dimY / devices.size(), devices[i].pedestal, devices[i].gain, devices[i].data, int(GPU_FRAMES), devices[i].photons);
+		calculate<<<devices.size() / 128, 128, (3 * sizeof(uint16_t) + 3 * sizeof(double)) * 128, devices[i].str>>>(uint16_t(dimX * dimY / devices.size()), devices[i].pedestal, devices[i].gain, devices[i].data, uint16_t(GPU_FRAMES), devices[i].photons);
 		CHECK_CUDA_KERNEL;
 		downloadFromGPU(devices[i], photonMaps);
 	}
@@ -150,13 +150,13 @@ bool Uploader::uploadToGPU(struct deviceData& dev, std::vector<Datamap>& data) {
 void Uploader::downloadFromGPU(struct deviceData& dev, std::vector<Photonmap>& data) {
 	std::size_t numPhotons = dimX * dimY * GPU_FRAMES;
 	//TODO: find a better way than malloc
-	float* photonData = (float*)malloc(numPhotons * sizeof(float));
+	uint16_t* photonData = (uint16_t*)malloc(numPhotons * sizeof(uint16_t));
 	if(!photonData) {
 		fputs("FATAL ERROR (Memory): Allocation failed!", stderr);
 		exit(EXIT_FAILURE);
 	}
 
-	HANDLE_CUDA_ERROR(cudaMemcpyAsync(photonData, dev.photons, numPhotons * sizeof(float), cudaMemcpyDeviceToHost));
+	HANDLE_CUDA_ERROR(cudaMemcpyAsync(photonData, dev.photons, numPhotons * sizeof(uint16_t), cudaMemcpyDeviceToHost));
 
 	for(size_t i = 0; i < numPhotons; i += dimX * dimY) {
 		data.emplace_back(dimX, dimY, &photonData[i]);

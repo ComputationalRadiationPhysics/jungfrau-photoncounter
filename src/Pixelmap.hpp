@@ -15,7 +15,6 @@ public:
         : buffer(buffer), dimX(dimX), dimY(dimY)
     {
     }
-	Pixelmap& operator=(Pixelmap& other) = default;
     T& operator()(std::size_t x, std::size_t y) { return buffer[y * dimX + x]; }
     std::size_t getSizeBytes() const { return dimX * dimY * sizeof(T); }
     T* data() const { return buffer; }
@@ -24,4 +23,4 @@ public:
 using Datamap = Pixelmap<uint16_t>;
 using Gainmap = Pixelmap<double>;
 using Pedestalmap = Pixelmap<uint16_t>;
-using Photonmap = Pixelmap<float>;
+using Photonmap = Pixelmap<uint16_t>;
