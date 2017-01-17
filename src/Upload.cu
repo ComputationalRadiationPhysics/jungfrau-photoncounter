@@ -12,8 +12,11 @@ static void handleCudaError(cudaError_t error, const char* file, int line) {
 Uploader::Uploader(std::array<Gainmap, 3> gain, std::array<Pedestalmap, 3> pedestal, std::size_t dimX, std::size_t dimY) 
   : gain(gain), pedestal(pedestal), dimX(dimX), dimY(dimY), dataBuffer(RINGBUFFER_SIZE), 
 	photonBuffer(RINGBUFFER_SIZE), 
-	devices(std::size_t(2 * cudaGetDeviceCount())), 
-	resources(devices.size()){
+	//devices(std::size_t(2 * cudaGetDeviceCount())), 
+	resources(100){
+	int num = 0;
+	HANDLE_CUDA_ERROR(cudaGetDeviceCount(&num));
+	devices.resize(2 * num);
 	initGPUs();
 	//TODO: init pedestal maps
 	currentBlock.reserve(GPU_FRAMES);
@@ -123,10 +126,10 @@ bool Uploader::calcFrames(std::vector<Datamap>& data) {
 	std::vector<std::vector<Datamap> > data_splitted = splitMaps<Datamap>(data, devices.size());
 
 	for(std::size_t i = 0; i < devices.size(); ++i) {
-		if(!uploadToGPU(devices[i], data[i]))
+		if(!uploadToGPU(devices[i], data_splitted[i]))
 			return false;
-		calculate<<<dimX, dimY, 0, devices[i].str>>>(devices[i].pedestal, devices[i].gain, devices[i].data, GPU_FRAMES, devices[i].photons);
-		CHECK_CUDA_KERNEL();
+		calculate<<<devices.size() / 128, 128, (3 * sizeof(uint16_t) + 3 * sizeof(double)) * 128, devices[i].str>>>(dimX * dimY / devices.size(), devices[i].pedestal, devices[i].gain, devices[i].data, int(GPU_FRAMES), devices[i].photons);
+		CHECK_CUDA_KERNEL;
 		downloadFromGPU(devices[i], photonMaps);
 	}
 

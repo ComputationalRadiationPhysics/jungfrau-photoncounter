@@ -6,7 +6,7 @@
 #include <cmath>
 
 #define HANDLE_CUDA_ERROR(err) (handleCudaError(err, __FILE__, __LINE__))
-#define CHECK_CUDA_KERNEL() (HANDLE_CUDA_ERROR(cudaGetLastError())
+#define CHECK_CUDA_KERNEL (handleCudaError(cudaGetLastError(), __FILE__, __LINE__))
 
 const std::size_t RINGBUFFER_SIZE = 1000;
 const std::size_t GPU_FRAMES = 2000000;
@@ -67,10 +67,11 @@ private:
 
 	bool calcFrames(std::vector<Datamap>& data);
 	bool uploadToGPU(struct deviceData& dev, std::vector<Datamap>& data);
-	void downloadFromGPU(struct deviceData& dev);
+	void downloadFromGPU(struct deviceData& dev, std::vector<Photonmap>& data);
 };
 
 template<typename MapType> std::vector<std::vector<MapType> > Uploader::splitMaps(std::vector<MapType>& maps, std::size_t numberOfSplits) {
+	//TODO: by numberOfSplits i mean actually number of parts
 	std::vector<MapType> ret(numberOfSplits);
 	std::size_t elementsPerMap = dimX * dimY;
 	std::size_t newMapSize = std::size_t(std::ceil(float(elementsPerMap) / float(numberOfSplits)));
