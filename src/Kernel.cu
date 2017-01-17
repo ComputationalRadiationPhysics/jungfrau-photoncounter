@@ -1,10 +1,10 @@
 #include "Kernel.hpp"
 
 __global__ void calculate(uint16_t mapsize, uint16_t* pede, double* gain,
-                          uint16_t* data, uint16_t num, float* energy)
+                          uint16_t* data, uint16_t num, uint16_t* photon)
 {
-    __shared__ uint16_t sPede[3 * mapsize];
-    __shared__ uint16_t sGain[3 * mapsize];
+    extern __shared__ uint16_t sPede[];
+    extern __shared__ uint16_t sGain[];
 
     uint16_t id = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -19,25 +19,28 @@ __global__ void calculate(uint16_t mapsize, uint16_t* pede, double* gain,
 
     for (int i = 0; i < num; i++) {
         uint16_t dataword = data[(mapsize * i) + id];
+        float energy;
 
         switch ((dataword & 0xc000) >> 14) {
         case 0:
-            energy[(mapsize * i) + id] =
+            energy =
                 (dataword & 0x3fff - sPede[id]) * sGain[id];
             break;
         case 1:
-            energy[(mapsize * i) + id] =
+            energy =
                 (sPede[mapsize + id] - dataword & 0x3fff) * sGain[mapsize + id];
             break;
         case 3:
-            energy[(mapsize * i) + id] =
+            energy =
                 (sPede[(2 * mapsize) + id] - dataword & 0x3fff) *
                 sGain[(2 * mapsize) + id];
             break;
         default:
-            energy[(mapsize * i) + id] = 0;
+            energy = 0;
             break;
         }
+
+        photon[(mapsize * i) + id] = int((energy + 6.2) / 12.4);
     }
 }
 
