@@ -3,8 +3,8 @@
 static void handleCudaError(cudaError_t error, const char* file, int line) {
 	if(error != cudaSuccess) {
 		char errorString[1000];
-		snprintf(errorString, 1000, "FATAL ERROR (CUDA): %s in %s at line %d!\n", cudaGetErrorString(error), file, line);
-		perror(errorString);
+		snprintf(errorString, 1000, "FATAL ERROR (CUDA, %d): %s in %s at line %d!\n", error, cudaGetErrorString(error), file, line);
+		fputs(errorString, stderr);
 		exit(EXIT_FAILURE);
 	}
 }
@@ -72,24 +72,29 @@ void Uploader::initGPUs() {
 	DEBUG("# of maps: " << gain_splitted.size() << " : " << pedestal_splitted.size());
 
 	for(std::size_t i = 0; i < 1/*devices.size()*/; ++i) {
-		DEBUG("Uploading Pedestalmaps for device " << i / 2 << "with i=" << i);
+		DEBUG("Uploading Pedestalmaps for device " << i / 2 << " with i=" << i);
 		devices[i].gain_host.push_back(gain_splitted[i][0]);
 		devices[i].gain_host.push_back(gain_splitted[i][1]);
 		devices[i].gain_host.push_back(gain_splitted[i][2]);
 
-		DEBUG("Uploading Gainmaps for device " << i / 2 << "with i=" << i);
+		DEBUG("Uploading Gainmaps for device " << i / 2 << " with i=" << i);
 		devices[i].pedestal_host.push_back(pedestal_splitted[i][0]);
 		devices[i].pedestal_host.push_back(pedestal_splitted[i][1]);
 		devices[i].pedestal_host.push_back(pedestal_splitted[i][2]);
 
 		DEBUG("Setting device " << i / 2);
 		HANDLE_CUDA_ERROR(cudaSetDevice(i / 2));
+
 		DEBUG("Allocating GPU memory on device for #" << i);
-		HANDLE_CUDA_ERROR(cudaMalloc((void**)&devices[i].gain, dimX * dimY * sizeof(double)));
-		HANDLE_CUDA_ERROR(cudaMalloc((void**)&devices[i].pedestal, dimX * dimY * sizeof(uint16_t)));
-		HANDLE_CUDA_ERROR(cudaMalloc((void**)&devices[i].data, dimX * dimY * sizeof(uint16_t)));
-		HANDLE_CUDA_ERROR(cudaMalloc((void**)&devices[i].photons, dimX * dimY * sizeof(uint16_t)));
+		HANDLE_CUDA_ERROR(cudaMalloc((void**)&devices[i].gain, dimX * dimY * sizeof(double) * 3));
+		HANDLE_CUDA_ERROR(cudaMalloc((void**)&devices[i].pedestal, dimX * dimY * sizeof(uint16_t) * 3));
+		HANDLE_CUDA_ERROR(cudaMalloc((void**)&devices[i].data, dimX * dimY * sizeof(uint16_t) * GPU_FRAMES));
+		HANDLE_CUDA_ERROR(cudaMalloc((void**)&devices[i].photons, dimX * dimY * sizeof(uint16_t) * GPU_FRAMES));
+
+		DEBUG("Creating GPU stream #" << i);
 		HANDLE_CUDA_ERROR(cudaStreamCreate(&devices[i].str));
+
+		synchronize();
 
 		DEBUG("Uploading Gainmaps for #" << i);
 		uploadGainmap(devices[i]);
@@ -115,17 +120,25 @@ void Uploader::freeGPUs() {
 	}
 }
 
+void Uploader::synchronize() {
+	for(struct deviceData dev : devices)
+		HANDLE_CUDA_ERROR(cudaStreamSynchronize(dev.str));
+}
+
 void Uploader::uploadGainmap(struct deviceData stream) {
 	DEBUG("Gainmap upload ...");
 	HANDLE_CUDA_ERROR(cudaSetDevice(stream.device));
-	HANDLE_CUDA_ERROR(cudaMemcpy(stream.gain, stream.gain_host.data(), stream.gain_host.at(0).getSizeBytes() * 3, cudaMemcpyHostToDevice));
+	//TODO: clean this function up
+	void* fts = malloc(128);
+	DEBUG("cudaMemcpy(" << stream.gain << ", " <<stream.gain_host.at(0).data() << ", " << stream.gain_host.at(0).getSizeBytes() * 3 << ", cudaMemcpyHostToDevice);");
+	HANDLE_CUDA_ERROR(cudaMemcpy(stream.gain, stream.gain_host.at(0).data(), stream.gain_host.at(0).getSizeBytes() * 3, cudaMemcpyHostToDevice));
 	DEBUG("Done!");
 }
 
 void Uploader::uploadPedestalmap(struct deviceData stream) {
 	DEBUG("Pedestalmap upload ...");
 	HANDLE_CUDA_ERROR(cudaSetDevice(stream.device));
-	HANDLE_CUDA_ERROR(cudaMemcpy(stream.pedestal, stream.pedestal_host.data(), stream.pedestal_host.at(0).getSizeBytes() * 3, cudaMemcpyHostToDevice));
+	HANDLE_CUDA_ERROR(cudaMemcpy(stream.pedestal, stream.pedestal_host.at(0).data(), stream.pedestal_host.at(0).getSizeBytes() * 3, cudaMemcpyHostToDevice));
 	DEBUG("Done!");
 }
 
@@ -144,7 +157,7 @@ void Uploader::downloadPedestalmap(struct deviceData stream) {
 }
 
 bool Uploader::calcFrames(std::vector<Datamap>& data) {
-	//TODO: only use every second device
+	//TODO: only use every second device?????
 	std::vector<Photonmap> photonMaps;
 	photonMaps.reserve(GPU_FRAMES);
 
@@ -153,7 +166,7 @@ bool Uploader::calcFrames(std::vector<Datamap>& data) {
 	for(std::size_t i = 0; i < devices.size(); ++i) {
 		if(!uploadToGPU(devices[i], data_splitted[i]))
 			return false;
-		calculate<<<devices.size() / 128, 128, (3 * sizeof(uint16_t) + 3 * sizeof(double)) * 128, devices[i].str>>>(uint16_t(dimX * dimY / devices.size()), devices[i].pedestal, devices[i].gain, devices[i].data, uint16_t(GPU_FRAMES), devices[i].photons);
+		calculate<<<devices.size() * NODES_PER_GPU / 128, 128, (3 * sizeof(uint16_t) + 3 * sizeof(double)) * 128, devices[i].str>>>(uint16_t(dimX * dimY / devices.size()), devices[i].pedestal, devices[i].gain, devices[i].data, uint16_t(GPU_FRAMES), devices[i].photons);
 		CHECK_CUDA_KERNEL;
 		downloadFromGPU(devices[i], photonMaps);
 	}
@@ -173,7 +186,7 @@ bool Uploader::uploadToGPU(struct deviceData& dev, std::vector<Datamap>& data) {
 }
 
 void Uploader::downloadFromGPU(struct deviceData& dev, std::vector<Photonmap>& data) {
-	std::size_t numPhotons = dimX * dimY * GPU_FRAMES;
+	std::size_t numPhotons = dimX * dimY * GPU_FRAMES / devices.size();
 	//TODO: find a better way than malloc
 	uint16_t* photonData = (uint16_t*)malloc(numPhotons * sizeof(uint16_t));
 	if(!photonData) {

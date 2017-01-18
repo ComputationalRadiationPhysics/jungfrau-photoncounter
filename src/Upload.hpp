@@ -9,7 +9,9 @@
 #define CHECK_CUDA_KERNEL (handleCudaError(cudaGetLastError(), __FILE__, __LINE__))
 
 const std::size_t RINGBUFFER_SIZE = 1000;
-const std::size_t GPU_FRAMES = 2000000;
+const std::size_t GPU_FRAMES = 2000;
+//TODO: make NODES_PER_GPU dynamic!
+const std::size_t NODES_PER_GPU = 4992;
 
 static void handleCudaError(cudaError_t error, const char* file, int line);
 
@@ -55,6 +57,8 @@ private:
 	void initGPUs();
 	void freeGPUs();
 
+	void synchronize();
+
 	void uploadGainmap(struct deviceData stream);
 	void uploadPedestalmap(struct deviceData stream);
 
@@ -97,7 +101,7 @@ template<typename MapType> std::vector<std::vector<MapType> > Uploader::splitMap
 			for(std::size_t k = 0; k < newMapSize; ++k) {
 				//DEBUG("k="<<k);
 				//DEBUG(k << " + " << i << " * " << newMapSize << " + " << j << " * " << maps.size() << " * " << elementsPerMap << " = " << k + i * newMapSize + j * maps.size() * elementsPerMap << " ["<< i << "|" << newMapSize << " * " << i << "=" << newMapSize * i << "]");
-				data[k + i * newMapSize + j * maps.size() * elementsPerMap] = maps[j].data()[i * newMapSize, k];
+				data[k + i * newMapSize + j * elementsPerMap] = maps[j].data()[i * newMapSize, k];
 			}
 			//DEBUG("Writing value!");
 			ret[i].emplace_back(newMapSize, 1, reinterpret_cast<typename MapType::contentT*>(&data[i * newMapSize + j * maps.size() * elementsPerMap]));
