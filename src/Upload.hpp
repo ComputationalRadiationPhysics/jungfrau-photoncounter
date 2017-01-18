@@ -33,6 +33,7 @@ public:
 	Uploader(std::array<Gainmap, 3> gain, std::array<Pedestalmap, 3> pedestal, std::size_t dimX, std::size_t dimY);
 	Uploader(const Uploader& other) = delete;
 	Uploader& operator=(const Uploader& other) = delete;
+	//TODO: check for memory leaks!
 	~Uploader();
 
 	bool upload(std::vector<Datamap> data);
