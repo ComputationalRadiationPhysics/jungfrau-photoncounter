@@ -2,6 +2,9 @@
 #include <cstdint>
 #include <vector>
 
+#include <iostream>
+#define DEBUG(msg) (std::cout << __FILE__ << "["<< __LINE__ << "]:\t" << msg << std::endl)
+
 template <typename T> class Pixelmap {
 private:
     T* buffer;

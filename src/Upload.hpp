@@ -72,24 +72,28 @@ private:
 };
 
 template<typename MapType> std::vector<std::vector<MapType> > Uploader::splitMaps(std::vector<MapType>& maps, std::size_t numberOfSplits) {
+	DEBUG("splitMaps()");
 	//TODO: by numberOfSplits i mean actually number of parts
 	std::vector<std::vector<MapType> > ret(numberOfSplits);
 	std::size_t elementsPerMap = dimX * dimY;
 	std::size_t newMapSize = std::size_t(std::ceil(float(elementsPerMap) / float(numberOfSplits)));
+	DEBUG("STL containers initialized!");
 	//TODO: find something better than malloc!
 	typename MapType::contentT* data = (typename MapType::contentT*)malloc(MapType::elementSize * newMapSize * maps.size());
 	if(!data) {
 		fputs("FATAL ERROR (Memory): Allocation failed!", stderr);
 		exit(EXIT_FAILURE);
 	}
+	DEBUG("Memory for split allocated!");
 
-	for(std::size_t i = 0; i < maps.size(); ++i) {
-		for(std::size_t j = 0; j < numberOfSplits; ++j) {
+	for(std::size_t i = 0; i < numberOfSplits; ++i) {
+		for(std::size_t j = 0; j < maps.size(); ++j) {
 			for(std::size_t k = 0; k < newMapSize; ++k) {
-				data[k + j * newMapSize + i * maps.size()] = maps[i](k * newMapSize, j);
+				data[k + i * newMapSize + j * maps.size() * elementsPerMap] = maps[j](k * newMapSize, i);
 			}
-			ret[i].emplace_back(newMapSize, 1, reinterpret_cast<typename MapType::contentT*>(&data[j * newMapSize + i * maps.size()]));
+			ret[i].emplace_back(newMapSize, 1, reinterpret_cast<typename MapType::contentT*>(&data[i * newMapSize + j * maps.size()]));
 		}
 	}
+	DEBUG("splitMaps done!");
 	return ret;
 }
