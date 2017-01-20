@@ -6,33 +6,46 @@
 #include <cmath>
 
 #define HANDLE_CUDA_ERROR(err) (handleCudaError(err, __FILE__, __LINE__))
-#define CHECK_CUDA_KERNEL                                                      \
-    (handleCudaError(cudaGetLastError(), __FILE__, __LINE__))
+#define CHECK_CUDA_KERNEL (handleCudaError(cudaGetLastError(), __FILE__, __LINE__))
 
+enum ProcessingState {
+	FREE,
+	PROCESSING,
+	READY
+};
+
+//TODO: find right size!
 const std::size_t RINGBUFFER_SIZE = 1000;
+//TODO: make dynamic & find right size
 const std::size_t GPU_FRAMES = 2000;
 // TODO: make NODES_PER_GPU dynamic!
+// TODO: is this still needed???
 const std::size_t NODES_PER_GPU = 4992;
 
-static void handleCudaError(cudaError_t error, const char* file, int line);
+void handleCudaError(cudaError_t error, const char* file, int line);
 
 struct deviceData {
     int device;
+	int id;
     cudaStream_t str;
     // TODO: define types somewhere
     double* gain;
     uint16_t* pedestal;
     uint16_t* data;
-    std::vector<Gainmap> gain_host;
-    std::vector<Pedestalmap> pedestal_host;
-    // TODO: define photon data type
     uint16_t* photons;
+    std::array<Gainmap, 3>* gain_host;
+    std::array<Pedestalmap, 3>* pedestal_host;
+	std::vector<Datamap> data_host;
+	std::vector<Photonmap> photon_host;
+	//TODO is the enum keyword really needed?
+	enum ProcessingState state;
 };
 
 class Uploader {
 public:
+	//TODO: use consitent names and fix types
     Uploader(std::array<Gainmap, 3> gain, std::array<Pedestalmap, 3> pedestal,
-             std::size_t dimX, std::size_t dimY);
+             std::size_t dimX, std::size_t dimY, std::size_t numberOfDevices);
     Uploader(const Uploader& other) = delete;
     Uploader& operator=(const Uploader& other) = delete;
     // TODO: check for memory leaks!
@@ -43,21 +56,17 @@ public:
 
 protected:
 private:
-    RingBuffer<std::vector<Photonmap>> dataBuffer;
-    // TODO: remove below (after all depencies are cleared)
     RingBuffer<deviceData*> resources;
-    RingBuffer<std::vector<Photonmap>> photonBuffer;
     std::vector<Datamap> currentBlock;
     // TODO: remove below (after all depencies are cleared)
     std::array<Gainmap, 3> gain;
     // TODO: remove below (after all depencies are cleared)
     std::array<Pedestalmap, 3> pedestal;
     std::size_t dimX, dimY;
-    std::vector<deviceData> devices;
+    static std::vector<deviceData> devices;
+	static std::size_t nextFree;
 
-    template <typename MapType>
-    std::vector<std::vector<MapType>> splitMaps(std::vector<MapType>& maps,
-                                                std::size_t numberOfSplits);
+	static void callback(void* data);
 
     void initGPUs();
     void freeGPUs();
@@ -70,63 +79,10 @@ private:
     void downloadGainmap(struct deviceData stream);
     void downloadPedestalmap(struct deviceData stream);
 
-    // OPTIONAL: add function to completely download and reassamble pedestal and
-    // Gainmaps
     // OPTIONAL: implement memory counter to prevent too much data in memory
     // OPTIONAL: implement error handling
-    // OPTIONAL: make GPU_FRAMES dynamic
 
     bool calcFrames(std::vector<Datamap>& data);
-    bool uploadToGPU(struct deviceData& dev, std::vector<Datamap>& data);
+    void uploadToGPU(struct deviceData& dev, std::vector<Datamap>& data);
     void downloadFromGPU(struct deviceData& dev, std::vector<Photonmap>& data);
 };
-
-template <typename MapType>
-std::vector<std::vector<MapType>>
-Uploader::splitMaps(std::vector<MapType>& maps, std::size_t numberOfSplits)
-{
-    DEBUG("splitMaps()");
-    // TODO: by numberOfSplits i mean actually number of parts
-    std::vector<std::vector<MapType>> ret(numberOfSplits);
-    if (maps.empty()) {
-        DEBUG("maps empty! Exiting!");
-        return ret;
-    }
-    std::size_t elementsPerMap = dimX * dimY;
-    std::size_t newMapSize =
-        std::size_t(std::ceil(float(elementsPerMap) / float(numberOfSplits)));
-    DEBUG("STL containers initialized!");
-    // TODO: find something better than malloc!
-    typename MapType::contentT* data = (typename MapType::contentT*)malloc(
-        maps[0].getSizeBytes() * maps.size());
-    if (!data) {
-        fputs("FATAL ERROR (Memory): Allocation failed!", stderr);
-        exit(EXIT_FAILURE);
-    }
-    DEBUG("Memory for split allocated (" << maps[0].getSizeBytes() * maps.size()
-                                         << " Bytes)!");
-
-    for (std::size_t i = 0; i < numberOfSplits; ++i) {
-        // DEBUG("i="<<i);
-        for (std::size_t j = 0; j < maps.size(); ++j) {
-            // DEBUG("j="<<j);
-            for (std::size_t k = 0; k < newMapSize; ++k) {
-                // DEBUG("k="<<k);
-                // DEBUG(k << " + " << i << " * " << newMapSize << " + " << j <<
-                // " * " << maps.size() << " * " << elementsPerMap << " = " << k
-                // + i * newMapSize + j * maps.size() * elementsPerMap << " ["<<
-                // i << "|" << newMapSize << " * " << i << "=" << newMapSize * i
-                // << "]");
-                data[k + i * newMapSize + j * elementsPerMap] =
-                    maps[j].data()[i * newMapSize, k];
-            }
-            // DEBUG("Writing value!");
-            ret[i].emplace_back(
-                newMapSize, 1,
-                reinterpret_cast<typename MapType::contentT*>(
-                    &data[i * newMapSize + j * maps.size() * elementsPerMap]));
-        }
-    }
-    DEBUG("splitMaps done!");
-    return ret;
-}
