@@ -84,5 +84,5 @@ private:
 
     bool calcFrames(std::vector<Datamap>& data);
     void uploadToGPU(struct deviceData& dev, std::vector<Datamap>& data);
-    void downloadFromGPU(struct deviceData& dev, std::vector<Photonmap>& data);
+    void downloadFromGPU(struct deviceData& dev);
 };
