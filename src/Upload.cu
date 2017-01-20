@@ -145,8 +145,8 @@ Uploader::Uploader(std::array<Gainmap, 3> gain,
  {
 	 DEBUG("Gainmap upload ...");
 	 HANDLE_CUDA_ERROR(cudaSetDevice(stream.device));
-	 DEBUG("cudaMemcpy(" << stream.gain << ", " << stream.gain_host[0].data() << ", " << stream.gain_host[0].getSizeBytes() * 3 << ", cudaMemcpyHostToDevice);");
-	 HANDLE_CUDA_ERROR(cudaMemcpy(stream.gain, stream.gain_host[0].data(), stream.gain_host[0].getSizeBytes() * 3, cudaMemcpyHostToDevice));
+	 DEBUG("cudaMemcpy(" << stream.gain << ", " << stream.gain_host->at(0).data() << ", " << stream.gain_host->at(0).getSizeBytes() * 3 << ", cudaMemcpyHostToDevice);");
+	 HANDLE_CUDA_ERROR(cudaMemcpy(stream.gain, stream.gain_host->at(0).data(), stream.gain_host->at(0).getSizeBytes() * 3, cudaMemcpyHostToDevice));
 	 DEBUG("Done!");
  }
 
@@ -154,7 +154,7 @@ Uploader::Uploader(std::array<Gainmap, 3> gain,
  {
 	 DEBUG("Pedestalmap upload ...");
 	 HANDLE_CUDA_ERROR(cudaSetDevice(stream.device));
-	 HANDLE_CUDA_ERROR(cudaMemcpy(stream.pedestal, stream.pedestal_host.at(0).data(), stream.pedestal_host.at(0).getSizeBytes() * 3, cudaMemcpyHostToDevice));
+	 HANDLE_CUDA_ERROR(cudaMemcpy(stream.pedestal, stream.pedestal_host->at(0).data(), stream.pedestal_host->at(0).getSizeBytes() * 3, cudaMemcpyHostToDevice));
 	 DEBUG("Done!");
  }
 
@@ -162,8 +162,8 @@ Uploader::Uploader(std::array<Gainmap, 3> gain,
  {
 	 DEBUG("Gainmap upload ...");
 	 HANDLE_CUDA_ERROR(cudaSetDevice(stream.device));
-	 DEBUG("cudaMemcpy(" << stream.gain_host.at(0).data() << ", " << stream.gain << ", " << stream.gain_host.at(0).getSizeBytes() * 3 << ", cudaMemcpyHostToDevice);");
-	 HANDLE_CUDA_ERROR(cudaMemcpy(stream.gain_host.at(0).data(), stream.gain, stream.gain_host.at(0).getSizeBytes() * 3, cudaMemcpyDeviceToHost));
+	 DEBUG("cudaMemcpy(" << stream.gain_host->at(0).data() << ", " << stream.gain << ", " << stream.gain_host->at(0).getSizeBytes() * 3 << ", cudaMemcpyHostToDevice);");
+	 HANDLE_CUDA_ERROR(cudaMemcpy(stream.gain_host->at(0).data(), stream.gain, stream.gain_host->at(0).getSizeBytes() * 3, cudaMemcpyDeviceToHost));
 	 DEBUG("Done!");
  }
 
@@ -171,7 +171,7 @@ Uploader::Uploader(std::array<Gainmap, 3> gain,
  {
 	 DEBUG("Pedestalmap doanload ...");
 	 HANDLE_CUDA_ERROR(cudaSetDevice(stream.device));
-	 HANDLE_CUDA_ERROR(cudaMemcpy(stream.pedestal_host.at(0).data(), stream.pedestal, stream.pedestal_host.at(0).getSizeBytes() * 3, cudaMemcpyDeviceToHost));
+	 HANDLE_CUDA_ERROR(cudaMemcpy(stream.pedestal_host->at(0).data(), stream.pedestal, stream.pedestal_host->at(0).getSizeBytes() * 3, cudaMemcpyDeviceToHost));
 	 DEBUG("Done!");
  }
 
