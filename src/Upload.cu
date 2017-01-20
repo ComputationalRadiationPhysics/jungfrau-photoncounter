@@ -190,9 +190,11 @@ Uploader::Uploader(std::array<Gainmap, 3> gain,
 
 	 uploadToGPU(dev, data);
 
-	 //TODO: FIX KERNEL CALL
-	 calculate<<</*DEVI.size() * NODES_PER_GPU / 128*/ 1, 128, 3 * (sizeof(uint16_t) + sizeof(double)) * 128, dev.str>>>(uint16_t(dimX * dimY / devices.size()), devices[i].pedestal, devices[i].gain, devices[i].data, uint16_t(GPU_FRAMES), devices[i].photons);
-	 CHECK_CUDA_KERNEL;
+	 //TODO: FIX KERNEL CALL - added makeshift solution with hardcoded block/thread size
+     for(int i = 0; i < devices.size(); i++) {
+	     calculate<<<1024, 512, 3 * (sizeof(uint16_t) + sizeof(double)) * 512, dev.str>>>(uint16_t(dimX * dimY / devices.size()), devices[i].pedestal, devices[i].gain, devices[i].data, uint16_t(GPU_FRAMES), devices[i].photons);
+     }
+     CHECK_CUDA_KERNEL;
 	 downloadFromGPU(dev);
 
 	 DEBUG("Creating callback ...");
