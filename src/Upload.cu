@@ -184,21 +184,21 @@ Uploader::Uploader(std::array<Gainmap, 3> gain,
 	 if(data.empty())
 		 return false;
 
-	 struct deviceData dev;
+	 struct deviceData* dev;
 	 if(!resources.pop(dev))
 		 return false;
 
-	 uploadToGPU(dev, data);
+	 uploadToGPU(*dev, data);
 
 	 //TODO: FIX KERNEL CALL - added makeshift solution with hardcoded block/thread size
      for(int i = 0; i < devices.size(); i++) {
-	     calculate<<<1024, 512, 3 * (sizeof(uint16_t) + sizeof(double)) * 512, dev.str>>>(uint16_t(dimX * dimY / devices.size()), devices[i].pedestal, devices[i].gain, devices[i].data, uint16_t(GPU_FRAMES), devices[i].photons);
+	     calculate<<<1024, 512, 3 * (sizeof(uint16_t) + sizeof(double)) * 512, dev->str>>>(uint16_t(dimX * dimY / devices.size()), devices[i].pedestal, devices[i].gain, devices[i].data, uint16_t(GPU_FRAMES), devices[i].photons);
      }
      CHECK_CUDA_KERNEL;
-	 downloadFromGPU(dev);
+	 downloadFromGPU(*dev);
 
 	 DEBUG("Creating callback ...");
-	 HANDLE_CUDA_ERROR(cudaStreamAddCallback(dev.str, Uploader::callback, &dev.id, 0));
+	 HANDLE_CUDA_ERROR(cudaStreamAddCallback(dev->str, Uploader::callback, &dev->id, 0));
 
 	 DEBUG("End calcFrames");
 	 return true;
