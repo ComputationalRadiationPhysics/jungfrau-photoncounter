@@ -74,7 +74,7 @@ Uploader::Uploader(std::array<Gainmap, 3> gain,
 	 return ret;
  }
 
- void Uploader::callback(void* data) {
+ void CUDART_CB Uploader::callback(cudaStream_t stream, cudaError_t status, void* data) {
 	 //TODO: does this work like that
 	 Uploader::devices[*((int*)data)].state = READY;
  }
