@@ -18,9 +18,6 @@ enum ProcessingState {
 const std::size_t RINGBUFFER_SIZE = 1000;
 //TODO: make dynamic & find right size
 const std::size_t GPU_FRAMES = 2000;
-// TODO: make NODES_PER_GPU dynamic!
-// TODO: is this still needed???
-const std::size_t NODES_PER_GPU = 4992;
 
 void handleCudaError(cudaError_t error, const char* file, int line);
 
@@ -44,15 +41,18 @@ struct deviceData {
 class Uploader {
 public:
 	//TODO: use consitent names and fix types
+	//TODO: add consts
     Uploader(std::array<Gainmap, 3> gain, std::array<Pedestalmap, 3> pedestal,
              std::size_t dimX, std::size_t dimY, std::size_t numberOfDevices);
     Uploader(const Uploader& other) = delete;
     Uploader& operator=(const Uploader& other) = delete;
-    // TODO: check for memory leaks!
     ~Uploader();
 
-    bool upload(std::vector<Datamap> data);
+    bool upload(std::vector<Datamap>& data);
     std::vector<Photonmap> download();
+
+    void synchronize();
+	void printDeviceName();
 
 protected:
 private:
@@ -70,8 +70,6 @@ private:
 
     void initGPUs();
     void freeGPUs();
-
-    void synchronize();
 
     void uploadGainmap(struct deviceData stream);
     void uploadPedestalmap(struct deviceData stream);

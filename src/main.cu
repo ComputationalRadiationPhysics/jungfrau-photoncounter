@@ -4,6 +4,8 @@
 #include <iostream>
 #include <string>
 
+const std::size_t NUM_UPLOADS = 5;
+
 int main()
 {
     DEBUG("Entering main ...");
@@ -37,16 +39,40 @@ int main()
     Uploader up(gain_array, pedestal_array, 1024, 512, num);
     DEBUG("Uploader created!");
 
-    up.upload(data);
-    DEBUG("Uploaded 1/5!");
-    up.upload(data);
-    DEBUG("Uploaded 2/5!");
-    up.upload(data);
-    DEBUG("Uploaded 3/5!");
-    up.upload(data);
-    DEBUG("Uploaded 4/5!");
-    up.upload(data);
-    DEBUG("Uploaded 5/5!");
+	std::vector<Datamap> data_backup(data);
+	std::vector<Photonmap> ready;
+	ready.reserve(GPU_FRAMES);
+
+	/*    DEBUG("Upload 1/5!");
+	data = data_backup;
+    DEBUG((up.upload(data) ? "done" : "failed"));*/
+	DEBUG("starting upload!");
+	for(std::size_t i = 0; i < NUM_UPLOADS; ++i) {
+		while(!up.upload(data)) {
+			while(!(ready = up.download()).empty()) {
+				free(ready[0].data());
+				DEBUG("freeing in main");
+			}
+			DEBUG("uploading again ...");
+		}
+		data = data_backup;
+		DEBUG("Uploaded " << i << "/" << NUM_UPLOADS);
+	}
+/*
+    DEBUG("Upload 2/5!");
+	data = data_backup;
+    DEBUG((up.upload(data) ? "done" : "failed"));
+    DEBUG("Upload 3/5!");
+	data = data_backup;
+    DEBUG((up.upload(data) ? "done" : "failed"));
+    DEBUG("Upload 4/5!");
+	data = data_backup;
+    DEBUG((up.upload(data) ? "done" : "failed"));
+    DEBUG("Upload 5/5!");
+	data = data_backup;
+    DEBUG((up.upload(data) ? "done" : "failed"));*/
+
+	up.synchronize();
 
     return 0;
 }

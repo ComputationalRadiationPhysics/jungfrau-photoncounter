@@ -22,6 +22,7 @@ Uploader::Uploader(std::array<Gainmap, 3> gain,
       resources(/*2 * numberOfDevices*/1)
  {
 	 DEBUG("Entering uploader constructor!");
+	 printDeviceName();
 	 // TODO: FIX MULTI GPU
 	 DEBUG("FIXME: Forcing to use only one GPU (with one stream)!");
 	 //TODO: use size function of ringbuffer (implement maybe)
@@ -37,15 +38,38 @@ Uploader::Uploader(std::array<Gainmap, 3> gain,
 
  Uploader::~Uploader() { freeGPUs(); }
 
- bool Uploader::upload(std::vector<Datamap> data)
+void Uploader::printDeviceName() {
+	struct cudaDeviceProp prop;
+	int numDevices;
+
+	HANDLE_CUDA_ERROR(cudaGetDeviceCount(&numDevices));
+	for(int i = 0; i < numDevices; ++i) {
+		HANDLE_CUDA_ERROR(cudaSetDevice(i));
+		HANDLE_CUDA_ERROR(cudaGetDeviceProperties(&prop, i));
+		std::cout << "Device #" << i << ":\t" << prop.name << std::endl;
+	}
+}
+
+ bool Uploader::upload(std::vector<Datamap>& data)
  {
+	 DEBUG("Entering upload");
+	 //TODO: handle incomplete uploads
 	 std::size_t i = 0;
 	 while (i < data.size()) {
 		 currentBlock.push_back(data[i++]);
 		 if (currentBlock.size() == GPU_FRAMES) {
-			 // input_buffer.push(current_block);
-			 if (!calcFrames(currentBlock))
+			 DEBUG("preparing upload to gpu");
+			 if (!calcFrames(currentBlock)) {
+				 DEBUG("rearranging data...");
+				 //TODO: find a better solution below
+				 //remove all used frames from the front
+				 for(std::size_t j = data.size() - i; j > 0; --j) {
+					 data[j-1] = data[i+j-1];
+					 data.pop_back();
+				 }
+				 DEBUG("done");
 				 return false;
+			 }
 			 currentBlock.clear();
 		 }
 	 }
@@ -60,11 +84,6 @@ Uploader::Uploader(std::array<Gainmap, 3> gain,
 		 return ret;
 	 ++nextFree;
 
-	 /*	//TODO: use local photonmap 
-	 for(size_t i = 0; i < GPU_FRAMES * dimX * dimY; ++i){
-			 devices[current].photon_host.emplace_back(dimX, dimY, devices[current].photon);
-			 }*/
-
 	 ret = Uploader::devices[current].photon_host;
 	 Uploader::devices[current].photon_host.clear();
 	 if(!resources.push(&devices[current])) {
@@ -75,7 +94,15 @@ Uploader::Uploader(std::array<Gainmap, 3> gain,
  }
 
  void CUDART_CB Uploader::callback(cudaStream_t stream, cudaError_t status, void* data) {
-	 //TODO: does this work like that
+	 //suppress "unused variable " compiler warning
+	 (void)stream;
+
+	 if(data == NULL) {
+		 fputs("FATAL ERROR (callback): Missing index!", stderr);
+		 exit(EXIT_FAILURE);
+	 }
+
+	 HANDLE_CUDA_ERROR(status);
 	 Uploader::devices[*((int*)data)].state = READY;
  }
 
@@ -97,7 +124,6 @@ Uploader::Uploader(std::array<Gainmap, 3> gain,
 		 DEBUG("Setting device " << i / 2);
 		 HANDLE_CUDA_ERROR(cudaSetDevice(i / 2));
 
-		 // TODO: fix dimensions!!!
 		 DEBUG("Allocating GPU memory on device for #" << i);
 		 HANDLE_CUDA_ERROR(cudaMalloc((void**)&devices[i].gain, dimX * dimY * sizeof(double) * 3));
 		 HANDLE_CUDA_ERROR(cudaMalloc((void**)&devices[i].pedestal, dimX * dimY * sizeof(uint16_t) * 3));
@@ -190,10 +216,7 @@ Uploader::Uploader(std::array<Gainmap, 3> gain,
 
 	 uploadToGPU(*dev, data);
 
-	 //TODO: FIX KERNEL CALL - added makeshift solution with hardcoded block/thread size
-     for(int i = 0; i < devices.size(); i++) {
-	     calculate<<<1024, 512, 3 * (sizeof(uint16_t) + sizeof(double)) * 512, dev->str>>>(uint16_t(dimX * dimY / devices.size()), devices[i].pedestal, devices[i].gain, devices[i].data, uint16_t(GPU_FRAMES), devices[i].photons);
-     }
+	 calculate<<<dimX, dimY, 3 * (sizeof(uint16_t) + sizeof(double)) * dimY, dev->str>>>(uint16_t(dimX * dimY), dev->pedestal, dev->gain, dev->data, uint16_t(GPU_FRAMES), dev->photons);
      CHECK_CUDA_KERNEL;
 	 downloadFromGPU(*dev);
 
@@ -215,7 +238,6 @@ void Uploader::downloadFromGPU(struct deviceData& dev)
     DEBUG("Entering downloadFromGPU (str=" << dev.str << ")");
     std::size_t numPhotons = dimX * dimY * GPU_FRAMES;
     DEBUG("numPhotons = " << numPhotons);
-    // TODO: find a better way than malloc
     uint16_t* photonData = (uint16_t*)malloc(numPhotons * sizeof(uint16_t));
     if (!photonData) {
         fputs("FATAL ERROR (Memory): Allocation failed!", stderr);
