@@ -1,9 +1,9 @@
 #include "Upload.hpp"
 
 std::size_t Uploader::nextFree = 0;
-std::vector<deviceData> devices;
+std::vector<deviceData> Uploader::devices;
 
-static void handleCudaError(cudaError_t error, const char* file, int line)
+void handleCudaError(cudaError_t error, const char* file, int line)
 {
     if (error != cudaSuccess) {
         char errorString[1000];
@@ -41,7 +41,7 @@ Uploader::Uploader(std::array<Gainmap, 3> gain,
  {
 	 std::size_t i = 0;
 	 while (i < data.size()) {
-		 currentBlock.push_back(data[i]);
+		 currentBlock.push_back(data[i++]);
 		 if (currentBlock.size() == GPU_FRAMES) {
 			 // input_buffer.push(current_block);
 			 if (!calcFrames(currentBlock))

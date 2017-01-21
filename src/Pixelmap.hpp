@@ -8,8 +8,8 @@
 template <typename T> class Pixelmap {
 private:
     T* buffer;
-    const std::size_t dimX;
-    const std::size_t dimY;
+    std::size_t dimX;
+    std::size_t dimY;
 
 public:
     using contentT = T;
