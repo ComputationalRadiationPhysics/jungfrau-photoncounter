@@ -30,7 +30,11 @@ int main()
     std::array<Gainmap, 3> gain_array = {gain[0], gain[1], gain[2]};
     DEBUG("Gain array created!");
 
-    Uploader up(gain_array, pedestal_array, 1024, 512);
+	int num = 0;
+	HANDLE_CUDA_ERROR(cudaGetDeviceCount(&num));
+
+	DEBUG("# of CUDA devices: " << num);
+    Uploader up(gain_array, pedestal_array, 1024, 512, num);
     DEBUG("Uploader created!");
 
     up.upload(data);
