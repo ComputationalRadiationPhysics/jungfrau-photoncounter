@@ -19,14 +19,11 @@ Uploader::Uploader(std::array<Gainmap, 3> gain,
                    std::array<Pedestalmap, 3> pedestal, std::size_t dimX,
                    std::size_t dimY, std::size_t numberOfDevices)
     : gain(gain), pedestal(pedestal), dimX(dimX), dimY(dimY),
-      resources(/*2 * numberOfDevices*/1)
+      resources(2 * numberOfDevices)
  {
 	 DEBUG("Entering uploader constructor!");
 	 printDeviceName();
-	 // TODO: FIX MULTI GPU
-	 DEBUG("FIXME: Forcing to use only one GPU (with one stream)!");
-	 //TODO: use size function of ringbuffer (implement maybe)
-	 devices.resize(2 * numberOfDevices);
+	 devices.resize(resources.getSize());
 
 	 DEBUG("Initializing GPUs!");
 	 initGPUs();
@@ -50,31 +47,37 @@ void Uploader::printDeviceName() {
 	}
 }
 
- bool Uploader::upload(std::vector<Datamap>& data)
- {
-	 DEBUG("Entering upload");
-	 //TODO: handle incomplete uploads
-	 std::size_t i = 0;
-	 while (i < data.size()) {
-		 currentBlock.push_back(data[i++]);
-		 if (currentBlock.size() == GPU_FRAMES) {
-			 DEBUG("preparing upload to gpu");
-			 if (!calcFrames(currentBlock)) {
-				 DEBUG("rearranging data...");
-				 //TODO: find a better solution below
-				 //remove all used frames from the front
-				 for(std::size_t j = data.size() - i; j > 0; --j) {
-					 data[j-1] = data[i+j-1];
-					 data.pop_back();
-				 }
-				 DEBUG("done");
-				 return false;
-			 }
-			 currentBlock.clear();
-		 }
-	 }
-	 return true;
- }
+bool Uploader::upload(std::vector<Datamap>& data)
+{
+	//DEBUG("Entering upload");
+	//TODO: handle incomplete uploads
+	std::size_t i = 0;
+	while (i < data.size()) {
+		currentBlock.push_back(data[i++]);
+		if (currentBlock.size() == GPU_FRAMES) {
+			//			DEBUG("preparing upload to gpu");
+			if (!calcFrames(currentBlock)) {
+				//DEBUG("rearranging data...");
+				//TODO: find a better solution below
+				//remove all used frames from the front
+				for(std::size_t j = data.size() - i; j > 0; --j) {
+					data[j-1] = data[i+j-1];
+					data.pop_back();
+				}
+				//DEBUG("done");
+				currentBlock.clear();
+				return false;
+			}
+			currentBlock.clear();
+		}
+		else if(currentBlock.size() > GPU_FRAMES) {
+			DEBUG("This was never meant to happen ...");
+			DEBUG("Commiting suicide ...");
+			exit(-1);
+		}
+	}
+	return true;
+}
 
  std::vector<Photonmap> Uploader::download()
  {
@@ -97,6 +100,8 @@ void Uploader::printDeviceName() {
 	 //suppress "unused variable " compiler warning
 	 (void)stream;
 
+	 DEBUG("HELP ME I AM TRAPPED IN A SUPERCOMPUTER AND I CAN'T GET OUT!!!!");
+
 	 if(data == NULL) {
 		 fputs("FATAL ERROR (callback): Missing index!", stderr);
 		 exit(EXIT_FAILURE);
@@ -110,6 +115,7 @@ void Uploader::printDeviceName() {
  {
 	 DEBUG("initGPU()");
 
+	 //TODO: init pedestalmaps!
 	 for (std::size_t i = 0; i < devices.size(); ++i) {
 		 DEBUG("Uploading Pedestalmaps for device " << i / 2 << " with i=" << i);
 		 devices[i].gain_host = &gain;
@@ -203,16 +209,20 @@ void Uploader::printDeviceName() {
 
  bool Uploader::calcFrames(std::vector<Datamap>& data)
  {
-	 DEBUG("calcFrames");
+	 //DEBUG("calcFrames");
 	 std::vector<Photonmap> photonMaps;
 	 photonMaps.reserve(GPU_FRAMES);
 
-	 if(data.empty())
+	 if(data.empty()) {
+		 DEBUG("no data .... doing nothing");
 		 return false;
+	 }
 
 	 struct deviceData* dev;
-	 if(!resources.pop(dev))
+	 if(!resources.pop(dev)) //<-- TODO: this allways fails!!
 		 return false;
+
+	 DEBUG("Doing GPU stuff now");
 
 	 uploadToGPU(*dev, data);
 
@@ -223,7 +233,7 @@ void Uploader::printDeviceName() {
 	 DEBUG("Creating callback ...");
 	 HANDLE_CUDA_ERROR(cudaStreamAddCallback(dev->str, Uploader::callback, &dev->id, 0));
 
-	 DEBUG("End calcFrames");
+	 //DEBUG("End calcFrames");
 	 return true;
  }
 
@@ -235,25 +245,25 @@ void Uploader::uploadToGPU(struct deviceData& dev, std::vector<Datamap>& data)
 
 void Uploader::downloadFromGPU(struct deviceData& dev)
 {
-    DEBUG("Entering downloadFromGPU (str=" << dev.str << ")");
+    //DEBUG("Entering downloadFromGPU (str=" << dev.str << ")");
     std::size_t numPhotons = dimX * dimY * GPU_FRAMES;
-    DEBUG("numPhotons = " << numPhotons);
+    //DEBUG("numPhotons = " << numPhotons);
     uint16_t* photonData = (uint16_t*)malloc(numPhotons * sizeof(uint16_t));
     if (!photonData) {
         fputs("FATAL ERROR (Memory): Allocation failed!", stderr);
         exit(EXIT_FAILURE);
     }
     DEBUG(numPhotons * sizeof(uint16_t) << " Bytes allocated");
-    DEBUG("cudaMemcpyAsync(" << photonData << ", " << dev.photons << ", " << numPhotons * sizeof(uint16_t) << ", cudaMemcpyDeviceToHost, " << dev.str << ");");
+    //DEBUG("cudaMemcpyAsync(" << photonData << ", " << dev.photons << ", " << numPhotons * sizeof(uint16_t) << ", cudaMemcpyDeviceToHost, " << dev.str << ");");
 
     HANDLE_CUDA_ERROR(cudaSetDevice(dev.device));
     HANDLE_CUDA_ERROR(cudaMemcpyAsync(photonData, dev.photons, numPhotons * sizeof(uint16_t), cudaMemcpyDeviceToHost, dev.str));
 
-    DEBUG("data downloaded");
+    //DEBUG("data downloaded");
 
     for (size_t i = 0; i < numPhotons; i += dimX * dimY) {
         dev.photon_host.emplace_back(dimX, dimY, &photonData[i]);
     }
-    DEBUG("Data written. downloadFromGPU done!");
+    //DEBUG("Data written. downloadFromGPU done!");
 }
 

@@ -4,17 +4,13 @@
 #include <iostream>
 #include <string>
 
-const std::size_t NUM_UPLOADS = 5;
+const std::size_t NUM_UPLOADS = 10;
 
 int main()
 {
     DEBUG("Entering main ...");
     Filecache fc(1024UL * 1024 * 1024 * 16);
     DEBUG("fc allocated. Loading maps!");
-    // TODO: load pedestal init files and calibrate pedestal maps
-    // std::vector<Datamap>
-    // fc.loadMaps("data_pool/px_101016/allpede_250us_1243__B_000000.dat", 1024,
-    // 512);
     std::vector<Pedestalmap> pedestal =
         fc.loadMaps<Pedestalmap>("data_pool/px_101016/pedeMaps.bin", 1024, 512);
     DEBUG("Pedestalmap loaded!");
@@ -43,34 +39,18 @@ int main()
 	std::vector<Photonmap> ready;
 	ready.reserve(GPU_FRAMES);
 
-	/*    DEBUG("Upload 1/5!");
-	data = data_backup;
-    DEBUG((up.upload(data) ? "done" : "failed"));*/
 	DEBUG("starting upload!");
-	for(std::size_t i = 0; i < NUM_UPLOADS; ++i) {
+	for(std::size_t i = 1; i <= NUM_UPLOADS; ++i) {
 		while(!up.upload(data)) {
 			while(!(ready = up.download()).empty()) {
 				free(ready[0].data());
-				DEBUG("freeing in main");
+				//				DEBUG("freeing in main");
 			}
-			DEBUG("uploading again ...");
+			//DEBUG("uploading again ...");
 		}
 		data = data_backup;
 		DEBUG("Uploaded " << i << "/" << NUM_UPLOADS);
 	}
-/*
-    DEBUG("Upload 2/5!");
-	data = data_backup;
-    DEBUG((up.upload(data) ? "done" : "failed"));
-    DEBUG("Upload 3/5!");
-	data = data_backup;
-    DEBUG((up.upload(data) ? "done" : "failed"));
-    DEBUG("Upload 4/5!");
-	data = data_backup;
-    DEBUG((up.upload(data) ? "done" : "failed"));
-    DEBUG("Upload 5/5!");
-	data = data_backup;
-    DEBUG((up.upload(data) ? "done" : "failed"));*/
 
 	up.synchronize();
 

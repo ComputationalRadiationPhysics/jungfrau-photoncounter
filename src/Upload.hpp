@@ -14,8 +14,6 @@ enum ProcessingState {
 	READY
 };
 
-//TODO: find right size!
-const std::size_t RINGBUFFER_SIZE = 1000;
 //TODO: make dynamic & find right size
 const std::size_t GPU_FRAMES = 2000;
 
@@ -34,8 +32,7 @@ struct deviceData {
     std::array<Pedestalmap, 3>* pedestal_host;
 	std::vector<Datamap> data_host;
 	std::vector<Photonmap> photon_host;
-	//TODO is the enum keyword really needed?
-	enum ProcessingState state;
+	ProcessingState state;
 };
 
 class Uploader {
@@ -57,14 +54,12 @@ public:
 protected:
 private:
     RingBuffer<deviceData*> resources;
-    std::vector<Datamap> currentBlock;
-    // TODO: remove below (after all depencies are cleared)
-    std::array<Gainmap, 3> gain;
-    // TODO: remove below (after all depencies are cleared)
-    std::array<Pedestalmap, 3> pedestal;
-    std::size_t dimX, dimY;
     static std::vector<deviceData> devices;
 	static std::size_t nextFree;
+    std::vector<Datamap> currentBlock;
+    std::array<Gainmap, 3> gain;
+    std::array<Pedestalmap, 3> pedestal;
+    std::size_t dimX, dimY;
 
 	static void CUDART_CB callback(cudaStream_t stream, cudaError_t status, void* data);
 
@@ -76,9 +71,6 @@ private:
 
     void downloadGainmap(struct deviceData stream);
     void downloadPedestalmap(struct deviceData stream);
-
-    // OPTIONAL: implement memory counter to prevent too much data in memory
-    // OPTIONAL: implement error handling
 
     bool calcFrames(std::vector<Datamap>& data);
     void uploadToGPU(struct deviceData& dev, std::vector<Datamap>& data);
