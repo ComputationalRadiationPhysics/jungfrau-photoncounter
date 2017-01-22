@@ -30,6 +30,9 @@ Uploader::Uploader(std::array<Gainmap, 3> gain,
 	 // TODO: init pedestal maps
 	 DEBUG("Reserving memory for currentBlock.");
 	 currentBlock.reserve(GPU_FRAMES);
+	 DEBUG("elements in the ringbuffer: " << resources.getNumberOfElements());
+	 DEBUG("is rb empty? " << resources.isEmpty());
+	 DEBUG("is rb full? " << resources.isFull());
 	 DEBUG("End of constructor!");
  }
 
@@ -90,20 +93,20 @@ bool Uploader::upload(std::vector<Datamap>& data)
 	 ret = Uploader::devices[current].photon_host;
 	 Uploader::devices[current].photon_host.clear();
 	 if(!resources.push(&devices[current])) {
-		 fputs("FATAL ERROR (RingBuffer): Unexpected size!", stderr);
+		 fputs("FATAL ERROR (RingBuffer): Unexpected size!\n", stderr);
 		 exit(EXIT_FAILURE);
 	 }
 	 return ret;
  }
 
  void CUDART_CB Uploader::callback(cudaStream_t stream, cudaError_t status, void* data) {
-	 //suppress "unused variable " compiler warning
+	 //suppress "unused variable" compiler warning
 	 (void)stream;
 
 	 DEBUG("HELP ME I AM TRAPPED IN A SUPERCOMPUTER AND I CAN'T GET OUT!!!!");
 
 	 if(data == NULL) {
-		 fputs("FATAL ERROR (callback): Missing index!", stderr);
+		 fputs("FATAL ERROR (callback): Missing index!\n", stderr);
 		 exit(EXIT_FAILURE);
 	 }
 
@@ -146,11 +149,16 @@ bool Uploader::upload(std::vector<Datamap>& data)
 		 DEBUG("Uploading Pedestalmaps for #" << i);
 		 uploadPedestalmap(devices[i]);
 
+		 DEBUG("elements in the ringbuffer: " << resources.getNumberOfElements());
+		 DEBUG("is rb empty? " << resources.isEmpty());
+		 DEBUG("is rb full? " << resources.isFull());
+
 		 if (!resources.push(&devices[i])) {
-			 fputs("FATAL ERROR (RingBuffer): Unexpected size!", stderr);
+			 fputs("FATAL ERROR (RingBuffer): Unexpected size!\n", stderr);
 			 exit(EXIT_FAILURE);
 		 }
 	 }
+	 DEBUG("number of elements in resources: " << resources.getNumberOfElements());
 	 DEBUG("initGPU done!");
  }
 
@@ -250,7 +258,7 @@ void Uploader::downloadFromGPU(struct deviceData& dev)
     //DEBUG("numPhotons = " << numPhotons);
     uint16_t* photonData = (uint16_t*)malloc(numPhotons * sizeof(uint16_t));
     if (!photonData) {
-        fputs("FATAL ERROR (Memory): Allocation failed!", stderr);
+        fputs("FATAL ERROR (Memory): Allocation failed!\n", stderr);
         exit(EXIT_FAILURE);
     }
     DEBUG(numPhotons * sizeof(uint16_t) << " Bytes allocated");
