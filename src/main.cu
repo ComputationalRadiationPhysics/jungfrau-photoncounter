@@ -41,13 +41,19 @@ int main()
 
 	DEBUG("starting upload!");
 	for(std::size_t i = 1; i <= NUM_UPLOADS; ++i) {
-		while(!up.upload(data)) {
+		while(!up.upload(data) && data.size() > GPU_FRAMES) {
 			while(!(ready = up.download()).empty()) {
 				free(ready[0].data());
-				//				DEBUG("freeing in main");
+				DEBUG("freeing in main");
 			}
-			//DEBUG("uploading again ...");
+			DEBUG("uploading again ...");
 		}
+		while(!(ready = up.download()).empty()) {
+			free(ready[0].data());
+			DEBUG("freeing in main");
+		}
+		if(!up.upload(data))
+			DEBUG("it broke!!!");
 		data = data_backup;
 		DEBUG("Uploaded " << i << "/" << NUM_UPLOADS);
 	}

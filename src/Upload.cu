@@ -112,6 +112,7 @@ bool Uploader::upload(std::vector<Datamap>& data)
 
 	 HANDLE_CUDA_ERROR(status);
 	 Uploader::devices[*((int*)data)].state = READY;
+	 DEBUG("stream: " << *((int*)data));
  }
 
  void Uploader::initGPUs()
@@ -129,6 +130,7 @@ bool Uploader::upload(std::vector<Datamap>& data)
 		 devices[i].state = FREE;
 		 //TODO: is this really needed? if yes, throw out device member
 		 devices[i].id = i;
+		 devices[i].device = i / 2;
 
 		 DEBUG("Setting device " << i / 2);
 		 HANDLE_CUDA_ERROR(cudaSetDevice(i / 2));
@@ -227,7 +229,7 @@ bool Uploader::upload(std::vector<Datamap>& data)
 	 }
 
 	 struct deviceData* dev;
-	 if(!resources.pop(dev)) //<-- TODO: this allways fails!!
+	 if(!resources.pop(dev))
 		 return false;
 
 	 DEBUG("Doing GPU stuff now");
@@ -248,6 +250,8 @@ bool Uploader::upload(std::vector<Datamap>& data)
 void Uploader::uploadToGPU(struct deviceData& dev, std::vector<Datamap>& data)
 {
     HANDLE_CUDA_ERROR(cudaSetDevice(dev.device));
+	//TODO: is data.data() the right thing?
+	//TODO: used pinned memory?
     HANDLE_CUDA_ERROR(cudaMemcpyAsync(dev.data, data.data(), data.size() * sizeof(data[0]), cudaMemcpyHostToDevice, dev.str));
 }
 
