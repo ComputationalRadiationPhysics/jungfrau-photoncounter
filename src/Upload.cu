@@ -58,15 +58,18 @@ bool Uploader::upload(std::vector<Datamap>& data)
 	while (i < data.size()) {
 		currentBlock.push_back(data[i++]);
 		if (currentBlock.size() == GPU_FRAMES) {
-			//			DEBUG("preparing upload to gpu");
+			//DEBUG("preparing upload to gpu");
 			if (!calcFrames(currentBlock)) {
+				//DEBUG("old size: " << data.size());
 				//DEBUG("rearranging data...");
 				//TODO: find a better solution below
 				//remove all used frames from the front
 				for(std::size_t j = data.size() - i; j > 0; --j) {
 					data[j-1] = data[i+j-1];
-					data.pop_back();
 				}
+				for(std::size_t j = 0; j < i; ++j)
+					data.pop_back();
+				DEBUG("new size at " << i << " = " << data.size());
 				//DEBUG("done");
 				currentBlock.clear();
 				return false;
@@ -79,6 +82,8 @@ bool Uploader::upload(std::vector<Datamap>& data)
 			exit(-1);
 		}
 	}
+	DEBUG("getting out! Resources available: " << resources.getNumberOfElements());
+	data.clear();
 	return true;
 }
 
@@ -86,16 +91,26 @@ bool Uploader::upload(std::vector<Datamap>& data)
  {
 	 std::vector<Photonmap> ret;
 	 int current = nextFree;
+	 //TODO: remove debug
+	 /*if(devices[nextFree].state == FREE) {
+		 DEBUG("nextFree = " << nextFree);
+		 DEBUG("good bye cruel cruel world ...");
+		 exit(-1);
+		 }*/
+
 	 if(devices[nextFree].state != READY)
 		 return ret;
-	 ++nextFree;
+	 nextFree = (nextFree + 1) % resources.getSize();
 
 	 ret = Uploader::devices[current].photon_host;
 	 Uploader::devices[current].photon_host.clear();
+	 DEBUG("setting " << current << " to FREE");
+	 Uploader::devices[current].state = FREE;
 	 if(!resources.push(&devices[current])) {
 		 fputs("FATAL ERROR (RingBuffer): Unexpected size!\n", stderr);
 		 exit(EXIT_FAILURE);
 	 }
+	 DEBUG("resources in use: " << resources.getNumberOfElements());
 	 return ret;
  }
 
@@ -111,6 +126,7 @@ bool Uploader::upload(std::vector<Datamap>& data)
 	 }
 
 	 HANDLE_CUDA_ERROR(status);
+	 DEBUG("setting " << *((int*)data) << " to READY");
 	 Uploader::devices[*((int*)data)].state = READY;
 	 DEBUG("stream: " << *((int*)data));
  }
@@ -127,6 +143,7 @@ bool Uploader::upload(std::vector<Datamap>& data)
 		 DEBUG("Uploading Gainmaps for device " << i / 2 << " with i=" << i);
 		 devices[i].pedestal_host = &pedestal;
 
+		 DEBUG("setting " << i << " to FREE");
 		 devices[i].state = FREE;
 		 //TODO: is this really needed? if yes, throw out device member
 		 devices[i].id = i;
@@ -234,6 +251,8 @@ bool Uploader::upload(std::vector<Datamap>& data)
 
 	 DEBUG("Doing GPU stuff now");
 
+	 DEBUG("setting " << dev->id << " to PROCESSING");
+	 dev->state = PROCESSING;
 	 uploadToGPU(*dev, data);
 
 	 calculate<<<dimX, dimY, 3 * (sizeof(uint16_t) + sizeof(double)) * dimY, dev->str>>>(uint16_t(dimX * dimY), dev->pedestal, dev->gain, dev->data, uint16_t(GPU_FRAMES), dev->photons);
@@ -249,10 +268,12 @@ bool Uploader::upload(std::vector<Datamap>& data)
 
 void Uploader::uploadToGPU(struct deviceData& dev, std::vector<Datamap>& data)
 {
+	if(data.empty())
+		return;
     HANDLE_CUDA_ERROR(cudaSetDevice(dev.device));
 	//TODO: is data.data() the right thing?
 	//TODO: used pinned memory?
-    HANDLE_CUDA_ERROR(cudaMemcpyAsync(dev.data, data.data(), data.size() * sizeof(data[0]), cudaMemcpyHostToDevice, dev.str));
+    HANDLE_CUDA_ERROR(cudaMemcpyAsync(dev.data, data[0].data(), data.size() * data[0].getSizeBytes(), cudaMemcpyHostToDevice, dev.str));
 }
 
 void Uploader::downloadFromGPU(struct deviceData& dev)

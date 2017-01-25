@@ -14,9 +14,8 @@ int main()
     std::vector<Pedestalmap> pedestal =
         fc.loadMaps<Pedestalmap>("data_pool/px_101016/pedeMaps.bin", 1024, 512);
     DEBUG("Pedestalmap loaded!");
-    std::vector<Datamap> data = fc.loadMaps<Datamap>(
-        "data_pool/px_101016/Insu_6_tr_1_45d_250us__B_000000.dat", 1024, 512);
-    DEBUG("Datamap loaded!");
+    std::vector<Datamap> data = fc.loadMaps<Datamap>("data_pool/px_101016/Insu_6_tr_1_45d_250us__B_000000.dat", 1024, 512);
+    DEBUG("Datamap [NOT] loaded!");
     std::vector<Gainmap> gain = fc.loadMaps<Gainmap>(
         "data_pool/px_101016/gainMaps_M022.bin", 1024, 512);
     DEBUG("Gainmap loaded!");
@@ -39,23 +38,21 @@ int main()
 	std::vector<Photonmap> ready;
 	ready.reserve(GPU_FRAMES);
 
+	std::size_t remove_me = 0;
 	DEBUG("starting upload!");
 	for(std::size_t i = 1; i <= NUM_UPLOADS; ++i) {
-		while(!up.upload(data) && data.size() > GPU_FRAMES) {
+		while(!up.upload(data) && !data.empty()) {
 			while(!(ready = up.download()).empty()) {
 				free(ready[0].data());
 				DEBUG("freeing in main");
 			}
-			DEBUG("uploading again ...");
+			DEBUG("data size: " << data.size());
+			//DEBUG("data_backup size: " << data_backup.size());
+			DEBUG("uploading again (" << remove_me++ << ") ...");
 		}
-		while(!(ready = up.download()).empty()) {
-			free(ready[0].data());
-			DEBUG("freeing in main");
-		}
-		if(!up.upload(data))
-			DEBUG("it broke!!!");
 		data = data_backup;
 		DEBUG("Uploaded " << i << "/" << NUM_UPLOADS);
+		remove_me = 0;
 	}
 
 	up.synchronize();
