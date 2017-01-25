@@ -3,6 +3,16 @@
 std::size_t Uploader::nextFree = 0;
 std::vector<deviceData> Uploader::devices;
 
+bool checkMapEmpty(Datamap map, std::size_t dimX, std::size_t dimY) {
+	for(std::size_t y = 0; y < dimY; ++y) {
+		for(std::size_t x = 0; x < dimX; ++x) {
+			if(map(x, y) != 0)
+				return true;
+		}
+	}
+	return false;
+}
+
 void handleCudaError(cudaError_t error, const char* file, int line)
 {
     if (error != cudaSuccess) {
@@ -59,6 +69,11 @@ bool Uploader::upload(std::vector<Datamap>& data)
 		currentBlock.push_back(data[i++]);
 		if (currentBlock.size() == GPU_FRAMES) {
 			//DEBUG("preparing upload to gpu");
+			DEBUG("are maps empty?");
+			for(std::size_t o = 0; o < GPU_FRAMES; ++o){
+				if(checkMapEmpty(currentBlock[o], dimX, dimY))
+					DEBUG("map" << o << " is empty!");
+			}
 			if (!calcFrames(currentBlock)) {
 				//DEBUG("old size: " << data.size());
 				//DEBUG("rearranging data...");
@@ -273,6 +288,7 @@ void Uploader::uploadToGPU(struct deviceData& dev, std::vector<Datamap>& data)
     HANDLE_CUDA_ERROR(cudaSetDevice(dev.device));
 	//TODO: is data.data() the right thing?
 	//TODO: used pinned memory?
+	DEBUG("upload size: " << data.size() * data[0].getSizeBytes());
     HANDLE_CUDA_ERROR(cudaMemcpyAsync(dev.data, data[0].data(), data.size() * data[0].getSizeBytes(), cudaMemcpyHostToDevice, dev.str));
 }
 
@@ -290,6 +306,7 @@ void Uploader::downloadFromGPU(struct deviceData& dev)
     //DEBUG("cudaMemcpyAsync(" << photonData << ", " << dev.photons << ", " << numPhotons * sizeof(uint16_t) << ", cudaMemcpyDeviceToHost, " << dev.str << ");");
 
     HANDLE_CUDA_ERROR(cudaSetDevice(dev.device));
+	DEBUG("download size: " << numPhotons * sizeof(uint16_t));
     HANDLE_CUDA_ERROR(cudaMemcpyAsync(photonData, dev.photons, numPhotons * sizeof(uint16_t), cudaMemcpyDeviceToHost, dev.str));
 
     //DEBUG("data downloaded");
