@@ -15,7 +15,7 @@ public:
      * @param highest possible number of elements
      * @throws bad_alloc if a memory error occurs
      */
-    RingBuffer(size_t size) : size(size), data(new T[size])
+    RingBuffer(size_t size) : size(size), full(false), data(new T[size])
     {
         head.store(0);
         tail.store(0);
@@ -26,7 +26,7 @@ public:
      * @param another RingBuffer object
      * @throws bad_alloc if a memory error occurs
      */
-    RingBuffer(const RingBuffer& other) : size(other.size), data(new T[size])
+    RingBuffer(const RingBuffer& other) : size(other.size), full(other.full), data(new T[size])
     {
         head.store(other.head.load());
         tail.store(other.tail.load());
@@ -45,17 +45,26 @@ public:
      */
     size_t getSize() const { return size; }
 
-    /**
-     * Checks if the buffer is empty.
-     * @return true if it is empty
-     */
-    bool isEmpty() const { return (head.load() == tail.load()); }
+	/**
+	 * Returns the number of elements in use.
+	 * @return number of elements
+	 */
+	size_t getNumberOfElements() const 
+	{
+		return (full ? size : ((tail.load() - head.load() + size) % size));
+	}
 
     /**
      * Checks if the buffer is empty.
      * @return true if it is empty
      */
-    bool isFull() const { return (increment(tail.load()) == head.load()); }
+    bool isEmpty() const { return ((head.load() == tail.load()) && !full); }
+
+    /**
+     * Checks if the buffer is empty.
+     * @return true if it is empty
+     */
+    bool isFull() const { return full; }
 
     /**
      * Tries to push an element into the RingBuffer.
@@ -65,10 +74,12 @@ public:
     bool push(T element)
     {
         size_t current_tail = tail.load();
-        if (current_tail + 1 == head.load())
+        if (full)
             return false;
         data[current_tail] = element;
         tail.store(increment(current_tail));
+		if(head.load() == tail.load())
+			full = true;
         return true;
     }
 
@@ -80,8 +91,9 @@ public:
     bool pop(T& element)
     {
         size_t current_head = head.load();
-        if (current_head == tail.load())
+        if (current_head == tail.load() && !full)
             return false;
+		full = false;
         element = data[current_head];
         head.store(increment(current_head));
         return true;
@@ -92,6 +104,7 @@ private:
     size_t size;
     std::unique_ptr<T[]> data;
     std::atomic<size_t> head, tail;
+	bool full;
 
     /**
      * Increments the given value inside the range of the RingBuffer size
