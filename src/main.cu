@@ -1,5 +1,6 @@
 #include "Filecache.hpp"
 #include "Upload.hpp"
+#include "Bitmap.hpp"
 #include <iomanip>
 #include <iostream>
 #include <string>
@@ -40,9 +41,26 @@ int main()
 
 	std::size_t remove_me = 0;
 	DEBUG("starting upload!");
+
+    int bitteFunktioniere = 1;
 	for(std::size_t i = 1; i <= NUM_UPLOADS; ++i) {
 		while(!up.upload(data) && !data.empty()) {
 			while(!(ready = up.download()).empty()) {
+                std::vector<Photonmap> testvec = up.download();
+                Photonmap test = testvec.at(1);
+                if (bitteFunktioniere == 1) {
+                    Bitmap::Image img(1024, 512);
+                    for(int j = 0; j < 1024; j++) {
+                        for(int k=0; k < 512; k++) {
+                            int h = test(j, k);
+                            if (h>bitteFunktioniere) bitteFunktioniere = h;
+                            Bitmap::Rgb color = {(unsigned char)h, (unsigned char)h, (unsigned char)h};
+                            img(j, k) = color;
+                        }
+                    }
+                    img.writeToFile("test.bmp");
+                    bitteFunktioniere = 0;
+                }
 				free(ready[0].data());
 				DEBUG("freeing in main");
 			}
