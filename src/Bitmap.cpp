@@ -39,10 +39,10 @@ void Image::writeToFile(const std::string& path)
 {
     std::ofstream file;
     file.open(path, std::ios::out | std::ios::binary);
-	iheader.biSizeImage = width * height * sizeof(Rgb);
+    iheader.biSizeImage = width * height * sizeof(Rgb);
     fheader.bfSize =
         sizeof(FileHeader) + sizeof(InfoHeader) + width * height * sizeof(Rgb);
-	file.write(reinterpret_cast<const char*>(&fheader), sizeof(fheader));
+    file.write(reinterpret_cast<const char*>(&fheader), sizeof(fheader));
     file.write(reinterpret_cast<const char*>(&iheader), sizeof(iheader));
     file.write(reinterpret_cast<const char*>(pixels.data()),
                pixels.size() * sizeof(Rgb));

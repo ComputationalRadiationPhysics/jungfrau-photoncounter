@@ -13,6 +13,7 @@ namespace Bitmap {
 
 enum { BI_RGB, BI_RLE4, BI_RLE8, BI_BITFIELDS };
 
+#pragma pack(push, 1)
 struct FileHeader {
     unsigned char bfType[2]; /* file type, must be BM */
     uint32_t bfSize;         /* size in bytes of bitmap file */
@@ -41,6 +42,7 @@ struct Rgb {
     unsigned char rgbGreen;
     unsigned char rgbRed;
 };
+#pragma pack(pop)
 
 struct FileHeader createFileHeader();
 struct InfoHeader createInfoHeader(int width, int height);
@@ -60,7 +62,7 @@ public:
     {
     }
     Rgb& operator()(int x, int y) { return pixels[y * width + x]; }
-	void writeToFile(const std::string& path);
+    void writeToFile(const std::string& path);
 };
 
 } /* namespace Bitmap */
