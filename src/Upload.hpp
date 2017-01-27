@@ -28,6 +28,9 @@ struct deviceData {
     uint16_t* pedestal;
     uint16_t* data;
     uint16_t* photons;
+	uint16_t* photon_host_raw;
+	uint16_t* photon_pinned;
+	uint16_t* data_pinned;
     std::array<Gainmap, 3>* gain_host;
     std::array<Pedestalmap, 3>* pedestal_host;
 	std::vector<Datamap> data_host;
@@ -37,7 +40,7 @@ struct deviceData {
 
 class Uploader {
 public:
-	//TODO: use consitent names and fix types
+	//TODO: use consistent names and fix types
 	//TODO: add consts
     Uploader(std::array<Gainmap, 3> gain, std::array<Pedestalmap, 3> pedestal,
              std::size_t dimX, std::size_t dimY, std::size_t numberOfDevices);
@@ -59,7 +62,7 @@ private:
     std::vector<Datamap> currentBlock;
     std::array<Gainmap, 3> gain;
     std::array<Pedestalmap, 3> pedestal;
-    std::size_t dimX, dimY;
+    static std::size_t dimX, dimY;
 
 	static void CUDART_CB callback(cudaStream_t stream, cudaError_t status, void* data);
 
