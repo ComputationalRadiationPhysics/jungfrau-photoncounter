@@ -53,7 +53,6 @@ int main()
                     for(int j = 0; j < 1024; j++) {
                         for(int k=0; k < 512; k++) {
                             int h = test(j, k);
-                            if (h>bitteFunktioniere) bitteFunktioniere = h;
                             Bitmap::Rgb color = {(unsigned char)h, (unsigned char)h, (unsigned char)h};
                             img(j, k) = color;
                         }

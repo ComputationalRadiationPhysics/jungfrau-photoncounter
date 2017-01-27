@@ -14,7 +14,7 @@ enum ProcessingState {
 	READY
 };
 
-//TODO: make dynamic & find right size
+//TODO: test different sizes
 const std::size_t GPU_FRAMES = 2000;
 
 void handleCudaError(cudaError_t error, const char* file, int line);

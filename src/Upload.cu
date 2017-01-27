@@ -265,14 +265,12 @@ bool Uploader::upload(std::vector<Datamap>& data)
 	 DEBUG("Creating callback ...");
 	 HANDLE_CUDA_ERROR(cudaStreamAddCallback(dev->str, Uploader::callback, &dev->id, 0));
 
-	 //DEBUG("End calcFrames");
 	 return true;
  }
 
  void CUDART_CB Uploader::callback(cudaStream_t stream, cudaError_t status, void* data) {
 	 //suppress "unused variable" compiler warning
 	 (void)stream;
-	 struct deviceData* dev;
 
 	 DEBUG("HELP ME I AM TRAPPED IN A SUPERCOMPUTER AND I CAN'T GET OUT!!!!");
 
@@ -283,9 +281,9 @@ bool Uploader::upload(std::vector<Datamap>& data)
 
 	 HANDLE_CUDA_ERROR(status);
 	 DEBUG("setting " << *((int*)data) << " to READY");
-	 //TODO: use local var for dev
-	 dev = &Uploader::devices[*((int*)data)];
-	 Uploader::devices[*((int*)data)].state = READY;
+
+	 struct deviceData* dev = &Uploader::devices[*((int*)data)];
+	 dev->state = READY;
 	 DEBUG("stream: " << *((int*)data));
 
 	 //TODO: fix values
@@ -295,11 +293,12 @@ bool Uploader::upload(std::vector<Datamap>& data)
 	 memcpy(dev->photon_host_raw, dev->photon_pinned, dimX * dimY * GPU_FRAMES);
 
 	 for (size_t i = 0; i < numPhotons; i += dimX * dimY) {
-		 Uploader::devices[*((int*)data)].photon_host.emplace_back(dimX, dimY, &Uploader::devices[*((int*)data)].photon_host_raw[i]);
+		 dev->photon_host.emplace_back(dimX, dimY, &dev->photon_host_raw[i]);
 	 }
 
+	 //TODO: remove debug below
 	 for(std::size_t o = 0; o < GPU_FRAMES; ++o){
-		 if(isMapEmpty(Uploader::devices[*((int*)data)].photon_host[o], dimX, dimY))
+		 if(isMapEmpty(dev->photon_host[o], dimX, dimY))
 			 DEBUG("map " << o << " is empty!");
 	 }
  }
@@ -318,19 +317,16 @@ void Uploader::uploadToGPU(struct deviceData& dev, std::vector<Datamap>& data)
 
 void Uploader::downloadFromGPU(struct deviceData& dev)
 {
-    //DEBUG("Entering downloadFromGPU (str=" << dev.str << ")");
     std::size_t numPhotons = dimX * dimY * GPU_FRAMES;
-    //DEBUG("numPhotons = " << numPhotons);
+	std::size_t copySize = numPhotons * sizeof(*dev.photons);
+
     dev.photon_host_raw = (uint16_t*)malloc(numPhotons * sizeof(uint16_t));
     if (!dev.photon_host_raw) {
         fputs("FATAL ERROR (Memory): Allocation failed!\n", stderr);
         exit(EXIT_FAILURE);
     }
-    DEBUG(numPhotons * sizeof(uint16_t) << " Bytes allocated");
 
     HANDLE_CUDA_ERROR(cudaSetDevice(dev.device));
-	DEBUG("download size: " << numPhotons * sizeof(uint16_t));
-
-	HANDLE_CUDA_ERROR(cudaMemcpyAsync(dev.photon_pinned, dev.photons, numPhotons * sizeof(uint16_t), cudaMemcpyDeviceToHost, dev.str));
+	HANDLE_CUDA_ERROR(cudaMemcpyAsync(dev.photon_pinned, dev.photons, copySize, cudaMemcpyDeviceToHost, dev.str));
 }
 
