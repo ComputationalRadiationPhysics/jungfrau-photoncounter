@@ -42,11 +42,8 @@ Uploader::Uploader(std::array<Gainmap, 3> gain,
 	 DEBUG("Initializing GPUs!");
 	 initGPUs();
 	 // TODO: init pedestal maps
-	 DEBUG("Reserving memory for currentBlock.");
 	 currentBlock.reserve(GPU_FRAMES);
 	 DEBUG("elements in the ringbuffer: " << resources.getNumberOfElements());
-	 DEBUG("is rb empty? " << resources.isEmpty());
-	 DEBUG("is rb full? " << resources.isFull());
 	 DEBUG("End of constructor!");
  }
 
@@ -66,12 +63,10 @@ void Uploader::printDeviceName() {
 
 bool Uploader::upload(std::vector<Datamap>& data)
 {
+	//TODO: waht to do with a small amount of frames when terminating?
+	DEBUG("uploading " << data.size() << "maps");
 	for (std::size_t i = 0; i < data.size(); ++i) {
-		if(currentBlock.size() < GPU_FRAMES) {
-			currentBlock.push_back(data[i]);
-		} else if (currentBlock.size() == GPU_FRAMES) {
-			DEBUG("are maps empty?");
-
+		if (currentBlock.size() == GPU_FRAMES) {
 			if (!calcFrames(currentBlock)) {
 				//TODO: find a better solution below
 				//remove all used frames from the front
@@ -87,11 +82,8 @@ bool Uploader::upload(std::vector<Datamap>& data)
 			}
 
 			currentBlock.clear();
-		} else if(currentBlock.size() > GPU_FRAMES) {
-			DEBUG("This was never meant to happen ...");
-			DEBUG("Commiting suicide ...");
-			exit(-1);
 		}
+		currentBlock.push_back(data[i]);
 	}
 
 	DEBUG("getting out! Resources available: " << resources.getNumberOfElements());

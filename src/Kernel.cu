@@ -44,8 +44,6 @@ __global__ void calculate(uint16_t mapsize, uint16_t* pede, double* gain,
         }
 
         photon[(mapsize * i) + id] = int((energy + 6.2) / 12.4);
-		/*if(i == 0)//photon[(mapsize * i) + id])
-		  printf("%d: photon[%d] = %d\n", i, (mapsize * i) + id, photon[(mapsize * i) + id]);*/
     }
 }
 
