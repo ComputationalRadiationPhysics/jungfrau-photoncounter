@@ -5,7 +5,7 @@
 #include <iostream>
 #include <string>
 
-const std::size_t NUM_UPLOADS = 10;
+const std::size_t NUM_UPLOADS = 2;
 
 int main()
 {
@@ -39,8 +39,9 @@ int main()
 	for(std::size_t i = 1; i <= NUM_UPLOADS; ++i) {
 		while(!up.upload(data) && !data.empty()) {
 			while(!(ready = up.download()).empty()) {
-                Photonmap test = ready.at(0);
+
                 if (bitteFunktioniere == 1) {
+					Photonmap test = ready.at(1);
                     Bitmap::Image img(1024, 512);
                     for(int j = 0; j < 1024; j++) {
                         for(int k=0; k < 512; k++) {
