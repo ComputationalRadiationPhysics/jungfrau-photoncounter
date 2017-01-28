@@ -15,7 +15,8 @@ enum ProcessingState {
 };
 
 //TODO: test different sizes
-const std::size_t GPU_FRAMES = 2000;
+const std::size_t GPU_FRAMES = 1000;
+const std::size_t STREAMS_PER_GPU = 4;
 
 void handleCudaError(cudaError_t error, const char* file, int line);
 

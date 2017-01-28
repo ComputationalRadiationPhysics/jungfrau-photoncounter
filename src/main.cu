@@ -46,8 +46,7 @@ int main()
 	for(std::size_t i = 1; i <= NUM_UPLOADS; ++i) {
 		while(!up.upload(data) && !data.empty()) {
 			while(!(ready = up.download()).empty()) {
-                std::vector<Photonmap> testvec = up.download();
-                Photonmap test = testvec.at(1);
+                Photonmap test = ready.at(0);
                 if (bitteFunktioniere == 1) {
                     Bitmap::Image img(1024, 512);
                     for(int j = 0; j < 1024; j++) {
