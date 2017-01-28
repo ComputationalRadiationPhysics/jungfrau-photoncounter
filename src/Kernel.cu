@@ -10,12 +10,12 @@ __global__ void calculate(uint16_t mapsize, uint16_t* pede, double* gain,
 
     uint16_t id = blockIdx.x * blockDim.x + threadIdx.x;
 
-    sPede[threadIdx.x] = pede[threadIdx.x];
-    sPede[blockDim.x + threadIdx.x] = pede[blockDim.x + threadIdx.x];
-    sPede[(blockDim.x * 2) + threadIdx.x] = pede[(blockDim.x * 2) + threadIdx.x];
-    sGain[threadIdx.x] = gain[threadIdx.x];
-    sGain[blockDim.x + threadIdx.x] = gain[blockDim.x + threadIdx.x];
-    sGain[(blockDim.x * 2) + threadIdx.x] = gain[(blockDim.x * 2) + threadIdx.x];
+    sPede[threadIdx.x] = pede[id];
+    sPede[blockDim.x + threadIdx.x] = pede[mapsize + id];
+    sPede[(blockDim.x * 2) + threadIdx.x] = pede[(mapsize * 2) +id];
+    sGain[threadIdx.x] = gain[id];
+    sGain[blockDim.x + threadIdx.x] = gain[mapsize + id];
+    sGain[(blockDim.x * 2) + threadIdx.x] = gain[(mapsize * 2) + id];
 
     __syncthreads();
 
