@@ -23,6 +23,49 @@ int main()
     std::array<Pedestalmap, 3> pedestal_array = {pedestal[0], pedestal[1], pedestal[2]};
     std::array<Gainmap, 3> gain_array = {gain[0], gain[1], gain[2]};
 
+
+
+	//TODO: remove below; this is only used because the loaded pedestal maps semm to be incorrect
+	//force pedestal to 0
+	uint16_t* p = pedestal.at(0).data();
+	for(std::size_t i = 0; i < pedestal.at(0).getSizeBytes() * 3; ++i){
+		p[i] = 0;
+	}
+
+	Datamap dtest = data.at(0);
+	Bitmap::Image img(1024, 512);
+	for(int j = 0; j < 1024; j++) {
+		for(int k=0; k < 512; k++) {
+			int h = dtest(j, k) / 256;
+			Bitmap::Rgb color = {(unsigned char)h, (unsigned char)h, (unsigned char)h};
+			img(j, k) = color;
+		}
+	}
+	img.writeToFile("dtest.bmp");
+
+	Pedestalmap ptest = pedestal.at(0);
+	Bitmap::Image img2(1024, 512);
+	for(int j = 0; j < 1024; j++) {
+		for(int k=0; k < 512; k++) {
+			int h = ptest(j, k) / 256;
+			Bitmap::Rgb color = {(unsigned char)h, (unsigned char)h, (unsigned char)h};
+			img2(j, k) = color;
+		}
+	}
+	img2.writeToFile("ptest.bmp");
+
+	Gainmap gtest = gain.at(0);
+	Bitmap::Image img3(1024, 512);
+	for(int j = 0; j < 1024; j++) {
+		for(int k=0; k < 512; k++) {
+			int h = gtest(j, k) * 200;
+			Bitmap::Rgb color = {(unsigned char)h, (unsigned char)h, (unsigned char)h};
+			img3(j, k) = color;
+		}
+	}
+	img3.writeToFile("gtest.bmp");
+
+
 	int num = 0;
 	HANDLE_CUDA_ERROR(cudaGetDeviceCount(&num));
 
@@ -41,7 +84,7 @@ int main()
 			while(!(ready = up.download()).empty()) {
 
                 if (bitteFunktioniere == 1) {
-					Photonmap test = ready.at(1);
+					Photonmap test = ready.at(0);
                     Bitmap::Image img(1024, 512);
                     for(int j = 0; j < 1024; j++) {
                         for(int k=0; k < 512; k++) {

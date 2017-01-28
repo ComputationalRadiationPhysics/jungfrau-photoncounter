@@ -9,7 +9,7 @@ __global__ void calculate(uint16_t mapsize, uint16_t* pede, double* gain,
     extern __shared__ double sGain[];
 
     uint16_t id = blockIdx.x * blockDim.x + threadIdx.x;
-
+	/*
     sPede[threadIdx.x] = pede[id];
     sPede[mapsize + id] = pede[mapsize + id];
     sPede[mapsize * 2 + id] = pede[mapsize * 2 + id];
@@ -17,7 +17,7 @@ __global__ void calculate(uint16_t mapsize, uint16_t* pede, double* gain,
     sGain[mapsize + id] = gain[mapsize + id];
     sGain[mapsize * 2 + id] = gain[mapsize * 2 + id];
 
-    __syncthreads();
+    __syncthreads();*/
 
     for (int i = 0; i < num; i++) {
         uint16_t dataword = data[(mapsize * i) + id];

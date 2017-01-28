@@ -110,6 +110,16 @@ bool Uploader::upload(std::vector<Datamap>& data)
 		 fputs("FATAL ERROR (RingBuffer): Unexpected size!\n", stderr);
 		 exit(EXIT_FAILURE);
 	 }
+   
+	 //TODO: remove debug below 
+	 int all_empty = 1;
+	 for(std::size_t i = 0; i < ret.size(); ++i)
+		 if(!isMapEmpty(ret[i], dimX, dimY))
+			 all_empty = 0;
+	 /*		 else
+			 DEBUG("map " << i << " is empty");
+	 */
+	 DEBUG("maps empty? " << (all_empty ? "yes" : "no"));
 
 	 DEBUG("resources in use: " << resources.getNumberOfElements());
 	 return ret;
@@ -221,6 +231,8 @@ bool Uploader::upload(std::vector<Datamap>& data)
         exit(EXIT_FAILURE);
     }
 
+	HANDLE_CUDA_ERROR(cudaSetDevice(dev->device));
+
 	 DEBUG("copyin to pinned memory");
 	 HANDLE_CUDA_ERROR(cudaMemcpyAsync(dev->data_pinned, data[0].data(), dimX * dimY * GPU_FRAMES, cudaMemcpyHostToHost, dev->str));
 
@@ -234,6 +246,7 @@ bool Uploader::upload(std::vector<Datamap>& data)
 	 downloadFromGPU(*dev);
 	 
 	 DEBUG("copying data from gpu to pinned memory");
+	 DEBUG(dev->photon_host_raw << " <- " << dev->photon_pinned);
 	 HANDLE_CUDA_ERROR(cudaMemcpyAsync(dev->photon_host_raw, dev->photon_pinned, dimX * dimY * GPU_FRAMES, cudaMemcpyHostToHost, dev->str));
 
 	 DEBUG("Creating callback ...");
@@ -276,6 +289,7 @@ void Uploader::downloadFromGPU(struct deviceData& dev)
     std::size_t numPhotons = dimX * dimY * GPU_FRAMES;
 	std::size_t copySize = numPhotons * sizeof(*dev.photons);
 
+	//TODO: copy back photons
     HANDLE_CUDA_ERROR(cudaSetDevice(dev.device));
 	HANDLE_CUDA_ERROR(cudaMemcpyAsync(dev.photon_pinned, dev.photons, copySize, cudaMemcpyDeviceToHost, dev.str));
 }
