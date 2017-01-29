@@ -77,6 +77,4 @@ private:
     void downloadPedestalmap(struct deviceData stream);
 
     bool calcFrames(std::vector<Datamap>& data);
-    void uploadToGPU(struct deviceData& dev, std::vector<Datamap>& data);
-    void downloadFromGPU(struct deviceData& dev);
 };

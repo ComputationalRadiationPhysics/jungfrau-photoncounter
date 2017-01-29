@@ -34,15 +34,12 @@ Uploader::Uploader(std::array<Gainmap, 3> gain,
  {
 	 Uploader::dimX = dimX;
 	 Uploader::dimY = dimY;
-	 DEBUG("Entering uploader constructor!");
 	 printDeviceName();
 	 devices.resize(resources.getSize());
 
-	 DEBUG("Initializing GPUs!");
 	 initGPUs();
 	 // TODO: init pedestal maps
 	 currentBlock.reserve(GPU_FRAMES);
-	 DEBUG("elements in the ringbuffer: " << resources.getNumberOfElements());
 	 DEBUG("End of constructor!");
  }
 
@@ -66,7 +63,6 @@ bool Uploader::upload(std::vector<Datamap>& data)
 	for (std::size_t i = 0; i < data.size(); ++i) {
 		if (currentBlock.size() == GPU_FRAMES) {
 			if (!calcFrames(currentBlock)) {
-
 				//TODO: find a better solution below
 				//remove all used frames from the front
 				for(std::size_t j = data.size() - i; j > 0; --j) {
@@ -78,7 +74,6 @@ bool Uploader::upload(std::vector<Datamap>& data)
 
 				return false;
 			}
-
 			currentBlock.clear();
 		}
 		currentBlock.push_back(data[i]);
@@ -116,9 +111,9 @@ bool Uploader::upload(std::vector<Datamap>& data)
 	 for(std::size_t i = 0; i < ret.size(); ++i)
 		 if(!isMapEmpty(ret[i], dimX, dimY))
 			 all_empty = 0;
-	 /*		 else
+		 else
 			 DEBUG("map " << i << " is empty");
-	 */
+	 
 	 DEBUG("maps empty? " << (all_empty ? "yes" : "no"));
 
 	 DEBUG("resources in use: " << resources.getNumberOfElements());
@@ -225,29 +220,30 @@ bool Uploader::upload(std::vector<Datamap>& data)
 	 if(!resources.pop(dev))
 		 return false;
 
-    dev->photon_host_raw = (uint16_t*)malloc(numPhotons * sizeof(uint16_t));
-    if (!dev->photon_host_raw) {
-        fputs("FATAL ERROR (Memory): Allocation failed!\n", stderr);
-        exit(EXIT_FAILURE);
-    }
+	 dev->photon_host_raw = (uint16_t*)malloc(numPhotons * sizeof(uint16_t));
+	 if (!dev->photon_host_raw) {
+		 fputs("FATAL ERROR (Memory): Allocation failed!\n", stderr);
+		 exit(EXIT_FAILURE);
+	 }
 
-	HANDLE_CUDA_ERROR(cudaSetDevice(dev->device));
+	 HANDLE_CUDA_ERROR(cudaSetDevice(dev->device));
 
 	 DEBUG("copyin to pinned memory");
-	 HANDLE_CUDA_ERROR(cudaMemcpyAsync(dev->data_pinned, data[0].data(), dimX * dimY * GPU_FRAMES, cudaMemcpyHostToHost, dev->str));
+	 HANDLE_CUDA_ERROR(cudaMemcpyAsync(dev->data_pinned, data[0].data(), dimX * dimY * GPU_FRAMES * sizeof(*data[0].data()), cudaMemcpyHostToHost, dev->str));
 
 	 DEBUG("setting " << dev->id << " to PROCESSING");
 	 dev->state = PROCESSING;
-	 uploadToGPU(*dev, data);
+
+	 HANDLE_CUDA_ERROR(cudaMemcpyAsync(dev->data, dev->data_pinned, numPhotons * sizeof(*dev->data_pinned), cudaMemcpyHostToDevice, dev->str));
 
 	 calculate<<<dimX, dimY, 3 * (sizeof(uint16_t) + sizeof(double)) * dimY, dev->str>>>(uint16_t(dimX * dimY), dev->pedestal, dev->gain, dev->data, uint16_t(GPU_FRAMES), dev->photons);
      CHECK_CUDA_KERNEL;
 
-	 downloadFromGPU(*dev);
+	 HANDLE_CUDA_ERROR(cudaMemcpyAsync(dev->photon_pinned, dev->photons, numPhotons * sizeof(*dev->photons), cudaMemcpyDeviceToHost, dev->str));
 	 
 	 DEBUG("copying data from gpu to pinned memory");
 	 DEBUG(dev->photon_host_raw << " <- " << dev->photon_pinned);
-	 HANDLE_CUDA_ERROR(cudaMemcpyAsync(dev->photon_host_raw, dev->photon_pinned, dimX * dimY * GPU_FRAMES, cudaMemcpyHostToHost, dev->str));
+	 HANDLE_CUDA_ERROR(cudaMemcpyAsync(dev->photon_host_raw, dev->photon_pinned, dimX * dimY * GPU_FRAMES * sizeof(*dev->photon_pinned), cudaMemcpyHostToHost, dev->str));
 
 	 DEBUG("Creating callback ...");
 	 HANDLE_CUDA_ERROR(cudaStreamAddCallback(dev->str, Uploader::callback, &dev->id, 0));
@@ -269,28 +265,3 @@ bool Uploader::upload(std::vector<Datamap>& data)
 
 	 Uploader::devices[*((int*)data)].state = READY;
  }
-
-void Uploader::uploadToGPU(struct deviceData& dev, std::vector<Datamap>& data)
-{
-    std::size_t numPhotons = dimX * dimY * GPU_FRAMES;
-	std::size_t copySize = numPhotons * sizeof(*dev.data);
-
-	if(data.empty())
-		return;
-
-    HANDLE_CUDA_ERROR(cudaSetDevice(dev.device));
-	DEBUG("upload size: " << copySize);
-
-	HANDLE_CUDA_ERROR(cudaMemcpyAsync(dev.data, dev.data_pinned, copySize, cudaMemcpyHostToDevice, dev.str));
-}
-
-void Uploader::downloadFromGPU(struct deviceData& dev)
-{
-    std::size_t numPhotons = dimX * dimY * GPU_FRAMES;
-	std::size_t copySize = numPhotons * sizeof(*dev.photons);
-
-	//TODO: copy back photons
-    HANDLE_CUDA_ERROR(cudaSetDevice(dev.device));
-	HANDLE_CUDA_ERROR(cudaMemcpyAsync(dev.photon_pinned, dev.photons, copySize, cudaMemcpyDeviceToHost, dev.str));
-}
-

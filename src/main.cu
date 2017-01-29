@@ -94,6 +94,30 @@ int main()
                         }
                     }
                     img.writeToFile("test.bmp");
+
+
+					test = ready.at(1);
+                    for(int j = 0; j < 1024; j++) {
+                        for(int k=0; k < 512; k++) {
+                            int h = test(j, k) / 256;
+                            Bitmap::Rgb color = {(unsigned char)h, (unsigned char)h, (unsigned char)h};
+                            img(j, k) = color;
+                        }
+                    }
+                    img.writeToFile("test1.bmp");
+
+					test = ready.at(2);
+                    for(int j = 0; j < 1024; j++) {
+                        for(int k=0; k < 512; k++) {
+                            int h = test(j, k) / 256;
+                            Bitmap::Rgb color = {(unsigned char)h, (unsigned char)h, (unsigned char)h};
+                            img(j, k) = color;
+                        }
+                    }
+                    img.writeToFile("test2.bmp");
+
+
+
                     bitteFunktioniere = 0;
                 }
 				free(ready[0].data());

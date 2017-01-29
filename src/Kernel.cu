@@ -2,13 +2,13 @@
 
 #include <cstdio>
 
-__global__ void calculate(uint16_t mapsize, uint16_t* pede, double* gain,
-                          uint16_t* data, uint16_t num, uint16_t* photon)
+__global__ void calculate(uint32_t mapsize, uint16_t* pede, double* gain,
+                          uint16_t* data, uint32_t num, uint16_t* photon)
 {
     extern __shared__ uint16_t sPede[];
     extern __shared__ double sGain[];
 
-    uint16_t id = blockIdx.x * blockDim.x + threadIdx.x;
+    uint32_t id = blockIdx.x * blockDim.x + threadIdx.x;
 	/*
     sPede[threadIdx.x] = pede[id];
     sPede[mapsize + id] = pede[mapsize + id];
@@ -19,10 +19,13 @@ __global__ void calculate(uint16_t mapsize, uint16_t* pede, double* gain,
 
     __syncthreads();*/
 
-    for (int i = 0; i < num; i++) {
+    for (int i = 0; i < num; ++i) {
         uint16_t dataword = data[(mapsize * i) + id];
 		uint16_t adc = dataword & 0x3fff;
         float energy;
+
+		//if(id == 2)
+		//printf("(%d * %d) + %d = %d\n", mapsize, i, id, (mapsize * i) + id);
 
         switch ((dataword & 0xc000) >> 14) {
         case 0:
@@ -40,7 +43,7 @@ __global__ void calculate(uint16_t mapsize, uint16_t* pede, double* gain,
             break;
         }
 
-        photon[(mapsize * i) + id] = int((energy + 6.2) / 12.4);
+        photon[(mapsize * i) + id] = /*16000;//*/int((energy + 6.2) / 12.4);
     }
 }
 
