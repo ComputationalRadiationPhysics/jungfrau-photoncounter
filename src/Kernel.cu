@@ -9,42 +9,43 @@ __global__ void calculate(uint32_t mapsize, uint16_t* pede, double* gain,
     extern __shared__ double sGain[];
 
     uint32_t id = blockIdx.x * blockDim.x + threadIdx.x;
-	/*
-    sPede[threadIdx.x] = pede[id];
-    sPede[mapsize + id] = pede[mapsize + id];
-    sPede[mapsize * 2 + id] = pede[mapsize * 2 + id];
-    sGain[id] = gain[id];
-    sGain[mapsize + id] = gain[mapsize + id];
-    sGain[mapsize * 2 + id] = gain[mapsize * 2 + id];
 
-    __syncthreads();*/
+    sPede[threadIdx.x] = pede[id];
+    sPede[blockDim.x + threadIdx.x] = pede[mapsize + id];
+    sPede[(blockDim.x * 2) + threadIdx.x] = pede[(mapsize * 2) +id];
+    sGain[threadIdx.x] = gain[id];
+    sGain[blockDim.x + threadIdx.x] = gain[mapsize + id];
+    sGain[(blockDim.x * 2) + threadIdx.x] = gain[(mapsize * 2) + id];
+
+    __syncthreads();
 
     for (int i = 0; i < num; ++i) {
         uint16_t dataword = data[(mapsize * i) + id];
 		uint16_t adc = dataword & 0x3fff;
         float energy;
 
-		//if(id == 2)
-		//printf("(%d * %d) + %d = %d\n", mapsize, i, id, (mapsize * i) + id);
-
         switch ((dataword & 0xc000) >> 14) {
         case 0:
-			//TODO: use shared memory here
-            energy = (adc - pede[id]) * gain[id];
+			//TODO: use shared memory
+            energy =
+                (adc - pede[threadIdx.x]) * gain[threadIdx.x];
             break;
         case 1:
-            energy = (pede[mapsize + id] - adc) * gain[mapsize + id];
+            energy =
+                (pede[blockDim.x + threadIdx.x] - adc) * 
+                gain[blockDim.x + threadIdx.x];
             break;
         case 3:
-            energy = (pede[mapsize * 2 + id] - adc) * gain[mapsize * 2 + id];
+            energy =
+                (pede[(2 * blockDim.x) + threadIdx.x] - adc) *
+                gain[(2 * blockDim.x) + threadIdx.x];
             break;
         default:
             energy = 0;
             break;
         }
-
-        photon[(mapsize * i) + id] = /*16000;//*/int((energy + 6.2) / 12.4);
-    }
+        photon[(mapsize * i) + id] = int((energy + 6.2) / 12.4);
+	}
 }
 
 __global__ void calibrate(uint16_t mapsize, uint16_t* data, uint16_t num,

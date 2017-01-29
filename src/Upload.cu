@@ -111,9 +111,9 @@ bool Uploader::upload(std::vector<Datamap>& data)
 	 for(std::size_t i = 0; i < ret.size(); ++i)
 		 if(!isMapEmpty(ret[i], dimX, dimY))
 			 all_empty = 0;
-		 else
+	 /*		 else
 			 DEBUG("map " << i << " is empty");
-	 
+	 */
 	 DEBUG("maps empty? " << (all_empty ? "yes" : "no"));
 
 	 DEBUG("resources in use: " << resources.getNumberOfElements());
@@ -236,7 +236,7 @@ bool Uploader::upload(std::vector<Datamap>& data)
 
 	 HANDLE_CUDA_ERROR(cudaMemcpyAsync(dev->data, dev->data_pinned, numPhotons * sizeof(*dev->data_pinned), cudaMemcpyHostToDevice, dev->str));
 
-	 calculate<<<dimX, dimY, 3 * (sizeof(uint16_t) + sizeof(double)) * dimY, dev->str>>>(uint16_t(dimX * dimY), dev->pedestal, dev->gain, dev->data, uint16_t(GPU_FRAMES), dev->photons);
+	 calculate<<<dimX, dimY, 3 * (sizeof(uint16_t) + sizeof(double)) * dimY, dev->str>>>(dimX * dimY, dev->pedestal, dev->gain, dev->data, GPU_FRAMES, dev->photons);
      CHECK_CUDA_KERNEL;
 
 	 HANDLE_CUDA_ERROR(cudaMemcpyAsync(dev->photon_pinned, dev->photons, numPhotons * sizeof(*dev->photons), cudaMemcpyDeviceToHost, dev->str));
