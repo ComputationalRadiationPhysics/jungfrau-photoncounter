@@ -59,7 +59,7 @@ void Uploader::printDeviceName() {
 
 bool Uploader::upload(std::vector<Datamap>& data)
 {
-	//TODO: waht to do with a small amount of frames when terminating?
+	//TODO: what to do with a small amount of frames when terminating? flushing function?
 	for (std::size_t i = 0; i < data.size(); ++i) {
 		if (currentBlock.size() == GPU_FRAMES) {
 			if (!calcFrames(currentBlock)) {
@@ -98,7 +98,6 @@ bool Uploader::upload(std::vector<Datamap>& data)
 		 ret.emplace_back(dimX, dimY, &dev->photon_host_raw[i]);
 
 	 dev->photon_host.clear();
-	 DEBUG("setting " << current << " to FREE");
 	 dev->state = FREE;
 
 	 if(!resources.push(&devices[current])) {
@@ -130,17 +129,14 @@ bool Uploader::upload(std::vector<Datamap>& data)
 		 devices[i].gain_host = &gain;
 		 devices[i].pedestal_host = &pedestal;
 
-		 DEBUG("setting " << i << " to FREE");
 		 devices[i].state = FREE;
 		 //TODO: is this really needed? if yes, throw out device member
 		 devices[i].id = i;
 		 devices[i].device = i / STREAMS_PER_GPU;
 
 		 HANDLE_CUDA_ERROR(cudaSetDevice(devices[i].device));
-
 		 HANDLE_CUDA_ERROR(cudaStreamCreate(&devices[i].str));
 
-		 DEBUG("Allocating GPU memory on device for #" << i);
 		 HANDLE_CUDA_ERROR(cudaMalloc((void**)&devices[i].gain, dimX * dimY * sizeof(double) * 3));
 		 HANDLE_CUDA_ERROR(cudaMalloc((void**)&devices[i].pedestal, dimX * dimY * sizeof(uint16_t) * 3));
 		 HANDLE_CUDA_ERROR(cudaMalloc((void**)&devices[i].data, dimX * dimY * sizeof(uint16_t) * GPU_FRAMES));
@@ -228,21 +224,17 @@ bool Uploader::upload(std::vector<Datamap>& data)
 
 	 HANDLE_CUDA_ERROR(cudaSetDevice(dev->device));
 
-	 DEBUG("copyin to pinned memory");
 	 HANDLE_CUDA_ERROR(cudaMemcpyAsync(dev->data_pinned, data[0].data(), dimX * dimY * GPU_FRAMES * sizeof(*data[0].data()), cudaMemcpyHostToHost, dev->str));
 
-	 DEBUG("setting " << dev->id << " to PROCESSING");
 	 dev->state = PROCESSING;
 
 	 HANDLE_CUDA_ERROR(cudaMemcpyAsync(dev->data, dev->data_pinned, numPhotons * sizeof(*dev->data_pinned), cudaMemcpyHostToDevice, dev->str));
 
-	 calculate<<<dimX, dimY, 3 * (sizeof(uint16_t) + sizeof(double)) * dimY, dev->str>>>(dimX * dimY, dev->pedestal, dev->gain, dev->data, GPU_FRAMES, dev->photons);
+	 calculate<<<dimX, dimY, 6 * sizeof(double) * dimY, dev->str>>>(dimX * dimY, dev->pedestal, dev->gain, dev->data, GPU_FRAMES, dev->photons);
      CHECK_CUDA_KERNEL;
 
 	 HANDLE_CUDA_ERROR(cudaMemcpyAsync(dev->photon_pinned, dev->photons, numPhotons * sizeof(*dev->photons), cudaMemcpyDeviceToHost, dev->str));
 	 
-	 DEBUG("copying data from gpu to pinned memory");
-	 DEBUG(dev->photon_host_raw << " <- " << dev->photon_pinned);
 	 HANDLE_CUDA_ERROR(cudaMemcpyAsync(dev->photon_host_raw, dev->photon_pinned, dimX * dimY * GPU_FRAMES * sizeof(*dev->photon_pinned), cudaMemcpyHostToHost, dev->str));
 
 	 DEBUG("Creating callback ...");

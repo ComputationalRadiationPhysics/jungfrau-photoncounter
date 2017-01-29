@@ -5,8 +5,9 @@
 __global__ void calculate(uint32_t mapsize, uint16_t* pede, double* gain,
                           uint16_t* data, uint32_t num, uint16_t* photon)
 {
-    extern __shared__ uint16_t sPede[];
-    extern __shared__ double sGain[];
+    extern __shared__ double shared[];
+	double* sPede = &shared[0];
+	double* sGain = &shared[blockDim.x * 3];
 
     uint32_t id = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -28,17 +29,17 @@ __global__ void calculate(uint32_t mapsize, uint16_t* pede, double* gain,
         case 0:
 			//TODO: use shared memory
             energy =
-                (adc - pede[threadIdx.x]) * gain[threadIdx.x];
+                (adc - /*pede[id]*/sPede[threadIdx.x]) * /*gain[id]*/sGain[threadIdx.x];
             break;
         case 1:
             energy =
-                (pede[blockDim.x + threadIdx.x] - adc) * 
-                gain[blockDim.x + threadIdx.x];
+                (/*pede[mapsize + id]*/sPede[blockDim.x + threadIdx.x] - adc) * 
+                /*gain[mapsize + id]*/sGain[blockDim.x + threadIdx.x];
             break;
         case 3:
             energy =
-                (pede[(2 * blockDim.x) + threadIdx.x] - adc) *
-                gain[(2 * blockDim.x) + threadIdx.x];
+                (/*pede[(mapsize * 2) + id]*/sPede[(2 * blockDim.x) + threadIdx.x] - adc) *
+                /*gain[(mapsize * 2) + id]*/sGain[(2 * blockDim.x) + threadIdx.x];
             break;
         default:
             energy = 0;
@@ -48,7 +49,7 @@ __global__ void calculate(uint32_t mapsize, uint16_t* pede, double* gain,
 	}
 }
 
-__global__ void calibrate(uint16_t mapsize, uint16_t* data, uint16_t num,
+__global__ void calibrate(uint32_t mapsize, uint16_t* data, uint32_t num,
                           uint16_t* pede)
 {
     extern __shared__ uint16_t sPede[];
