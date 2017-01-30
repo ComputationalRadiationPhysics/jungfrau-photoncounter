@@ -11,7 +11,11 @@ off_t Filecache::getFileSize(const std::string path) const
 }
 
 Filecache::Filecache(std::size_t sizeBytes)
-    : buffer(new char[sizeBytes]), bufferPointer(buffer.get()),
-      sizeBytes(sizeBytes)
+    : buffer([sizeBytes]() {
+          void* p;
+          cudaMallocHost(&p, sizeBytes);
+          return reinterpret_cast<char*>(p);
+      }(), cudaFreeHost),
+      bufferPointer(buffer.get()), sizeBytes(sizeBytes)
 {
 }
