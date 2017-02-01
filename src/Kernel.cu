@@ -21,25 +21,24 @@ __global__ void calculate(uint32_t mapsize, uint16_t* pede, double* gain,
     __syncthreads();
 
     for (int i = 0; i < num; ++i) {
-        uint16_t dataword = data[(mapsize * i) + id];
+        uint16_t dataword = data[(mapsize * i) + id + (8 * (i+1))];
 		uint16_t adc = dataword & 0x3fff;
         float energy;
 
         switch ((dataword & 0xc000) >> 14) {
         case 0:
-			//TODO: use shared memory
             energy =
-                (adc - /*pede[id]*/sPede[threadIdx.x]) * /*gain[id]*/sGain[threadIdx.x];
+                (adc - sPede[threadIdx.x]) * sGain[threadIdx.x];
             break;
         case 1:
             energy =
-                (/*pede[mapsize + id]*/sPede[blockDim.x + threadIdx.x] - adc) * 
-                /*gain[mapsize + id]*/sGain[blockDim.x + threadIdx.x];
+                (sPede[blockDim.x + threadIdx.x] - adc) * 
+                sGain[blockDim.x + threadIdx.x];
             break;
         case 3:
             energy =
-                (/*pede[(mapsize * 2) + id]*/sPede[(2 * blockDim.x) + threadIdx.x] - adc) *
-                /*gain[(mapsize * 2) + id]*/sGain[(2 * blockDim.x) + threadIdx.x];
+                (sPede[(2 * blockDim.x) + threadIdx.x] - adc) *
+                sGain[(2 * blockDim.x) + threadIdx.x];
             break;
         default:
             energy = 0;
