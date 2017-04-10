@@ -2,11 +2,14 @@
 #include <cstdint>
 #include <vector>
 
+#include <iostream>
+#define DEBUG(msg) (std::cout << __FILE__ << "["<< __LINE__ << "]:\t" << msg << std::endl)
+
 template <typename T> class Pixelmap {
 private:
     T* buffer;
-    const std::size_t dimX;
-    const std::size_t dimY;
+    std::size_t dimX;
+    std::size_t dimY;
 
 public:
     using contentT = T;
@@ -23,3 +26,4 @@ public:
 using Datamap = Pixelmap<uint16_t>;
 using Gainmap = Pixelmap<double>;
 using Pedestalmap = Pixelmap<uint16_t>;
+using Photonmap = Pixelmap<uint16_t>;

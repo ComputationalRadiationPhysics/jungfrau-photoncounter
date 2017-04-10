@@ -5,7 +5,7 @@
 
 class Filecache {
 private:
-    std::unique_ptr<char[]> buffer;
+    std::unique_ptr<char, decltype(cudaFreeHost)*> buffer;
     char* bufferPointer;
     const std::size_t sizeBytes;
     off_t getFileSize(const std::string path) const;
@@ -33,8 +33,9 @@ std::vector<Maptype> Filecache::loadMaps(const std::string& path,
     file.read(bufferPointer, fileSize);
     file.close();
     for (std::size_t i = 0; i < numMaps; ++i) {
-        maps.emplace_back(dimX, dimY,
-                          reinterpret_cast<typename Maptype::contentT*>(bufferPointer));
+        maps.emplace_back(
+            dimX, dimY,
+            reinterpret_cast<typename Maptype::contentT*>(bufferPointer));
         bufferPointer += mapSize;
     }
     return maps;
