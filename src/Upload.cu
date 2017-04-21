@@ -60,10 +60,14 @@ void Uploader::printDeviceName() const
     }
 }
 
+bool Uploader::isEmpty() const {
+	return resources.isFull();
+}
+
 std::size_t Uploader::upload(Datamap& data, std::size_t offset)
 {
 	std::size_t ret = offset;
-
+	
     // upload and process data package efficiently
     for (std::size_t i = ret; i < data.getN() + GPU_FRAMES; i += GPU_FRAMES) {
         Datamap current(GPU_FRAMES, data.data() + i);
@@ -117,6 +121,7 @@ void Uploader::initGPUs()
         devices[i].pedestal_host = &pedestal;
 
         devices[i].state = FREE;
+		devices[i].id = i;
         devices[i].device = i / STREAMS_PER_GPU;
 
         HANDLE_CUDA_ERROR(cudaSetDevice(devices[i].device));
@@ -218,6 +223,7 @@ int Uploader::calcFrames(Datamap& data)
     HANDLE_CUDA_ERROR(cudaSetDevice(dev->device));
 
 	/*	
+//TODO: remove this???
 	//theoretically not needed because the data is loaded into pinned memory
     HANDLE_CUDA_ERROR(cudaMemcpyAsync(dev->data_pinned, data.data(),
                                       num_photons * sizeof(DataType),
@@ -257,13 +263,15 @@ int Uploader::calcFrames(Datamap& data)
 void CUDART_CB Uploader::callback(cudaStream_t stream, cudaError_t status,
                                   void* data)
 {
-    // suppress "unused variable" compiler warning
+	// suppress "unused variable" compiler warning
     (void)stream;
 
     if (data == NULL) {
         fputs("FATAL ERROR (callback): Missing index!\n", stderr);
         exit(EXIT_FAILURE);
     }
+
+	DEBUG(*((int*)data) << " is now ready to process!");
 
     // TODO: move HANDLE_CUDA_ERROR out of the callback function
     HANDLE_CUDA_ERROR(status);

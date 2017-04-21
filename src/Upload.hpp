@@ -39,6 +39,7 @@ public:
     Uploader& operator=(const Uploader& other) = delete;
     ~Uploader();
 
+	bool isEmpty() const;
 	std::size_t upload(Datamap& data, std::size_t offset);
     Photonmap download();
 
