@@ -15,13 +15,17 @@ struct deviceData {
     int id;
     cudaStream_t str;
     // Pinned data pointer
+    PhotonType* photon_host;
+	PhotonType* photon_pinned;
+    DataType* data_pinned;
+	//GPU pointer
     PhotonType* photon;
     DataType* data;
+	GainType* gain;
+	PedestalType* pedestal;	
     // Maps
     Gainmap* gain_host;
     Pedestalmap* pedestal_host;
-    Datamap data_host;
-    Photonmap photon_host;
     // State
     ProcessingState state;
 	//Number of frames
@@ -35,7 +39,7 @@ public:
     Uploader& operator=(const Uploader& other) = delete;
     ~Uploader();
 
-    int upload(Datamap& data);
+	std::size_t upload(Datamap& data, std::size_t offset);
     Photonmap download();
 
     void synchronize();

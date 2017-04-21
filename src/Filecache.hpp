@@ -9,17 +9,17 @@ private:
     char* bufferPointer;
     const std::size_t sizeBytes;
     off_t getFileSize(const std::string path) const;
-	bool header;
 
 public:
-    Filecache(std::size_t sizeBytes, bool header = false);
-    template <typename Maptype> Maptype loadMaps(const std::string& path);
+    Filecache(std::size_t sizeBytes);
+    template <typename Maptype> Maptype loadMaps(const std::string& path, bool header = false);
 };
 
-template <typename Maptype> Maptype Filecache::loadMaps(const std::string& path)
+template <typename Maptype> Maptype Filecache::loadMaps(const std::string& path, bool header)
 {
     auto fileSize = getFileSize(path);
-    auto mapSize = Maptype::elementSize * DIMX * DIMY + (header ? FRAME_HEADER_SIZE : 0);
+    auto mapSize =
+        Maptype::elementSize * DIMX * DIMY + (header ? FRAME_HEADER_SIZE : 0);
     auto numMaps = fileSize / mapSize;
 
     std::ifstream file;
@@ -27,7 +27,8 @@ template <typename Maptype> Maptype Filecache::loadMaps(const std::string& path)
     file.read(bufferPointer, fileSize);
     file.close();
 
-        Maptype maps(numMaps, reinterpret_cast<typename Maptype::contentT*>(bufferPointer)));
+    Maptype maps(numMaps,
+                 reinterpret_cast<typename Maptype::contentT*>(bufferPointer), header);
 
-        return maps;
+    return maps;
 }

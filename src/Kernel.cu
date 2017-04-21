@@ -11,6 +11,9 @@ __global__ void calculate(uint32_t mapsize, uint16_t* pede, double* gain,
 
     uint32_t id = blockIdx.x * blockDim.x + threadIdx.x;
 
+	if(id >= mapsize + 16)
+		return;
+	
     sPede[threadIdx.x] = pede[id];
     sPede[blockDim.x + threadIdx.x] = pede[mapsize + id];
     sPede[(blockDim.x * 2) + threadIdx.x] = pede[(mapsize * 2) +id];
