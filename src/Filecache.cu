@@ -1,3 +1,4 @@
+#include "CudaHeader.hpp"
 #include "Filecache.hpp"
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -10,12 +11,14 @@ off_t Filecache::getFileSize(const std::string path) const
     return fileStat.st_size;
 }
 
-Filecache::Filecache(std::size_t sizeBytes)
-    : buffer([sizeBytes]() {
-          void* p;
-          cudaMallocHost(&p, sizeBytes);
-          return reinterpret_cast<char*>(p);
-      }(), cudaFreeHost),
-      bufferPointer(buffer.get()), sizeBytes(sizeBytes)
+Filecache::Filecache(std::size_t sizeBytes, bool header)
+    : buffer(
+          [sizeBytes]() {
+              void* p;
+              HANDLE_CUDA_ERROR(cudaMallocHost(&p, sizeBytes));
+              return reinterpret_cast<char*>(p);
+          }(),
+          cudaFreeHost),
+      bufferPointer(buffer.get()), sizeBytes(sizeBytes), header(header)
 {
 }
