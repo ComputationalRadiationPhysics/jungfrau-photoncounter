@@ -107,9 +107,6 @@ int main()
 	int num = 0;
 	HANDLE_CUDA_ERROR(cudaGetDeviceCount(&num));
 
-	//for debug only:
-	num = 2;
-
     Uploader up(gain, pedestal, num);
     DEBUG("Uploader created!");
 	Photonmap ready(0, NULL);

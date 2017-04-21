@@ -4,15 +4,20 @@ std::size_t Uploader::nextFree = 0;
 std::vector<deviceData> Uploader::devices;
 
 template <typename T>
-T* allocateFrames(bool host = true, std::size_t n = GPU_FRAMES)
+T* allocateFrames(bool header, bool host, std::size_t n)
 {
     T* ret;
+	std::size_t size = DIMX * DIMY * sizeof(T) * n;
+	
+	if(header)
+		size += n * FRAME_HEADER_SIZE;
+			
     if (host)
         HANDLE_CUDA_ERROR(
-            cudaMallocHost((void**)&ret, DIMX * DIMY * sizeof(T) * n));
+            cudaMallocHost((void**)&ret, size));
     else
         HANDLE_CUDA_ERROR(
-            cudaMalloc((void**)&ret, DIMX * DIMY * sizeof(T) * n));
+            cudaMalloc((void**)&ret, size));
     return ret;
 }
 
@@ -117,12 +122,12 @@ void Uploader::initGPUs()
         HANDLE_CUDA_ERROR(cudaSetDevice(devices[i].device));
         HANDLE_CUDA_ERROR(cudaStreamCreate(&devices[i].str));
 
-        devices[i].gain = allocateFrames<GainType>(false, 3);
-        devices[i].pedestal = allocateFrames<PedestalType>(false, 3);
-        devices[i].data = allocateFrames<DataType>(false);
-        devices[i].photon = allocateFrames<PhotonType>(false);
-        devices[i].data_pinned = allocateFrames<DataType>();
-        devices[i].photon_pinned = allocateFrames<PhotonType>();
+        devices[i].gain = allocateFrames<GainType>(false, false, 3);
+        devices[i].pedestal = allocateFrames<PedestalType>(false, false, 3);
+        devices[i].data = allocateFrames<DataType>(true, false, GPU_FRAMES);
+        devices[i].photon = allocateFrames<PhotonType>(true, false, GPU_FRAMES);
+        devices[i].data_pinned = allocateFrames<DataType>(true, true, GPU_FRAMES);
+        devices[i].photon_pinned = allocateFrames<PhotonType>(true, true, GPU_FRAMES);
 
         uploadGainmap(devices[i]);
         uploadPedestalmap(devices[i]);
@@ -222,10 +227,11 @@ int Uploader::calcFrames(Datamap& data)
     HANDLE_CUDA_ERROR(cudaMemcpyAsync(dev->data, data.data(),//dev->data_pinned,
                                       num_photons * sizeof(DataType),
                                       cudaMemcpyHostToDevice, dev->str));
-	
+
+	//TODO: optimize kernel vars???
 	//calculate photon data and check for kernel errors
-    calculate<<<DIMX, DIMY+32, 6 * sizeof(GainType) * DIMY, dev->str>>>(
-        DIMX * DIMY, dev->pedestal, dev->gain, dev->data, GPU_FRAMES,
+    calculate<<<DIMX, DIMY, 6 * sizeof(GainType) * DIMY, dev->str>>>(
+        DIMX * DIMY, dev->pedestal, dev->gain, dev->data, dev->num_frames,
         dev->photon);
     CHECK_CUDA_KERNEL;
 
