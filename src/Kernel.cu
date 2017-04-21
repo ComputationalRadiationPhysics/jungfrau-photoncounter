@@ -2,43 +2,50 @@
 
 #include <cstdio>
 
-__global__ void calculate(uint32_t mapsize, uint16_t* pede, double* gain,
+__global__ void calculate(uint32_t mapsize, uint64_t* pede, double* gain,
                           uint16_t* data, uint32_t num, uint16_t* photon)
 {
-    extern __shared__ double shared[];
-	double* sPede = &shared[0];
-	double* sGain = &shared[blockDim.x * 3];
+    //locally save gain/ped values for the associated pixel
+    uint16_t lPede[3];
+    uint16_t lMovAvg;
+    uint32_t lCounter;
+    uint16_t lGain[3];
 
+    //find id and copy gain/pede maps
     uint32_t id = blockIdx.x * blockDim.x + threadIdx.x;
 
-    sPede[threadIdx.x] = pede[id];
-    sPede[blockDim.x + threadIdx.x] = pede[mapsize + id];
-    sPede[(blockDim.x * 2) + threadIdx.x] = pede[(mapsize * 2) +id];
-    sGain[threadIdx.x] = gain[id];
-    sGain[blockDim.x + threadIdx.x] = gain[mapsize + id];
-    sGain[(blockDim.x * 2) + threadIdx.x] = gain[(mapsize * 2) + id];
+    lPede[0] = pede[id] & 0x000000000000ffff;
+    lPede[1] = pede[mapsize + id] & 0x000000000000ffff;
+    lPede[2] = pede[(2 * mapsize) + id] & 0x000000000000ffff;
+    lMovAvg = (pede[id] & 0x00000000ffff0000) >> 16;
+    lCounter = (pede[id] & 0xffffffff00000000) >> 32;
+    lGain[0] = gain[id];
+    lGain[1] = gain[mapsize + id];
+    lGain[2] = gain[(mapsize * 2) + id];
 
-    __syncthreads();
-
+    //calc the energy value for one pixel in each frame
     for (int i = 0; i < num; ++i) {
+        // 8*(i++) is the header of each frame
         uint16_t dataword = data[(mapsize * i) + id + (8 * (i+1))];
 		uint16_t adc = dataword & 0x3fff;
         float energy;
 
         switch ((dataword & 0xc000) >> 14) {
         case 0:
-            energy =
-                (adc - sPede[threadIdx.x]) * sGain[threadIdx.x];
+            if (adc < 100) {
+                //calibration for dark pixels
+                lMovAvg = lMovAvg + adc - (lMovAvg/lCounter);
+                if (lCounter < 4294000000) lCounter ++;
+                
+                lPede[0] = lMovAvg / lCounter;
+            }
+            else energy = (adc - lPede[0]) * lGain[0];
             break;
         case 1:
-            energy =
-                (sPede[blockDim.x + threadIdx.x] - adc) * 
-                sGain[blockDim.x + threadIdx.x];
+            energy = (lPede[1] - adc) * lGain[1];
             break;
         case 3:
-            energy =
-                (sPede[(2 * blockDim.x) + threadIdx.x] - adc) *
-                sGain[(2 * blockDim.x) + threadIdx.x];
+            energy = (lPede[2] - adc) * lGain[2];
             break;
         default:
             energy = 0;
@@ -46,6 +53,7 @@ __global__ void calculate(uint32_t mapsize, uint16_t* pede, double* gain,
         }
         photon[(mapsize * i) + id + (8 * (i+1))] = int((energy + 6.2) / 12.4);
 
+        //copy the header
         if(threadIdx.x < 8) {
             photon[(mapsize * i) + id + (threadIdx.x * (i+1))] = 
                 data[(mapsize * i) + id + (threadIdx.x * (i+1))];
@@ -53,27 +61,54 @@ __global__ void calculate(uint32_t mapsize, uint16_t* pede, double* gain,
 	}
 }
 
-__global__ void calibrate(uint32_t mapsize, uint16_t* data, uint32_t num,
-                          uint16_t* pede)
+__global__ void calibrate(uint32_t mapsize, uint16_t* data, uint64_t* pede)
 {
-    extern __shared__ uint16_t sPede[];
+    //32 bit counter; 16 bit moving average; 16 bit offset 
+    //for calibration only average = offset
+    uint32_t counter = 0;
+    uint16_t average = 0;
 
     uint16_t id = blockIdx.x * blockDim.x + threadIdx.x;
 
+    //base value for pedestal stage 0
     for (int i = 0; i < 1000; i++) {
-        if (i == 0) {
-            sPede[threadIdx.x] = data[(mapsize * i) + id] & 0x3fff;
-        }
-        else {
-            sPede[threadIdx.x] += data[(mapsize * i) + id] & 0x3fff;
-        }
+        average += data[(mapsize * i) + id] & 0x3fff;
+        counter ++;
     }
 
-    for (int i = 1000; i < num; i++) {
-        sPede[threadIdx.x] =
-            (sPede[threadIdx.x] + data[(mapsize * i) + id] & 0x3fff) - 
-            (sPede[threadIdx.x] / i);
+    average = round((double)average / counter);
+    
+    //combine all values into one 64 bit dataword, so we only need one map
+    pede[id] = ((uint64_t)counter << 32)
+        | ((uint64_t)average << 16)
+        | (uint64_t)average;
+
+    //base value for pedestal stage 1
+    average = 0;
+    counter = 0;
+    for (int i = 1000; i < 2000; i++) {
+        average += data[(mapsize * i) + id] & 0x3fff;
+        counter ++;
     }
 
-    pede[id] = round((double)sPede[threadIdx.x] / 1000);
+    average = round((double)average / counter);
+    
+    pede[mapsize + id] = ((uint64_t)counter << 32)
+        | ((uint64_t)average << 16)
+        | (uint64_t)average;
+
+    //base value for pedestal stage 3
+    average = 0;
+    counter = 0;
+    for (int i = 2000; i < 2999; i++) {
+        average += data[(mapsize * i) + id] & 0x3fff;
+        counter ++;
+    }
+
+    average = round((double)average / counter);
+    
+    pede[(mapsize * 2) + id] = ((uint64_t)counter << 32)
+                | ((uint64_t)average << 16)
+                | (uint64_t)average;
+
 }
