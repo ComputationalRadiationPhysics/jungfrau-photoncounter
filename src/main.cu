@@ -37,13 +37,15 @@ int main()
 	for(std::size_t i = 0; i < pedestal.getSizeBytes(); ++i){
 		p[i] = 0;
 	}
+    
 
-	save_image<Datamap>(std::string("dtest.bmp"), data, std::size_t(0));
-	save_image<Datamap>(std::string("dtest1.bmp"), data, std::size_t(1));
-	save_image<Datamap>(std::string("dtest2.bmp"), data, std::size_t(2));
-	save_image<Datamap>(std::string("dtest3.bmp"), data, std::size_t(3));
-	save_image<Datamap>(std::string("dtest999.bmp"), data, std::size_t(999));
-	save_image<Datamap>(std::string("dtest1000.bmp"), data, std::size_t(1000));
+	save_image<Datamap>(std::string("test.bmp"), data, std::size_t(0));
+	save_image<Datamap>(std::string("test1.bmp"), data, std::size_t(1));
+	save_image<Datamap>(std::string("test2.bmp"), data, std::size_t(2));
+	save_image<Datamap>(std::string("test3.bmp"), data, std::size_t(3));
+	save_image<Datamap>(std::string("test500.bmp"), data, std::size_t(500));
+	save_image<Datamap>(std::string("test999.bmp"), data, std::size_t(999));
+	save_image<Datamap>(std::string("test1000.bmp"), data, std::size_t(1000));
 	save_image<Gainmap>(std::string("gtest.bmp"), gain, std::size_t(0));
 	save_image<Pedestalmap>(std::string("ptest.bmp"), pedestal, std::size_t(0));
 
@@ -73,11 +75,12 @@ int main()
 				
                 if (is_first_package == 1) {
 					
-					save_image<Datamap>(std::string("dtest.bmp"), data, std::size_t(0));
-					save_image<Datamap>(std::string("dtest1.bmp"), data, std::size_t(1));
-					save_image<Datamap>(std::string("dtest2.bmp"), data, std::size_t(2));
-					save_image<Datamap>(std::string("dtest3.bmp"), data, std::size_t(3));
-					save_image<Datamap>(std::string("dtest999.bmp"), data, std::size_t(999));
+					save_image<Datamap>(std::string("dtest.bmp"), ready, std::size_t(0));
+					save_image<Datamap>(std::string("dtest1.bmp"), ready, std::size_t(1));
+					save_image<Datamap>(std::string("dtest2.bmp"), ready, std::size_t(2));
+					save_image<Datamap>(std::string("dtest3.bmp"), ready, std::size_t(3));
+					save_image<Datamap>(std::string("dtest500.bmp"), ready, std::size_t(500));
+					save_image<Datamap>(std::string("dtest999.bmp"), ready, std::size_t(999));
 
                     is_first_package = 2;
                 } else if (is_first_package == 2){
