@@ -1,8 +1,13 @@
 #include "CudaHeader.hpp"
-#include <stdio.h>
 
-void handleCudaError(cudaError_t error, const char* file, int line) {
-    if(error == cudaSuccess) return;
-    printf("<%s>:%i",file,line);
-    printf(" %s\n", cudaGetErrorString(error));
+void handleCudaError(cudaError_t error, const char* file, int line)
+{
+    if (error != cudaSuccess) {
+        char errorString[1000];
+        snprintf(errorString, 1000,
+                 "FATAL ERROR (CUDA, %d): %s in %s at line %d!\n", error,
+                 cudaGetErrorString(error), file, line);
+        fputs(errorString, stderr);
+        exit(EXIT_FAILURE);
+    }
 }
