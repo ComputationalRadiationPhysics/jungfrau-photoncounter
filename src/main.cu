@@ -11,7 +11,6 @@ template<typename Maptype> bool is_map_empty(Maptype map, int num){
 	for(int x = 0; x < DIMX; ++x){
 		for(int y = 0; y < DIMY; ++y) {
 			if(map(x, y, num) != 0) {
-				DEBUG(" " << num << " is not empty!");
 				return false;
 			}
 		}
@@ -20,36 +19,15 @@ template<typename Maptype> bool is_map_empty(Maptype map, int num){
 }
 
 template<typename Maptype> void save_image(std::string path, Maptype map, std::size_t frame_number, double divider = 256) {
-	bool dark = true;
-	bool black = true;
-	bool blakk = is_map_empty<Maptype>(map, frame_number);
 	Bitmap::Image img(1024, 512);
 	for(int j = 0; j < 1024; j++) {
 		for(int k=0; k < 512; k++) {
 			int h = map(j, k, frame_number) / divider;
-			if(h != 0)
-				black = false;
-			if(h < 100)
-				dark = false;
 			Bitmap::Rgb color = {(unsigned char)h, (unsigned char)h, (unsigned char)h};
 			img(j, k) = color;
 		}
 	}
-	DEBUG("The map is " << path << " is "  << (dark ? "dark " : "") << (black ? "black" : "normal") << "!");
-	DEBUG(((black != blakk) ? "BOOM!" : "Nothing."));
 	img.writeToFile(path);
-}
-
-template<typename Maptype> bool is_map_dark(Maptype map, int num){
-	for(int x = 0; x < DIMX; ++x){
-		for(int y = 0; y < DIMY; ++y) {
-			if(map(x, y, num) <= 100) {
-				DEBUG(" " << num << " is not dark!");
-				return false;
-			}
-		}
-	}
-	return true;
 }
 
 int main()
@@ -61,11 +39,6 @@ int main()
     Gainmap gain = fc.loadMaps<Gainmap>("data_pool/px_101016/gainMaps_M022.bin");
     DEBUG("Maps loaded!");
 
-	for(int i = 0; i < 500; ++i){
-		if(is_map_empty<Datamap>(data, i))
-			DEBUG("Map " << i << " is black!");
-	}
-	
 	Pedestalmap pedestal(3, pedestal_too_large.data(), false);
 
 
@@ -116,20 +89,20 @@ int main()
     DEBUG("Uploader created!");
 	Photonmap ready(0, NULL);	
 
-	DEBUG("starting upload!");
-
+	DEBUG("starting uploading " << data.getN() << " maps!");
+	
     int is_first_package = 1;
 	for(std::size_t i = 1; i <= NUM_UPLOADS; ++i) {
 		size_t current_offset = 0;
-		while((current_offset = up.upload(data, current_offset)) < 10000 - 1/*TODO: calculate number of frames*/) {
+		while((current_offset = up.upload(data, current_offset)) < data.getN()) {
 
 			std::size_t internal_offset = 0;
 			
 			while(!up.isEmpty()) {
-				if(!(ready = up.download()).getSizeBytes())
+				if(!(ready = up.download()).getN())
 					continue;
-
-				internal_offset += ready.getSizeBytes() / DIMX / DIMY;
+ 
+				internal_offset += ready.getN();
 				
 				DEBUG(internal_offset << " of " << current_offset << " Frames processed!");
 				
@@ -145,7 +118,13 @@ int main()
                     is_first_package = 2;
                 } else if (is_first_package == 2){
 					
-					save_image<Datamap>(std::string("dtest1000.bmp"), data, std::size_t(0));
+					save_image<Datamap>(std::string("dtest1000.bmp"), ready, std::size_t(0));
+					save_image<Datamap>(std::string("dtest1001.bmp"), ready, std::size_t(1));
+					save_image<Datamap>(std::string("dtest1002.bmp"), ready, std::size_t(2));
+					save_image<Datamap>(std::string("dtest1003.bmp"), ready, std::size_t(3));
+					save_image<Datamap>(std::string("dtest1004.bmp"), ready, std::size_t(4));
+					save_image<Datamap>(std::string("dtest1005.bmp"), ready, std::size_t(5));
+					save_image<Datamap>(std::string("dtest1006.bmp"), ready, std::size_t(6));
 				    is_first_package = 0;
 				}
 				free(ready.data());
@@ -155,7 +134,22 @@ int main()
 		DEBUG("Uploaded " << i << "/" << NUM_UPLOADS);
 	}
 
+	DEBUG("Flushing leftover frames");
+	
 	up.synchronize();
+
+	std::size_t internal_offset = 0;	
+	while(!up.isEmpty()) {
+		if(!(ready = up.download()).getN())
+			continue;
+
+		internal_offset += ready.getN();
+				
+		DEBUG(internal_offset << " Frames processed!");
+
+		free(ready.data());
+		DEBUG("freeing leftover frames");
+	}
 
     return 0;
 }

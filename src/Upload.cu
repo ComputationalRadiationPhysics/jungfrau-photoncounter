@@ -67,18 +67,22 @@ bool Uploader::isEmpty() const {
 std::size_t Uploader::upload(Datamap& data, std::size_t offset)
 {
 	std::size_t ret = offset;
+	std::size_t map_size = (DIMX * DIMY + FRAME_HEADER_SIZE) * Datamap::elementSize;
 	
     // upload and process data package efficiently
-    for (std::size_t i = ret; i < data.getN() + GPU_FRAMES; i += GPU_FRAMES) {
-        Datamap current(GPU_FRAMES, data.data() + i);
+    for (; ret <= data.getN() - GPU_FRAMES; ret += GPU_FRAMES) {
+		DEBUG("-->current offset is " << ret * map_size << " (max: " << data.getSizeBytes() << ")");
+        Datamap current(GPU_FRAMES, data.data() + ret * map_size);
+
+		//TODO: (below) is this even a valid state???
         if (!calcFrames(current))
             return ret;
-        ret += GPU_FRAMES;
     }
 
     // flush the remaining data
     if (ret < data.getN()) {
-        Datamap current(GPU_FRAMES, data.data() + ret);
+		DEBUG("-->last offset is " << ret * map_size << " (max: " << data.getSizeBytes() << ")");
+        Datamap current(ret - data.getN(), data.data() + ret * map_size);
         ret += calcFrames(current);
     }
 
@@ -131,7 +135,6 @@ void Uploader::initGPUs()
         devices[i].pedestal = allocateFrames<PedestalType>(false, false, 3);
         devices[i].data = allocateFrames<DataType>(true, false, GPU_FRAMES);
         devices[i].photon = allocateFrames<PhotonType>(true, false, GPU_FRAMES);
-        devices[i].data_pinned = allocateFrames<DataType>(true, true, GPU_FRAMES);
         devices[i].photon_pinned = allocateFrames<PhotonType>(true, true, GPU_FRAMES);
 
         uploadGainmap(devices[i]);
@@ -157,7 +160,6 @@ void Uploader::freeGPUs()
         HANDLE_CUDA_ERROR(cudaFree(devices[i].data));
         HANDLE_CUDA_ERROR(cudaFree(devices[i].photon));
         HANDLE_CUDA_ERROR(cudaFreeHost(devices[i].photon_pinned));
-        HANDLE_CUDA_ERROR(cudaFreeHost(devices[i].data_pinned));
         HANDLE_CUDA_ERROR(cudaStreamDestroy(devices[i].str));
     }
 }
@@ -170,6 +172,7 @@ void Uploader::synchronize()
 
 void Uploader::uploadGainmap(struct deviceData stream)
 {
+	DEBUG("upload gain of stream " << stream.id);
     HANDLE_CUDA_ERROR(cudaSetDevice(stream.device));
     HANDLE_CUDA_ERROR(cudaMemcpy(stream.gain, stream.gain_host->data(),
                                  stream.gain_host->getSizeBytes(),
@@ -178,6 +181,7 @@ void Uploader::uploadGainmap(struct deviceData stream)
 
 void Uploader::uploadPedestalmap(struct deviceData stream)
 {
+	DEBUG("upload pede of stream " << stream.id);
     HANDLE_CUDA_ERROR(cudaSetDevice(stream.device));
     HANDLE_CUDA_ERROR(cudaMemcpy(stream.pedestal, stream.pedestal_host->data(),
                                  stream.pedestal_host->getSizeBytes(),
@@ -222,19 +226,11 @@ int Uploader::calcFrames(Datamap& data)
 	// select device
     HANDLE_CUDA_ERROR(cudaSetDevice(dev->device));
 
-	/*	
-//TODO: remove this???
-	//theoretically not needed because the data is loaded into pinned memory
-    HANDLE_CUDA_ERROR(cudaMemcpyAsync(dev->data_pinned, data.data(),
-                                      num_photons * sizeof(DataType),
-                                      cudaMemcpyHostToHost, dev->str));
-*/
 	//upload data to GPU
-    HANDLE_CUDA_ERROR(cudaMemcpyAsync(dev->data, data.data(),//dev->data_pinned,
+    HANDLE_CUDA_ERROR(cudaMemcpyAsync(dev->data, data.data(),
                                       num_photons * sizeof(DataType),
                                       cudaMemcpyHostToDevice, dev->str));
-
-	//TODO: optimize kernel vars???
+	
 	//calculate photon data and check for kernel errors
     calculate<<<DIMX, DIMY, 6 * sizeof(GainType) * DIMY, dev->str>>>(
         DIMX * DIMY, dev->pedestal, dev->gain, dev->data, dev->num_frames,

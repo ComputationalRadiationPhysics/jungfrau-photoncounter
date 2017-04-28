@@ -23,6 +23,7 @@ __global__ void calculate(uint32_t mapsize, uint16_t* pede, double* gain,
     for (int i = 0; i < num; ++i) {
         uint16_t dataword = data[(mapsize * i) + id + (8 * (i+1))];
 		uint16_t adc = dataword & 0x3fff;
+
         float energy;
 
         switch ((dataword & 0xc000) >> 14) {
@@ -47,8 +48,7 @@ __global__ void calculate(uint32_t mapsize, uint16_t* pede, double* gain,
         photon[(mapsize * i) + id + (8 * (i+1))] = int((energy + 6.2) / 12.4);
 		 
         if(threadIdx.x < 8) {
-            photon[(mapsize * i) + id + (threadIdx.x * (i+1))] = 
-                data[(mapsize * i) + id + (threadIdx.x * (i+1))];
+            photon[(mapsize * i) + (threadIdx.x * (i+1))] = data[(mapsize * i) + (threadIdx.x * (i+1))];
 		}
 	}
 }

@@ -17,7 +17,6 @@ struct deviceData {
     // Pinned data pointer
     PhotonType* photon_host;
 	PhotonType* photon_pinned;
-    DataType* data_pinned;
 	//GPU pointer
     PhotonType* photon;
     DataType* data;
