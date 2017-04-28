@@ -7,16 +7,49 @@
 
 const std::size_t NUM_UPLOADS = 2;
 
-template<typename Maptype> void save_image(std::string path, Maptype map, std::size_t frame_number) {
+template<typename Maptype> bool is_map_empty(Maptype map, int num){
+	for(int x = 0; x < DIMX; ++x){
+		for(int y = 0; y < DIMY; ++y) {
+			if(map(x, y, num) != 0) {
+				DEBUG(" " << num << " is not empty!");
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
+template<typename Maptype> void save_image(std::string path, Maptype map, std::size_t frame_number, double divider = 256) {
+	bool dark = true;
+	bool black = true;
+	bool blakk = is_map_empty<Maptype>(map, frame_number);
 	Bitmap::Image img(1024, 512);
 	for(int j = 0; j < 1024; j++) {
 		for(int k=0; k < 512; k++) {
-			int h = map(j, k, frame_number) / 256;
+			int h = map(j, k, frame_number) / divider;
+			if(h != 0)
+				black = false;
+			if(h < 100)
+				dark = false;
 			Bitmap::Rgb color = {(unsigned char)h, (unsigned char)h, (unsigned char)h};
 			img(j, k) = color;
 		}
 	}
+	DEBUG("The map is " << path << " is "  << (dark ? "dark " : "") << (black ? "black" : "normal") << "!");
+	DEBUG(((black != blakk) ? "BOOM!" : "Nothing."));
 	img.writeToFile(path);
+}
+
+template<typename Maptype> bool is_map_dark(Maptype map, int num){
+	for(int x = 0; x < DIMX; ++x){
+		for(int y = 0; y < DIMY; ++y) {
+			if(map(x, y, num) <= 100) {
+				DEBUG(" " << num << " is not dark!");
+				return false;
+			}
+		}
+	}
+	return true;
 }
 
 int main()
@@ -28,13 +61,19 @@ int main()
     Gainmap gain = fc.loadMaps<Gainmap>("data_pool/px_101016/gainMaps_M022.bin");
     DEBUG("Maps loaded!");
 
+	for(int i = 0; i < 500; ++i){
+		if(is_map_empty<Datamap>(data, i))
+			DEBUG("Map " << i << " is black!");
+	}
+	
 	Pedestalmap pedestal(3, pedestal_too_large.data(), false);
 
 
 	//TODO: remove below; this is only used because the loaded pedestal maps seam to be incorrect
 	//force pedestal to 0
+	
 	uint16_t* p = pedestal.data();
-	for(std::size_t i = 0; i < pedestal.getSizeBytes(); ++i){
+	for(std::size_t i = 0; i < pedestal.getSizeBytes() / sizeof(PedestalType); ++i){
 		p[i] = 0;
 	}
     
@@ -43,6 +82,27 @@ int main()
 	save_image<Datamap>(std::string("test1.bmp"), data, std::size_t(1));
 	save_image<Datamap>(std::string("test2.bmp"), data, std::size_t(2));
 	save_image<Datamap>(std::string("test3.bmp"), data, std::size_t(3));
+	save_image<Datamap>(std::string("test4.bmp"), data, std::size_t(4));
+	save_image<Datamap>(std::string("test5.bmp"), data, std::size_t(5));
+	save_image<Datamap>(std::string("test6.bmp"), data, std::size_t(6));
+	save_image<Datamap>(std::string("test7.bmp"), data, std::size_t(7));
+	save_image<Datamap>(std::string("test8.bmp"), data, std::size_t(8));
+	save_image<Datamap>(std::string("test9.bmp"), data, std::size_t(9));
+	save_image<Datamap>(std::string("test10.bmp"), data, std::size_t(10));
+	save_image<Datamap>(std::string("test11.bmp"), data, std::size_t(11));
+	save_image<Datamap>(std::string("test12.bmp"), data, std::size_t(12));
+	save_image<Datamap>(std::string("test13.bmp"), data, std::size_t(13));
+	save_image<Datamap>(std::string("test14.bmp"), data, std::size_t(14));
+	save_image<Datamap>(std::string("test15.bmp"), data, std::size_t(15));
+	save_image<Datamap>(std::string("test16.bmp"), data, std::size_t(16));
+	save_image<Datamap>(std::string("test17.bmp"), data, std::size_t(17));
+	save_image<Datamap>(std::string("test18.bmp"), data, std::size_t(18));
+	save_image<Datamap>(std::string("test19.bmp"), data, std::size_t(19));
+	save_image<Datamap>(std::string("test20.bmp"), data, std::size_t(20));
+	save_image<Datamap>(std::string("test21.bmp"), data, std::size_t(21));
+	save_image<Datamap>(std::string("test22.bmp"), data, std::size_t(22));
+	save_image<Datamap>(std::string("test23.bmp"), data, std::size_t(23));
+	save_image<Datamap>(std::string("test24.bmp"), data, std::size_t(24));
 	save_image<Datamap>(std::string("test500.bmp"), data, std::size_t(500));
 	save_image<Datamap>(std::string("test999.bmp"), data, std::size_t(999));
 	save_image<Datamap>(std::string("test1000.bmp"), data, std::size_t(1000));

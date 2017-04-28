@@ -18,3 +18,4 @@ using PhotonType = uint16_t;
 #include <iostream>
 #define DEBUG(msg)                                                             \
     (std::cout << __FILE__ << "[" << __LINE__ << "]:\t" << msg << std::endl)
+

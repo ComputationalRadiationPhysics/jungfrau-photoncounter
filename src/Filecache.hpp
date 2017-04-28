@@ -21,7 +21,7 @@ template <typename Maptype> Maptype Filecache::loadMaps(const std::string& path,
     auto mapSize =
         Maptype::elementSize * DIMX * DIMY + (header ? FRAME_HEADER_SIZE : 0);
     auto numMaps = fileSize / mapSize;
-
+	
     std::ifstream file;
     file.open(path, std::ios::in | std::ios::binary);
     file.read(bufferPointer, fileSize);
@@ -29,6 +29,8 @@ template <typename Maptype> Maptype Filecache::loadMaps(const std::string& path,
 
     Maptype maps(numMaps,
                  reinterpret_cast<typename Maptype::contentT*>(bufferPointer), header);
+
+	bufferPointer += fileSize;
 
     return maps;
 }
