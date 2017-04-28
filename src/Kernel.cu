@@ -1,7 +1,5 @@
 #include "Kernel.hpp"
 
-#include <cstdio>
-
 __global__ void calculate(uint32_t mapsize, uint16_t* pede, double* gain,
                           uint16_t* data, uint32_t num, uint16_t* photon)
 {
@@ -48,7 +46,8 @@ __global__ void calculate(uint32_t mapsize, uint16_t* pede, double* gain,
         photon[(mapsize * i) + id + (8 * (i+1))] = int((energy + 6.2) / 12.4);
 		 
         if(threadIdx.x < 8) {
-            photon[(mapsize * i) + (threadIdx.x * (i+1))] = data[(mapsize * i) + (threadIdx.x * (i+1))];
+            photon[(mapsize * i) + (threadIdx.x * (i+1))] = 
+                data[(mapsize * i) + (threadIdx.x * (i+1))];
 		}
 	}
 }
