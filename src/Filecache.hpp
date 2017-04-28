@@ -12,31 +12,25 @@ private:
 
 public:
     Filecache(std::size_t sizeBytes);
-    template <typename Maptype>
-    std::vector<Maptype> loadMaps(const std::string& path,
-                                  const std::size_t dimX,
-                                  const std::size_t dimY);
+    template <typename Maptype> Maptype loadMaps(const std::string& path, bool header = false);
 };
 
-template <typename Maptype>
-std::vector<Maptype> Filecache::loadMaps(const std::string& path,
-                                         const std::size_t dimX,
-                                         const std::size_t dimY)
+template <typename Maptype> Maptype Filecache::loadMaps(const std::string& path, bool header)
 {
     auto fileSize = getFileSize(path);
-    auto mapSize = Maptype::elementSize * dimX * dimY;
+    auto mapSize =
+        Maptype::elementSize * DIMX * DIMY + (header ? FRAME_HEADER_SIZE : 0);
     auto numMaps = fileSize / mapSize;
-    std::vector<Maptype> maps;
-    maps.reserve(numMaps);
+	
     std::ifstream file;
     file.open(path, std::ios::in | std::ios::binary);
     file.read(bufferPointer, fileSize);
     file.close();
-    for (std::size_t i = 0; i < numMaps; ++i) {
-        maps.emplace_back(
-            dimX, dimY,
-            reinterpret_cast<typename Maptype::contentT*>(bufferPointer));
-        bufferPointer += mapSize;
-    }
+
+    Maptype maps(numMaps,
+                 reinterpret_cast<typename Maptype::contentT*>(bufferPointer), header);
+
+	bufferPointer += fileSize;
+
     return maps;
 }

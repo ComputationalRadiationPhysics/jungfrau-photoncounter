@@ -55,9 +55,9 @@ __global__ void calculate(uint32_t mapsize, uint64_t* pede, double* gain,
 
         //copy the header
         if(threadIdx.x < 8) {
-            photon[(mapsize * i) + id + (threadIdx.x * (i+1))] = 
-                data[(mapsize * i) + id + (threadIdx.x * (i+1))];
-        }
+            photon[(mapsize * i) + (threadIdx.x * (i+1))] = 
+                data[(mapsize * i) + (threadIdx.x * (i+1))];
+		}
 	}
 }
 

@@ -1,29 +1,39 @@
 #pragma once
-#include <cstdint>
+#include "Config.hpp"
 #include <vector>
-
-#include <iostream>
-#define DEBUG(msg) (std::cout << __FILE__ << "["<< __LINE__ << "]:\t" << msg << std::endl)
 
 template <typename T> class Pixelmap {
 private:
     T* buffer;
-    std::size_t dimX;
-    std::size_t dimY;
+    std::size_t n;
+    bool header;
 
 public:
     using contentT = T;
     static const std::size_t elementSize = sizeof(T);
-    Pixelmap(std::size_t dimX, std::size_t dimY, T* buffer)
-        : buffer(buffer), dimX(dimX), dimY(dimY)
+    Pixelmap(std::size_t n, T* buffer, bool header = true)
+        : buffer(buffer), n(n), header(header)
     {
     }
-    T& operator()(std::size_t x, std::size_t y) { return buffer[y * dimX + x]; }
-    std::size_t getSizeBytes() const { return dimX * dimY * sizeof(T); }
+    T& operator()(std::size_t x, std::size_t y, std::size_t n)
+    {
+        std::size_t index = n * DIMX * DIMY + y * DIMX + x;
+        if (header)
+            index += (n + 1) * FRAME_HEADER_SIZE;
+        return buffer[index];
+    }
+    std::size_t getSizeBytes() const
+    {
+        std::size_t size = DIMX * DIMY * n * sizeof(T);
+        if (header)
+            size += n * FRAME_HEADER_SIZE * sizeof(T);
+        return size;
+    }
     T* data() const { return buffer; }
+    std::size_t getN() const { return n; }
 };
 
-using Datamap = Pixelmap<uint16_t>;
-using Gainmap = Pixelmap<double>;
-using Pedestalmap = Pixelmap<uint16_t>;
-using Photonmap = Pixelmap<uint16_t>;
+using Datamap = Pixelmap<DataType>;
+using Gainmap = Pixelmap<GainType>;
+using Pedestalmap = Pixelmap<PedestalType>;
+using Photonmap = Pixelmap<PhotonType>;
