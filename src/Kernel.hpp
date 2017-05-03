@@ -11,7 +11,7 @@ __global__ void calculate(uint32_t mapsize, uint64_t* pede, double* gain,
 
 /**
  *  Kernel function to update pedestal maps, call for each level individual
- *  @param 2999 "dark" frames (1k stage 1, 1k stage 2, 999 stage 3), 
+ *  @param 2999 "dark" frames (1k stage 1, 1k stage 2, 999 stage 3),
  *  pedestal maps
  * */
-__global__ void calibrate(uint16_t mapsize, uint16_t* data, uint64_t* pede);
+__global__ void calibrate(uint32_t mapsize, uint16_t* data, uint64_t* pede);

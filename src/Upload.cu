@@ -3,36 +3,31 @@
 std::size_t Uploader::nextFree = 0;
 std::vector<deviceData> Uploader::devices;
 
-template <typename T>
-T* allocateFrames(bool header, bool host, std::size_t n)
+template <typename T> T* allocateFrames(bool header, bool host, std::size_t n)
 {
     T* ret;
-	std::size_t size = DIMX * DIMY * sizeof(T) * n;
-	
-	if(header)
-		size += n * FRAME_HEADER_SIZE;
-			
+    std::size_t size = DIMX * DIMY * sizeof(T) * n;
+
+    if (header)
+        size += n * FRAME_HEADER_SIZE;
+
     if (host)
-        HANDLE_CUDA_ERROR(
-            cudaMallocHost((void**)&ret, size));
+        HANDLE_CUDA_ERROR(cudaMallocHost((void**)&ret, size));
     else
-        HANDLE_CUDA_ERROR(
-            cudaMalloc((void**)&ret, size));
+        HANDLE_CUDA_ERROR(cudaMalloc((void**)&ret, size));
     return ret;
 }
 
-Uploader::Uploader(Gainmap gain, Pedestalmap pedestal,
-                   std::size_t numberOfDevices)
-    : gain(gain), pedestal(pedestal),
-      resources(STREAMS_PER_GPU * numberOfDevices)
+Uploader::Uploader(Gainmap gain, std::size_t numberOfDevices)
+    : gain(gain), resources(STREAMS_PER_GPU * numberOfDevices)
 {
-    // check pedestal and gain map size
-    if (gain.getN() != 3 || pedestal.getN() != 3) {
+    // check gain map size
+    if (gain.getN() != 3) {
         char errorString[1000];
-        snprintf(errorString, 1000, "FATAL ERROR (Map loading): %zu Pedestal "
-                                    "maps and %zu Gain maps loaded! Exactly 3 "
-                                    "of each are needed!\n",
-                 pedestal.getN(), gain.getN());
+        snprintf(errorString, 1000, "FATAL ERROR (Map loading): "
+                                    "%zu Gain maps loaded! Exactly 3 "
+                                    "are needed!\n",
+                 gain.getN());
         fputs(errorString, stderr);
         exit(EXIT_FAILURE);
     }
@@ -41,6 +36,7 @@ Uploader::Uploader(Gainmap gain, Pedestalmap pedestal,
     printDeviceName();
     devices.resize(resources.getSize());
     initGPUs();
+
     // TODO: init pedestal maps
     DEBUG("End of constructor!");
 }
@@ -60,14 +56,12 @@ void Uploader::printDeviceName() const
     }
 }
 
-bool Uploader::isEmpty() const {
-	return resources.isFull();
-}
+bool Uploader::isEmpty() const { return resources.isFull(); }
 
 std::size_t Uploader::upload(Datamap& data, std::size_t offset)
 {
-	std::size_t ret = offset;
-	
+    std::size_t ret = offset;
+
     // upload and process data package efficiently
     for (std::size_t i = ret; i < data.getN() + GPU_FRAMES; i += GPU_FRAMES) {
         Datamap current(GPU_FRAMES, data.data() + i);
@@ -93,7 +87,7 @@ Photonmap Uploader::download()
     if (devices[nextFree].state != READY)
         return Datamap(0, NULL);
     nextFree = (nextFree + 1) % resources.getSize();
-	
+
     std::size_t num_frames = dev->num_frames;
     Datamap ret(num_frames, dev->photon_host);
 
@@ -112,16 +106,14 @@ void Uploader::initGPUs()
 {
     DEBUG("initGPU()");
 
-    // TODO: init pedestalmaps!
     for (std::size_t i = 0; i < devices.size(); ++i) {
 
         devices[i].num_frames = 0;
 
         devices[i].gain_host = &gain;
-        devices[i].pedestal_host = &pedestal;
 
         devices[i].state = FREE;
-		devices[i].id = i;
+        devices[i].id = i;
         devices[i].device = i / STREAMS_PER_GPU;
 
         HANDLE_CUDA_ERROR(cudaSetDevice(devices[i].device));
@@ -131,8 +123,10 @@ void Uploader::initGPUs()
         devices[i].pedestal = allocateFrames<PedestalType>(false, false, 3);
         devices[i].data = allocateFrames<DataType>(true, false, GPU_FRAMES);
         devices[i].photon = allocateFrames<PhotonType>(true, false, GPU_FRAMES);
-        devices[i].data_pinned = allocateFrames<DataType>(true, true, GPU_FRAMES);
-        devices[i].photon_pinned = allocateFrames<PhotonType>(true, true, GPU_FRAMES);
+        devices[i].data_pinned =
+            allocateFrames<DataType>(true, true, GPU_FRAMES);
+        devices[i].photon_pinned =
+            allocateFrames<PhotonType>(true, true, GPU_FRAMES);
 
         uploadGainmap(devices[i]);
         uploadPedestalmap(devices[i]);
@@ -202,68 +196,98 @@ void Uploader::downloadPedestalmap(struct deviceData stream)
 
 int Uploader::calcFrames(Datamap& data)
 {
-	// load available device and number of frames
+    // load available device and number of frames
     std::size_t num_photons = DIMX * DIMY * data.getN();
     struct deviceData* dev;
     if (!resources.pop(dev))
         return false;
     dev->num_frames = data.getN();
 
-	// allocate memory for the photon data
+    // allocate memory for the photon data
     dev->photon_host = (PhotonType*)malloc(num_photons * sizeof(PhotonType));
     if (!dev->photon_host) {
         fputs("FATAL ERROR (Memory): Allocation failed!\n", stderr);
         exit(EXIT_FAILURE);
     }
-	
-	// set state to processing
+
+    // set state to processing
     dev->state = PROCESSING;
 
-	// select device
+    // select device
     HANDLE_CUDA_ERROR(cudaSetDevice(dev->device));
 
-	/*	
-//TODO: remove this???
-	//theoretically not needed because the data is loaded into pinned memory
-    HANDLE_CUDA_ERROR(cudaMemcpyAsync(dev->data_pinned, data.data(),
-                                      num_photons * sizeof(DataType),
-                                      cudaMemcpyHostToHost, dev->str));
-*/
-	//upload data to GPU
-    HANDLE_CUDA_ERROR(cudaMemcpyAsync(dev->data, data.data(),//dev->data_pinned,
-                                      num_photons * sizeof(DataType),
-                                      cudaMemcpyHostToDevice, dev->str));
+    // upload data to GPU
+    HANDLE_CUDA_ERROR(cudaMemcpyAsync(
+        dev->data, data.data(), // dev->data_pinned,
+        num_photons * sizeof(DataType), cudaMemcpyHostToDevice, dev->str));
 
-	//TODO: optimize kernel vars???
-	//calculate photon data and check for kernel errors
-    calculate<<<DIMX, DIMY, 6 * sizeof(GainType) * DIMY, dev->str>>>(
-        DIMX * DIMY, dev->pedestal, dev->gain, dev->data, dev->num_frames,
-        dev->photon);
+    // calculate photon data and check for kernel errors
+    calculate<<<DIMX, DIMY, 0, dev->str>>>(DIMX * DIMY, dev->pedestal,
+                                           dev->gain, dev->data,
+                                           dev->num_frames, dev->photon);
     CHECK_CUDA_KERNEL;
 
-	//download data from GPU to pinned memory
+    // download data from GPU to pinned memory
     HANDLE_CUDA_ERROR(cudaMemcpyAsync(dev->photon_pinned, dev->photon,
                                       num_photons * sizeof(PhotonType),
                                       cudaMemcpyDeviceToHost, dev->str));
 
-	//copy data to 'less expensive' memory
+    // copy data to 'less expensive' memory
     HANDLE_CUDA_ERROR(cudaMemcpyAsync(dev->photon_host, dev->photon_pinned,
                                       num_photons * sizeof(PhotonType),
                                       cudaMemcpyHostToHost, dev->str));
 
-	//create callback function
+    // create callback function
     DEBUG("Creating callback ...");
     HANDLE_CUDA_ERROR(
         cudaStreamAddCallback(dev->str, Uploader::callback, &dev->id, 0));
 
-	//return number of processed frames
+    // return number of processed frames
     return GPU_FRAMES;
+}
+
+void Uploader::calcPedestals(Datamap& pedestaldata)
+{
+    // load available device and number of frames
+    std::size_t num_photons = DIMX * DIMY * pedestaldata.getN();
+    struct deviceData* dev;
+    if (!resources.pop(dev))
+        return;
+    dev->num_frames = pedestaldata.getN();
+
+    // select device
+    HANDLE_CUDA_ERROR(cudaSetDevice(dev->device));
+
+    // upload data to GPU
+    HANDLE_CUDA_ERROR(cudaMemcpyAsync(
+        dev->pedestaldata, pedestaldata.data(), // dev->data_pinned,
+        num_photons * sizeof(PhotonType), cudaMemcpyHostToDevice, dev->str));
+
+    // calculate photon data and check for kernel errors
+    calibrate<<<DIMX, DIMY, 0, dev->str>>>(DIMX * DIMY, dev->pedestaldata,
+                                           dev->pedestal);
+    CHECK_CUDA_KERNEL;
+
+    // download data from GPU to pinned memory
+    HANDLE_CUDA_ERROR(cudaMemcpyAsync(dev->pedestal_pinned, dev->pedestal,
+                                      num_photons * sizeof(PedestalType),
+                                      cudaMemcpyDeviceToHost, dev->str));
+
+    // copy data to 'less expensive' memory
+    HANDLE_CUDA_ERROR(cudaMemcpyAsync(dev->pedestal_host, dev->pedestal_pinned,
+                                      num_photons * sizeof(PedestalType),
+                                      cudaMemcpyHostToHost, dev->str));
+
+    // create callback function
+    DEBUG("Creating callback pedestals");
+    HANDLE_CUDA_ERROR(
+        cudaStreamAddCallback(dev->str, Uploader::callback, &dev->id, 0));
 }
 
 void CUDART_CB Uploader::callback(cudaStream_t stream, cudaError_t status,
                                   void* data)
 {
-	// suppress "unused variable" compiler warning
+    // suppress "unused variable" compiler warning
     (void)stream;
 
     if (data == NULL) {
@@ -271,7 +295,7 @@ void CUDART_CB Uploader::callback(cudaStream_t stream, cudaError_t status,
         exit(EXIT_FAILURE);
     }
 
-	DEBUG(*((int*)data) << " is now ready to process!");
+    DEBUG(*((int*)data) << " is now ready to process!");
 
     // TODO: move HANDLE_CUDA_ERROR out of the callback function
     HANDLE_CUDA_ERROR(status);

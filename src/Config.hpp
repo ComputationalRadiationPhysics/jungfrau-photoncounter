@@ -11,7 +11,7 @@ const std::size_t DIMY = 512;
 
 using DataType = uint16_t;
 using GainType = double;
-using PedestalType = uint16_t;
+using PedestalType = uint64_t;
 using PhotonType = uint16_t;
 
 // TODO: remove this debugging statement later

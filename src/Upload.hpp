@@ -16,31 +16,34 @@ struct deviceData {
     cudaStream_t str;
     // Pinned data pointer
     PhotonType* photon_host;
-	PhotonType* photon_pinned;
+    PhotonType* photon_pinned;
+    PedestalType* pedestal_pinned;
     DataType* data_pinned;
-	//GPU pointer
+    // GPU pointer
     PhotonType* photon;
     DataType* data;
-	GainType* gain;
-	PedestalType* pedestal;	
+    PedestalType* pedestal;
+    DataType* pedestaldata;
+    GainType* gain;
     // Maps
     Gainmap* gain_host;
     Pedestalmap* pedestal_host;
     // State
     ProcessingState state;
-	//Number of frames
-	std::size_t num_frames;
+    // Number of frames
+    std::size_t num_frames;
 };
 
 class Uploader {
 public:
-    Uploader(Gainmap gain, Pedestalmap pedestal, std::size_t numberOfDevices);
+    Uploader(Gainmap gain, std::size_t numberOfDevices);
     Uploader(const Uploader& other) = delete;
     Uploader& operator=(const Uploader& other) = delete;
     ~Uploader();
 
-	bool isEmpty() const;
-	std::size_t upload(Datamap& data, std::size_t offset);
+    bool isEmpty() const;
+    std::size_t upload(Datamap& data, std::size_t offset);
+    void calcPedestals(Datamap& data);
     Photonmap download();
 
     void synchronize();
@@ -52,7 +55,6 @@ private:
     static std::vector<deviceData> devices;
     static std::size_t nextFree;
     Gainmap gain;
-    Pedestalmap pedestal;
 
     static void CUDART_CB callback(cudaStream_t stream, cudaError_t status,
                                    void* data);
