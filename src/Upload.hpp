@@ -16,6 +16,7 @@ struct deviceData {
     cudaStream_t str;
     // Pinned data pointer
     PhotonType* photon_host;
+    PedestalType* pedestal_host;
     PhotonType* photon_pinned;
     PedestalType* pedestal_pinned;
     DataType* data_pinned;
@@ -23,11 +24,9 @@ struct deviceData {
     PhotonType* photon;
     DataType* data;
     PedestalType* pedestal;
-    DataType* pedestaldata;
     GainType* gain;
     // Maps
     Gainmap* gain_host;
-    Pedestalmap* pedestal_host;
     // State
     ProcessingState state;
     // Number of frames
@@ -43,7 +42,7 @@ public:
 
     bool isEmpty() const;
     std::size_t upload(Datamap& data, std::size_t offset);
-    void calcPedestals(Datamap& data);
+    void uploadPedestaldata(Datamap& data);
     Photonmap download();
 
     void synchronize();
@@ -69,4 +68,5 @@ private:
     void downloadPedestalmap(struct deviceData stream);
 
     int calcFrames(Datamap& data);
+    int calcPedestals(Datamap& data, uint32_t num);
 };

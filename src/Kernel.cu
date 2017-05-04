@@ -61,19 +61,32 @@ __global__ void calculate(uint32_t mapsize, uint64_t* pede, double* gain,
                 data[(mapsize * i) + (threadIdx.x * (i + 1))];
         }
     }
+
+    // save new pedestal value
+    pede[id] = ((uint64_t)lCounter << 32) | ((uint64_t)lMovAvg << 16) |
+               (uint64_t)lPede[0];
 }
 
-__global__ void calibrate(uint32_t mapsize, uint16_t* data, uint64_t* pede)
+__global__ void calibrate(uint32_t mapsize, uint32_t num, uint16_t* data,
+                          uint64_t* pede)
 {
-    // 32 bit counter; 16 bit moving average; 16 bit offset
-    // for calibration only average = offset
-    uint32_t counter = 0;
-    uint16_t average = 0;
-
     uint16_t id = blockIdx.x * blockDim.x + threadIdx.x;
 
+    // 32 bit counter; 16 bit moving average; 16 bit offset
+    // for calibration only average = offset
+    uint32_t counter;
+    uint16_t average;
+
+    if (num == 0) {
+        counter = 0;
+        average = 0;
+    } else {
+        counter = pede[id] & 0xffffffff00000000;
+        average = pede[id] & 0x00000000ffff0000;
+    }
+
     // base value for pedestal stage 0
-    for (int i = 0; i < 1000; i++) {
+    for (int i = num; i < 1000; i++) {
         average += data[(mapsize * i) + id] & 0x3fff;
         counter++;
     }
@@ -87,7 +100,7 @@ __global__ void calibrate(uint32_t mapsize, uint16_t* data, uint64_t* pede)
     // base value for pedestal stage 1
     average = 0;
     counter = 0;
-    for (int i = 1000; i < 2000; i++) {
+    for (int i = num; i > 999 && i < 2000; i++) {
         average += data[(mapsize * i) + id] & 0x3fff;
         counter++;
     }
@@ -100,7 +113,7 @@ __global__ void calibrate(uint32_t mapsize, uint16_t* data, uint64_t* pede)
     // base value for pedestal stage 3
     average = 0;
     counter = 0;
-    for (int i = 2000; i < 2999; i++) {
+    for (int i = num; i > 1999 && i < 2999; i++) {
         average += data[(mapsize * i) + id] & 0x3fff;
         counter++;
     }

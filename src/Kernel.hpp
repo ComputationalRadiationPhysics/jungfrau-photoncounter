@@ -14,4 +14,5 @@ __global__ void calculate(uint32_t mapsize, uint64_t* pede, double* gain,
  *  @param 2999 "dark" frames (1k stage 1, 1k stage 2, 999 stage 3),
  *  pedestal maps
  * */
-__global__ void calibrate(uint32_t mapsize, uint16_t* data, uint64_t* pede);
+__global__ void calibrate(uint32_t mapsize, uint32_t num, uint16_t* data,
+                          uint64_t* pede);
