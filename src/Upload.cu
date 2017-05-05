@@ -173,22 +173,12 @@ void Uploader::uploadGainmap(struct deviceData stream)
                                  cudaMemcpyHostToDevice));
 }
 
-void Uploader::uploadPedestalmap(struct deviceData stream)
-{
-    //TODO
-}
-
 void Uploader::downloadGainmap(struct deviceData stream)
 {
     HANDLE_CUDA_ERROR(cudaSetDevice(stream.device));
     HANDLE_CUDA_ERROR(cudaMemcpy(stream.gain_host->data(), stream.gain,
                                  stream.gain_host->getSizeBytes(),
                                  cudaMemcpyDeviceToHost));
-}
-
-void Uploader::downloadPedestalmap(struct deviceData stream)
-{
-    //TODO
 }
 
 int Uploader::calcFrames(Datamap& data)

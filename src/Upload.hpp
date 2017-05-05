@@ -59,10 +59,8 @@ private:
     void freeGPUs();
 
     void uploadGainmap(struct deviceData stream);
-    void uploadPedestalmap(struct deviceData stream);
 
     void downloadGainmap(struct deviceData stream);
-    void downloadPedestalmap(struct deviceData stream);
 
     int calcFrames(Datamap& data);
     int calcPedestals(Datamap& data, uint32_t num);
