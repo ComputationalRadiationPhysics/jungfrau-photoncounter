@@ -19,15 +19,22 @@ public:
     {
         std::size_t index = n * DIMX * DIMY + y * DIMX + x;
         if (header)
-            index += (n + 1) * FRAME_HEADER_SIZE;
+            index += (n + 1) * FRAME_HEADER_SIZE / elementSize;
         return buffer[index];
     }
+	std::size_t getPixelsPerFrame() const
+	{
+        std::size_t size = DIMX * DIMY;
+        if (header)
+            size += FRAME_HEADER_SIZE / elementSize;
+        return size;
+	}
     std::size_t getSizeBytes() const
     {
-        std::size_t size = DIMX * DIMY * n * sizeof(T);
+        std::size_t size = DIMX * DIMY * elementSize;
         if (header)
-            size += n * FRAME_HEADER_SIZE * sizeof(T);
-        return size;
+            size += FRAME_HEADER_SIZE;
+        return size * n;
     }
     T* data() const { return buffer; }
     std::size_t getN() const { return n; }

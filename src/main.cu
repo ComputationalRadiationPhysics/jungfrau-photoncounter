@@ -7,20 +7,16 @@
 
 const std::size_t NUM_UPLOADS = 2;
 
-template <typename Maptype>
-void save_image(std::string path, Maptype map, std::size_t frame_number,
-                double divider = 256)
-{
-    Bitmap::Image img(1024, 512);
-    for (int j = 0; j < 1024; j++) {
-        for (int k = 0; k < 512; k++) {
-            int h = map(j, k, frame_number) / divider;
-            Bitmap::Rgb color = {(unsigned char)h, (unsigned char)h,
-                                 (unsigned char)h};
-            img(j, k) = color;
-        }
-    }
-    img.writeToFile(path);
+template<typename Maptype> void save_image(std::string path, Maptype map, std::size_t frame_number, double divider = 256) {
+	Bitmap::Image img(1024, 512);
+	for(int j = 0; j < 1024; j++) {
+		for(int k=0; k < 512; k++) {
+			int h = map(j, k, frame_number) / divider;
+			Bitmap::Rgb color = {(unsigned char)h, (unsigned char)h, (unsigned char)h};
+			img(j, k) = color;
+		}
+	}
+	img.writeToFile(path);
 }
 
 int main()
@@ -75,25 +71,23 @@ int main()
     DEBUG("Pedestals created!");
     Photonmap ready(0, NULL);
 
-    DEBUG("starting upload!");
-
+	DEBUG("starting uploading " << data.getN() << " maps!");
+	
     int is_first_package = 1;
-    for (std::size_t i = 1; i <= NUM_UPLOADS; ++i) {
-        size_t current_offset = 0;
-        while ((current_offset = up.upload(data, current_offset)) <
-               10000 - 1 /*TODO: calculate number of frames*/) {
+	for(std::size_t i = 1; i <= NUM_UPLOADS; ++i) {
+		size_t current_offset = 0;
+		while((current_offset = up.upload(data, current_offset)) < data.getN()) {
 
-            std::size_t internal_offset = 0;
-
-            while (!up.isEmpty()) {
-                if (!(ready = up.download()).getSizeBytes())
-                    continue;
-
-                internal_offset += ready.getSizeBytes() / DIMX / DIMY;
-
-                DEBUG(internal_offset << " of " << current_offset
-                                      << " Frames processed!");
-
+			std::size_t internal_offset = 0;
+			
+			while(!up.isEmpty()) {
+				if(!(ready = up.download()).getN())
+					continue;
+ 
+				internal_offset += ready.getN();
+				
+				DEBUG(internal_offset << " of " << current_offset << " Frames processed!");
+				
                 if (is_first_package == 1) {
 
                     save_image<Datamap>(std::string("dtest.bmp"), ready,
@@ -110,21 +104,40 @@ int main()
                                         std::size_t(999));
 
                     is_first_package = 2;
-                }
-                else if (is_first_package == 2) {
+                } else if (is_first_package == 2){
+					
+					save_image<Datamap>(std::string("dtest1000.bmp"), ready, std::size_t(0));
+					save_image<Datamap>(std::string("dtest1001.bmp"), ready, std::size_t(1));
+					save_image<Datamap>(std::string("dtest1002.bmp"), ready, std::size_t(2));
+					save_image<Datamap>(std::string("dtest1003.bmp"), ready, std::size_t(3));
+					save_image<Datamap>(std::string("dtest1004.bmp"), ready, std::size_t(4));
+					save_image<Datamap>(std::string("dtest1005.bmp"), ready, std::size_t(5));
+					save_image<Datamap>(std::string("dtest1006.bmp"), ready, std::size_t(6));
+				    is_first_package = 0;
+				}
+				free(ready.data());
+				DEBUG("freeing in main");
+			}
+		}
+		DEBUG("Uploaded " << i << "/" << NUM_UPLOADS);
+	}
 
-                    save_image<Datamap>(std::string("dtest1000.bmp"), data,
-                                        std::size_t(0));
-                    is_first_package = 0;
-                }
-                free(ready.data());
-                DEBUG("freeing in main");
-            }
-        }
-        DEBUG("Uploaded " << i << "/" << NUM_UPLOADS);
-    }
+	DEBUG("Flushing leftover frames");
+	
+	up.synchronize();
 
-    up.synchronize();
+	std::size_t internal_offset = 0;	
+	while(!up.isEmpty()) {
+		if(!(ready = up.download()).getN())
+			continue;
+
+		internal_offset += ready.getN();
+				
+		DEBUG(internal_offset << " Frames processed!");
+
+		free(ready.data());
+		DEBUG("freeing leftover frames");
+	}
 
     return 0;
 }

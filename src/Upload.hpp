@@ -16,11 +16,8 @@ struct deviceData {
     cudaStream_t str;
     // Pinned data pointer
     PhotonType* photon_host;
-    PedestalType* pedestal_host;
-    PhotonType* photon_pinned;
-    PedestalType* pedestal_pinned;
-    DataType* data_pinned;
-    // GPU pointer
+	PhotonType* photon_pinned;
+	//GPU pointer
     PhotonType* photon;
     DataType* data;
     PedestalType* pedestal;
