@@ -7,7 +7,7 @@ __global__ void calculate(uint32_t mapsize, uint64_t* pede, double* gain,
     uint16_t lPede[3];
     uint16_t lMovAvg;
     uint32_t lCounter;
-    uint16_t lGain[3];
+    double lGain[3];
 
     // find id and copy gain/pede maps
     uint32_t id = blockIdx.x * blockDim.x + threadIdx.x;
@@ -30,6 +30,7 @@ __global__ void calculate(uint32_t mapsize, uint64_t* pede, double* gain,
 
         switch ((dataword & 0xc000) >> 14) {
         case 0:
+			//TODO: use a const value for this
             if (adc < 100) {
                 // calibration for dark pixels
                 lMovAvg = lMovAvg + adc - (lMovAvg / lCounter);
@@ -68,7 +69,7 @@ __global__ void calculate(uint32_t mapsize, uint64_t* pede, double* gain,
 __global__ void calibrate(uint32_t mapsize, uint32_t num, uint32_t currentnum,
                           uint16_t* data, uint64_t* pede)
 {
-    uint16_t id = blockIdx.x * blockDim.x + threadIdx.x;
+    uint32_t id = blockIdx.x * blockDim.x + threadIdx.x;
 
     // 32 bit counter; 16 bit moving average; 16 bit offset
     // for calibration only average = offset

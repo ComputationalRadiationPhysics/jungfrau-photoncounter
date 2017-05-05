@@ -59,8 +59,6 @@ int main()
     save_image<Datamap>(std::string("test500.bmp"), data, std::size_t(500));
     save_image<Datamap>(std::string("test999.bmp"), data, std::size_t(999));
     save_image<Datamap>(std::string("test1000.bmp"), data, std::size_t(1000));
-    save_image<Gainmap>(std::string("gtest.bmp"), gain, std::size_t(0));
-    //save_image<Pedestalmap>(std::string("ptest.bmp"), pedestal, std::size_t(0));
 
     int num = 0;
     HANDLE_CUDA_ERROR(cudaGetDeviceCount(&num));

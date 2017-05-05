@@ -65,7 +65,7 @@ std::size_t Uploader::upload(Datamap& data, std::size_t offset)
         (DIMX * DIMY) * Datamap::elementSize + FRAME_HEADER_SIZE;
 
     // upload and process data package efficiently
-    for (; ret <= data.getN() - GPU_FRAMES; ret += GPU_FRAMES) {
+    while (ret <= data.getN() - GPU_FRAMES) {
         DEBUG("-->current offset is "
               << ret * map_size << " (max: " << data.getSizeBytes() << ")");
         Datamap current(GPU_FRAMES, data.data() + ret * map_size / sizeof(DataType), true);
@@ -73,6 +73,8 @@ std::size_t Uploader::upload(Datamap& data, std::size_t offset)
         // TODO: (below) is this even a valid state???
         if (!calcFrames(current))
             return ret;
+		
+		ret += GPU_FRAMES;
     }
 
     // flush the remaining data
@@ -216,7 +218,7 @@ int Uploader::calcFrames(Datamap& data)
         dev->device, 
         devices[(dev->id - 1) % devices.size()].pedestal,
         devices[(dev->id - 1) % devices.size()].device, 
-        data.getSizeBytes(), dev->str));
+        3 * DIMX * DIMY * sizeof(PedestalType), dev->str));
 
     // calculate photon data and check for kernel errors
     calculate<<<DIMX, DIMY, 0, dev->str>>>(DIMX * DIMY, dev->pedestal,
@@ -247,29 +249,36 @@ int Uploader::calcFrames(Datamap& data)
 void Uploader::uploadPedestaldata(Datamap& pedestaldata)
 {
     std::size_t offset = 0;
-    std::size_t map_size =
-        (DIMX * DIMY) * Datamap::elementSize + FRAME_HEADER_SIZE;
+    std::size_t map_size = pedestaldata.getPixelsPerFrame();
 
+    if (pedestaldata.getN() != 3000) {
+        fputs("FATAL ERROR (pedestal init data): Unexpected size!\n", stderr);
+        exit(EXIT_FAILURE);
+    }
+	
     // upload and process data package efficiently
     // TODO test; at least 2999 frames for pedestals
-    for (; offset < pedestaldata.getN() - GPU_FRAMES;
-         offset += GPU_FRAMES) {
-        Datamap current(GPU_FRAMES, pedestaldata.data() + offset * map_size / sizeof(DataType), false);
+    while (offset <= pedestaldata.getN() - GPU_FRAMES) {
+        Datamap current(GPU_FRAMES, pedestaldata.data() + offset * map_size, false);
         if (!calcPedestals(current, offset))
             return;
 
         DEBUG("Frames " << offset << " von " << (pedestaldata.getN()));
+		
+		offset += GPU_FRAMES;
     }
 
     // flush the remaining data
     if (offset < pedestaldata.getN()) {
-        Datamap current(GPU_FRAMES, pedestaldata.data() + offset * map_size / sizeof(DataType), false);
+        Datamap current(GPU_FRAMES, pedestaldata.data() + offset * map_size, false);
         calcPedestals(current, offset);
     }
 }
 
 int Uploader::calcPedestals(Datamap& pedestaldata, uint32_t num)
 {
+
+	DEBUG("mapsize: " << pedestaldata.getSizeBytes());
     // load available device and number of frames
     std::size_t num_pixels = pedestaldata.getPixelsPerFrame() * pedestaldata.getN();
     struct deviceData* dev;
@@ -283,15 +292,15 @@ int Uploader::calcPedestals(Datamap& pedestaldata, uint32_t num)
     // select device
     HANDLE_CUDA_ERROR(cudaSetDevice(dev->device));
 
-    DEBUG("dev->data" << dev->data);
-    DEBUG("pedestaldata.data()" << pedestaldata.data());
+	/*    DEBUG("dev->data" << dev->data);
+		  DEBUG("pedestaldata.data()" << pedestaldata.data());*/
     // upload data to GPU
     HANDLE_CUDA_ERROR(cudaMemcpy(
         dev->data, pedestaldata.data(),
         num_pixels * sizeof(DataType), cudaMemcpyHostToDevice));
 
-    DEBUG("From: " << devices[(dev->id - 1) % devices.size()].device); 
-    DEBUG("To: " << dev->device);
+    //DEBUG("From: " << devices[(dev->id - 1) % devices.size()].device); 
+    //DEBUG("To: " << dev->device);
 
     // transfer pedestal data from last device
     HANDLE_CUDA_ERROR(cudaMemcpyPeer(
@@ -299,7 +308,7 @@ int Uploader::calcPedestals(Datamap& pedestaldata, uint32_t num)
         dev->device, 
         devices[(dev->id - 1) % devices.size()].pedestal,
         devices[(dev->id - 1) % devices.size()].device, 
-        pedestaldata.getSizeBytes()));
+        3 * DIMX * DIMY * sizeof(PedestalType)));
 
     // calculate photon data and check for kernel errors
     calibrate<<<DIMX, DIMY, 0, dev->str>>>(DIMX * DIMY, dev->num_frames, num,
@@ -313,7 +322,7 @@ int Uploader::calcPedestals(Datamap& pedestaldata, uint32_t num)
         exit(EXIT_FAILURE);
     }
 
-    DEBUG("resources in use: " << resources.getNumberOfElements());
+	//    DEBUG("resources in use: " << resources.getNumberOfElements());
 
     // return number of processed frames
     return GPU_FRAMES;
