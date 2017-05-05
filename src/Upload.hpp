@@ -54,6 +54,8 @@ private:
 
     static void CUDART_CB callback(cudaStream_t stream, cudaError_t status,
                                    void* data);
+    static void CUDART_CB callbackPede(cudaStream_t stream, cudaError_t status,
+                                   void* data);
 
     void initGPUs();
     void freeGPUs();

@@ -99,7 +99,7 @@ __global__ void calibrate(uint32_t mapsize, uint32_t num, uint32_t currentnum,
     average = 0;
     counter = 0;
     for (int i = currentnum; i > 999 && i < 2000 && i < (999 + num); i++) {
-        average += data[(mapsize * i) + id] & 0x3fff;
+        average += data[(mapsize * (i - currentnum)) + id] & 0x3fff;
         counter++;
     }
 
@@ -111,8 +111,8 @@ __global__ void calibrate(uint32_t mapsize, uint32_t num, uint32_t currentnum,
     // base value for pedestal stage 3
     average = 0;
     counter = 0;
-    for (int i = currentnum; i > 1999 && i < 2999 + i < (1999 + num); i++) {
-        average += data[(mapsize * i) + id] & 0x3fff;
+    for (int i = currentnum; i > 1999 && i < 2999 && i < (1999 + num); i++) {
+        average += data[(mapsize * (i - currentnum)) + id] & 0x3fff;
         counter++;
     }
 

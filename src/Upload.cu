@@ -68,7 +68,7 @@ std::size_t Uploader::upload(Datamap& data, std::size_t offset)
     for (; ret <= data.getN() - GPU_FRAMES; ret += GPU_FRAMES) {
         DEBUG("-->current offset is "
               << ret * map_size << " (max: " << data.getSizeBytes() << ")");
-        Datamap current(GPU_FRAMES, data.data() + ret * map_size / sizeof(DataType));
+        Datamap current(GPU_FRAMES, data.data() + ret * map_size / sizeof(DataType), true);
 
         // TODO: (below) is this even a valid state???
         if (!calcFrames(current))
@@ -79,7 +79,7 @@ std::size_t Uploader::upload(Datamap& data, std::size_t offset)
     if (ret < data.getN()) {
         DEBUG("-->last offset is " << ret * map_size
                                    << " (max: " << data.getSizeBytes() << ")");
-        Datamap current(ret - data.getN(), data.data() + ret * map_size / sizeof(DataType));
+        Datamap current(ret - data.getN(), data.data() + ret * map_size / sizeof(DataType), true);
         ret += calcFrames(current);
     }
 
@@ -92,11 +92,11 @@ Photonmap Uploader::download()
     struct deviceData* dev = &Uploader::devices[current];
 
     if (devices[nextFree].state != READY)
-        return Datamap(0, NULL);
+        return Datamap(0, NULL, true);
     nextFree = (nextFree + 1) % resources.getSize();
 
     std::size_t num_frames = dev->num_frames;
-    Datamap ret(num_frames, dev->photon_host);
+    Datamap ret(num_frames, dev->photon_host, true);
 
     dev->state = FREE;
 
@@ -216,8 +216,7 @@ int Uploader::calcFrames(Datamap& data)
         dev->device, 
         devices[(dev->id - 1) % devices.size()].pedestal,
         devices[(dev->id - 1) % devices.size()].device, 
-        3 * DIMX * DIMY * sizeof(PedestalType), dev->str));
-
+        data.getSizeBytes(), dev->str));
 
     // calculate photon data and check for kernel errors
     calculate<<<DIMX, DIMY, 0, dev->str>>>(DIMX * DIMY, dev->pedestal,
@@ -255,16 +254,16 @@ void Uploader::uploadPedestaldata(Datamap& pedestaldata)
     // TODO test; at least 2999 frames for pedestals
     for (; offset < pedestaldata.getN() - GPU_FRAMES;
          offset += GPU_FRAMES) {
-        Datamap current(GPU_FRAMES, pedestaldata.data() + offset * map_size / sizeof(DataType));
+        Datamap current(GPU_FRAMES, pedestaldata.data() + offset * map_size / sizeof(DataType), false);
         if (!calcPedestals(current, offset))
             return;
 
-        DEBUG("Frames " << offset << " von " << (pedestaldata.getN() + GPU_FRAMES));
+        DEBUG("Frames " << offset << " von " << (pedestaldata.getN()));
     }
 
     // flush the remaining data
     if (offset < pedestaldata.getN()) {
-        Datamap current(GPU_FRAMES, pedestaldata.data() + offset * map_size / sizeof(DataType));
+        Datamap current(GPU_FRAMES, pedestaldata.data() + offset * map_size / sizeof(DataType), false);
         calcPedestals(current, offset);
     }
 }
@@ -284,6 +283,8 @@ int Uploader::calcPedestals(Datamap& pedestaldata, uint32_t num)
     // select device
     HANDLE_CUDA_ERROR(cudaSetDevice(dev->device));
 
+    DEBUG("dev->data" << dev->data);
+    DEBUG("pedestaldata.data()" << pedestaldata.data());
     // upload data to GPU
     HANDLE_CUDA_ERROR(cudaMemcpy(
         dev->data, pedestaldata.data(),
@@ -306,6 +307,13 @@ int Uploader::calcPedestals(Datamap& pedestaldata, uint32_t num)
     CHECK_CUDA_KERNEL;
 
     dev->state = FREE;
+
+    if (!resources.push(dev)) {
+        fputs("FATAL ERROR (RingBuffer): Unexpected size!\n", stderr);
+        exit(EXIT_FAILURE);
+    }
+
+    DEBUG("resources in use: " << resources.getNumberOfElements());
 
     // return number of processed frames
     return GPU_FRAMES;

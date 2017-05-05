@@ -11,7 +11,7 @@ private:
 public:
     using contentT = T;
     static const std::size_t elementSize = sizeof(T);
-    Pixelmap(std::size_t n, T* buffer, bool header = true)
+    Pixelmap(std::size_t n, T* buffer, bool header)
         : buffer(buffer), n(n), header(header)
     {
     }

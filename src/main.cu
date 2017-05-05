@@ -69,7 +69,7 @@ int main()
     DEBUG("Uploader created!");
     up.uploadPedestaldata(pedestaldata);
     DEBUG("Pedestals created!");
-    Photonmap ready(0, NULL);
+    Photonmap ready(0, NULL, true);
 
 	DEBUG("starting uploading " << data.getN() << " maps!");
 	
