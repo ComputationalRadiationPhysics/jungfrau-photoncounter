@@ -191,6 +191,7 @@ void Uploader::downloadPedestalmap(struct deviceData stream)
 
 int Uploader::calcFrames(Datamap& data)
 {
+    DEBUG("1");
     // load available device and number of frames
     std::size_t num_photons = DIMX * DIMY * data.getN();
     struct deviceData* dev;
@@ -198,6 +199,7 @@ int Uploader::calcFrames(Datamap& data)
         return false;
     dev->num_frames = data.getN();
 
+    DEBUG("2");
     // allocate memory for the photon data
     dev->photon_host = (PhotonType*)malloc(num_photons * sizeof(PhotonType));
     if (!dev->photon_host) {
@@ -208,6 +210,7 @@ int Uploader::calcFrames(Datamap& data)
     // set state to processing
     dev->state = PROCESSING;
 
+    DEBUG("3");
     // select device
     HANDLE_CUDA_ERROR(cudaSetDevice(dev->device));
 
@@ -215,6 +218,17 @@ int Uploader::calcFrames(Datamap& data)
     HANDLE_CUDA_ERROR(cudaMemcpyAsync(
         dev->data, data.data(),
         num_photons * sizeof(DataType), cudaMemcpyHostToDevice, dev->str));
+
+    DEBUG("From: " << devices[(dev->id - 1) % devices.size()].device); 
+    DEBUG("To: " << dev->device);
+    // transfer pedestal data from last device
+    HANDLE_CUDA_ERROR(cudaMemcpyPeerAsync(
+        dev->pedestal,
+        dev->device, 
+        devices[(dev->id - 1) % devices.size()].pedestal,
+        devices[(dev->id - 1) % devices.size()].device, 
+        3 * DIMX * DIMY * sizeof(PedestalType), dev->str));
+
 
     // calculate photon data and check for kernel errors
     calculate<<<DIMX, DIMY, 0, dev->str>>>(DIMX * DIMY, dev->pedestal,
@@ -246,12 +260,14 @@ void Uploader::uploadPedestaldata(Datamap& pedestaldata)
     std::size_t offset = 0;
 
     // upload and process data package efficiently
-    for (std::size_t i = 0; i < pedestaldata.getN() + GPU_FRAMES;
+    for (std::size_t i = 0; i < pedestaldata.getN()+ GPU_FRAMES;
          i += GPU_FRAMES) {
         Datamap current(GPU_FRAMES, pedestaldata.data() + i);
         if (!calcPedestals(current, offset))
             return;
         offset += GPU_FRAMES;
+
+        DEBUG("Frames " << i << " von " << (pedestaldata.getN() + GPU_FRAMES));
     }
 
     // flush the remaining data
@@ -270,13 +286,13 @@ int Uploader::calcPedestals(Datamap& pedestaldata, uint32_t num)
         return false;
     dev->num_frames = pedestaldata.getN();
 
-    // allocate memory for the pedestal data
+    /*/ allocate memory for the pedestal data
     dev->pedestal_host =
         (PedestalType*)malloc(num_photons * sizeof(PedestalType));
     if (!dev->pedestal_host) {
         fputs("FATAL ERROR (Memory): Allocation failed!\n", stderr);
         exit(EXIT_FAILURE);
-    }
+    }*/
 
     // set state to processing
     dev->state = PROCESSING;
@@ -289,12 +305,22 @@ int Uploader::calcPedestals(Datamap& pedestaldata, uint32_t num)
         dev->data, pedestaldata.data(),
         num_photons * sizeof(DataType), cudaMemcpyHostToDevice, dev->str));
 
+    DEBUG("From: " << devices[(dev->id - 1) % devices.size()].device); 
+    DEBUG("To: " << dev->device);
+    // transfer pedestal data from last device
+    HANDLE_CUDA_ERROR(cudaMemcpyPeerAsync(
+        dev->pedestal,
+        dev->device, 
+        devices[(dev->id - 1) % devices.size()].pedestal,
+        devices[(dev->id - 1) % devices.size()].device, 
+        3 * DIMX * DIMY * sizeof(PedestalType), dev->str));
+
     // calculate photon data and check for kernel errors
-    calibrate<<<DIMX, DIMY, 0, dev->str>>>(DIMX * DIMY, num, dev->data,
-                                           dev->pedestal);
+    calibrate<<<DIMX, DIMY, 0, dev->str>>>(DIMX * DIMY, dev->num_frames, num,
+                                           dev->data, dev->pedestal);
     CHECK_CUDA_KERNEL;
 
-    // download data from GPU to pinned memory
+    /*/ download data from GPU to pinned memory
     HANDLE_CUDA_ERROR(cudaMemcpyAsync(dev->pedestal_pinned, dev->pedestal,
                                       3 * DIMX * DIMY * sizeof(PedestalType),
                                       cudaMemcpyDeviceToHost, dev->str));
@@ -303,6 +329,7 @@ int Uploader::calcPedestals(Datamap& pedestaldata, uint32_t num)
     HANDLE_CUDA_ERROR(cudaMemcpyAsync(dev->pedestal_host, dev->pedestal_pinned,
                                       3 * DIMX * DIMY * sizeof(PedestalType),
                                       cudaMemcpyHostToHost, dev->str));
+*/
 
     // create callback function
     DEBUG("Creating callback pedestals");
