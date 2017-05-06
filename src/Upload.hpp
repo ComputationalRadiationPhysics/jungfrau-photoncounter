@@ -14,6 +14,8 @@ struct deviceData {
     int device;
     int id;
     cudaStream_t str;
+    // Event for sequentiell kernel execution
+    cudaEvent_t event;
     // Pinned data pointer
     PhotonType* photon_host;
 	PhotonType* photon_pinned;

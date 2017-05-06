@@ -127,6 +127,7 @@ void Uploader::initGPUs()
 
         HANDLE_CUDA_ERROR(cudaSetDevice(devices[i].device));
         HANDLE_CUDA_ERROR(cudaStreamCreate(&devices[i].str));
+        HANDLE_CUDA_ERROR(cudaEventCreate(&devices[i].event));
 
         devices[i].gain = allocateFrames<GainType>(false, false, 3);
         devices[i].pedestal = allocateFrames<PedestalType>(false, false, 3);
@@ -210,8 +211,10 @@ int Uploader::calcFrames(Datamap& data)
                                   num_pixels * sizeof(DataType),
 								  cudaMemcpyHostToDevice, dev->str));
  
-    DEBUG("From: " << devices[(dev->id - 1) % devices.size()].device); 
-    DEBUG("To: " << dev->device);
+    // delay further actions until previos kernel finished
+    HANDLE_CUDA_ERROR(cudaStreamWaitEvent(dev->str,
+        devices[(dev->id - 1) % devices.size()].event, 0));
+
     // transfer pedestal data from last device
     HANDLE_CUDA_ERROR(cudaMemcpyPeerAsync(
         dev->pedestal,
@@ -226,16 +229,13 @@ int Uploader::calcFrames(Datamap& data)
                                            dev->num_frames, dev->photon);
     CHECK_CUDA_KERNEL;
 
+    // record new event
+    HANDLE_CUDA_ERROR(cudaEventRecord(dev->event, dev->str));
+
     // download data from GPU to pinned memory
     HANDLE_CUDA_ERROR(cudaMemcpyAsync(dev->photon_pinned, dev->photon,
                                       num_pixels * sizeof(PhotonType),
                                       cudaMemcpyDeviceToHost, dev->str));
-
-	//TODO: does this work this way, or do i have to copy the data in the callback function?????
-    // copy data to 'less expensive' memory
-    HANDLE_CUDA_ERROR(cudaMemcpyAsync(dev->photon_host, dev->photon_pinned,
-                                      num_pixels * sizeof(PhotonType),
-                                      cudaMemcpyHostToHost, dev->str));
 
     // create callback function
     DEBUG("Creating callback ...");
@@ -292,15 +292,11 @@ int Uploader::calcPedestals(Datamap& pedestaldata, uint32_t num)
     // select device
     HANDLE_CUDA_ERROR(cudaSetDevice(dev->device));
 
-	/*    DEBUG("dev->data" << dev->data);
-		  DEBUG("pedestaldata.data()" << pedestaldata.data());*/
     // upload data to GPU
     HANDLE_CUDA_ERROR(cudaMemcpy(
         dev->data, pedestaldata.data(),
         num_pixels * sizeof(DataType), cudaMemcpyHostToDevice));
 
-    //DEBUG("From: " << devices[(dev->id - 1) % devices.size()].device); 
-    //DEBUG("To: " << dev->device);
 
     // transfer pedestal data from last device
     HANDLE_CUDA_ERROR(cudaMemcpyPeer(
@@ -321,8 +317,6 @@ int Uploader::calcPedestals(Datamap& pedestaldata, uint32_t num)
         fputs("FATAL ERROR (RingBuffer): Unexpected size!\n", stderr);
         exit(EXIT_FAILURE);
     }
-
-	//    DEBUG("resources in use: " << resources.getNumberOfElements());
 
     // return number of processed frames
     return GPU_FRAMES;
