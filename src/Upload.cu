@@ -159,6 +159,7 @@ void Uploader::freeGPUs()
         HANDLE_CUDA_ERROR(cudaFree(devices[i].photon));
         HANDLE_CUDA_ERROR(cudaFreeHost(devices[i].photon_pinned));
         HANDLE_CUDA_ERROR(cudaStreamDestroy(devices[i].str));
+        HANDLE_CUDA_ERROR(cudaEventDestroy(devices[i].event));
     }
 }
 
