@@ -247,11 +247,9 @@ int Uploader::calcFrames(Datamap& data)
 
     // download sum data from GPU to pinned memory
     HANDLE_CUDA_ERROR(cudaMemcpyAsync(dev->photonsum_pinned, dev->photonsum,
-                                      num_pixels/SUM_FRAMES * 
-                                      sizeof(PhotonSumType) * 0 + 1,
+                                        DIMX * DIMY * GPU_FRAMES / SUM_FRAMES * 
+                                      sizeof(PhotonSumType),
                                       cudaMemcpyDeviceToHost, dev->str));
-
-DEBUG(num_pixels/SUM_FRAMES * sizeof(PhotonSumType) << " ?= " << dev->photonsum.getSizeBytes());
 
     // create callback function
     DEBUG("Creating callback ...");

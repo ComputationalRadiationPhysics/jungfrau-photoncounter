@@ -4,7 +4,7 @@
 
 // TODO: test different sizes
 const std::size_t GPU_FRAMES = 1000;
-const std::size_t SUM_FRAMES = 10;
+const std::size_t SUM_FRAMES = 100;
 const std::size_t STREAMS_PER_GPU = 2;
 const std::size_t FRAME_HEADER_SIZE = 16;
 const std::size_t DIMX = 1024;
