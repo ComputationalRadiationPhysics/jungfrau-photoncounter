@@ -133,8 +133,12 @@ void Uploader::initGPUs()
         devices[i].pedestal = allocateFrames<PedestalType>(false, false, 3);
         devices[i].data = allocateFrames<DataType>(true, false, GPU_FRAMES);
         devices[i].photon = allocateFrames<PhotonType>(true, false, GPU_FRAMES);
+        devices[i].photonsum = 
+            allocateFrames<PhotonSumType>(false, false, GPU_FRAMES/SUM_FRAMES);
         devices[i].photon_pinned =
             allocateFrames<PhotonType>(true, true, GPU_FRAMES);
+        devices[i].photonsum_pinned =
+            allocateFrames<PhotonSumType>(false, true, GPU_FRAMES/SUM_FRAMES);
 
         uploadGainmap(devices[i]);
 
@@ -157,7 +161,9 @@ void Uploader::freeGPUs()
         HANDLE_CUDA_ERROR(cudaFree(devices[i].pedestal));
         HANDLE_CUDA_ERROR(cudaFree(devices[i].data));
         HANDLE_CUDA_ERROR(cudaFree(devices[i].photon));
+        HANDLE_CUDA_ERROR(cudaFree(devices[i].photonsum));
         HANDLE_CUDA_ERROR(cudaFreeHost(devices[i].photon_pinned));
+        HANDLE_CUDA_ERROR(cudaFreeHost(devices[i].photonsum_pinned));
         HANDLE_CUDA_ERROR(cudaStreamDestroy(devices[i].str));
         HANDLE_CUDA_ERROR(cudaEventDestroy(devices[i].event));
     }
@@ -227,7 +233,8 @@ int Uploader::calcFrames(Datamap& data)
     // calculate photon data and check for kernel errors
     calculate<<<DIMX, DIMY, 0, dev->str>>>(DIMX * DIMY, dev->pedestal,
                                            dev->gain, dev->data,
-                                           dev->num_frames, dev->photon);
+                                           dev->num_frames, dev->photon,
+                                           SUM_FRAMES, dev->photonsum);
     CHECK_CUDA_KERNEL;
 
     // record new event
@@ -237,6 +244,14 @@ int Uploader::calcFrames(Datamap& data)
     HANDLE_CUDA_ERROR(cudaMemcpyAsync(dev->photon_pinned, dev->photon,
                                       num_pixels * sizeof(PhotonType),
                                       cudaMemcpyDeviceToHost, dev->str));
+
+    // download sum data from GPU to pinned memory
+    HANDLE_CUDA_ERROR(cudaMemcpyAsync(dev->photonsum_pinned, dev->photonsum,
+                                      num_pixels/SUM_FRAMES * 
+                                      sizeof(PhotonSumType) * 0 + 1,
+                                      cudaMemcpyDeviceToHost, dev->str));
+
+DEBUG(num_pixels/SUM_FRAMES * sizeof(PhotonSumType) << " ?= " << dev->photonsum.getSizeBytes());
 
     // create callback function
     DEBUG("Creating callback ...");

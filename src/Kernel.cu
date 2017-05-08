@@ -1,14 +1,15 @@
 #include "Kernel.hpp"
 
 __global__ void calculate(uint32_t mapsize, uint64_t* pede, double* gain,
-                          uint16_t* data, uint32_t num, uint16_t* photon)
+                          uint16_t* data, uint32_t num, uint16_t* photon,
+                          uint16_t sumnumber, uint64_t* photonsum)
 {
     // locally save gain/ped values for the associated pixel
     uint16_t lPede[3];
     uint16_t lMovAvg;
     uint32_t lCounter;
     double lGain[3];
-
+ 
     // find id and copy gain/pede maps
     uint32_t id = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -53,6 +54,11 @@ __global__ void calculate(uint32_t mapsize, uint64_t* pede, double* gain,
             break;
         }
         photon[(mapsize * i) + id + (8 * (i + 1))] = int((energy + 6.2) / 12.4);
+        
+        // sum of maps 
+        if (i%sumnumber == 0) photonsum[(mapsize * int(i/sumnumber)) + id] = 0; 
+        photonsum[(mapsize * int(i/sumnumber)) + id] += 
+            int((energy + 6.2) / 12.4);
 
         // copy the header
         if (threadIdx.x < 8) {
