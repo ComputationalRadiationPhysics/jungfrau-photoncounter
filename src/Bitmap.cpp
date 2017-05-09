@@ -22,8 +22,8 @@ struct InfoHeader createInfoHeader(int width, int height)
     struct InfoHeader header;
     header.biSize = sizeof(header);
     header.biWidth = width;
-    /* height negative for top-down image */
-    header.biHeight = -height;
+    /* height positive for bottom-up image */
+    header.biHeight = height;
     header.biPlanes = 1;
     header.biBitCount = 24;
     header.biCompression = BI_RGB;
