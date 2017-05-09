@@ -1,4 +1,21 @@
 #include "Upload.hpp"
+#include "Bitmap.hpp"
+#include <iomanip>
+#include <iostream>
+#include <string>
+
+template<typename Maptype> void save_image(std::string path, Maptype map, std::size_t frame_number, double divider = 256) {
+	Bitmap::Image img(1024, 512);
+	for(int j = 0; j < 1024; j++) {
+		for(int k=0; k < 512; k++) {
+			int h = map(j, k, frame_number) / divider;
+			Bitmap::Rgb color = {(unsigned char)h, (unsigned char)h, (unsigned char)h};
+			img(j, k) = color;
+		}
+	}
+	img.writeToFile(path);
+}
+
 
 std::size_t Uploader::nextFree = 0;
 std::vector<deviceData> Uploader::devices;
@@ -102,6 +119,12 @@ Photonmap Uploader::download()
 
     dev->state = FREE;
 
+
+	//TODO: fix this
+	PhotonSumMap psm(10, dev->photonsum_pinned, false);
+    save_image<PhotonSumMap>(std::string("sum0.bmp"), psm, std::size_t(0), SUM_FRAMES * 255);
+
+	
     if (!resources.push(&devices[current])) {
         fputs("FATAL ERROR (RingBuffer): Unexpected size!\n", stderr);
         exit(EXIT_FAILURE);
@@ -191,6 +214,24 @@ void Uploader::downloadGainmap(struct deviceData stream)
                                  cudaMemcpyDeviceToHost));
 }
 
+void Uploader::downloadPedestalmap()
+{
+	struct deviceData stream = devices[nextFree];
+	
+	std::size_t s = DIMX * DIMY * 3 * sizeof(PedestalType);
+	PedestalType* pedestal_host = (PedestalType*)malloc(s);
+	if(!pedestal_host)
+		return;
+    HANDLE_CUDA_ERROR(cudaSetDevice(stream.device));
+    HANDLE_CUDA_ERROR(cudaMemcpy(pedestal_host, stream.pedestal,
+                                 s, cudaMemcpyDeviceToHost));
+
+	Pedestalmap pm(3, pedestal_host, false);
+	save_image<Pedestalmap>(std::string("pedestal0.bmp"), pm, 0, 1);
+	save_image<Pedestalmap>(std::string("pedestal1.bmp"), pm, 1, 1);
+	save_image<Pedestalmap>(std::string("pedestal2.bmp"), pm, 2, 1);
+}
+
 int Uploader::calcFrames(Datamap& data)
 {
     // load available device and number of frames
@@ -251,6 +292,10 @@ int Uploader::calcFrames(Datamap& data)
                                       sizeof(PhotonSumType),
                                       cudaMemcpyDeviceToHost, dev->str));
 
+    // download data from GPU to pinned memory
+    HANDLE_CUDA_ERROR(cudaMemcpyAsync(dev->photon_host, dev->photon_pinned,
+                                      num_pixels * sizeof(PhotonType),
+                                      cudaMemcpyHostToHost, dev->str));
     // create callback function
     DEBUG("Creating callback ...");
     HANDLE_CUDA_ERROR(

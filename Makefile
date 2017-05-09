@@ -6,8 +6,8 @@ APP := photoncounter
 # CXX: Compiler. Choose between g++, clang++, nvcc
 CXX := nvcc
 # CXXFLAGS: Compiler flags. Required: c++11, MMD
-CXXFLAGS := -std=c++11 -MMD -Wall -Wextra -pedantic -g3
-NVCCFLAGS := -std=c++11 --compiler-options -Wall,-Wextra,-MMD,-g3
+CXXFLAGS := -std=c++11 -MMD -Wall -Wextra -pedantic -O3
+NVCCFLAGS := -std=c++11 --compiler-options -Wall,-Wextra,-MMD,-O3
 # LD: Linker. Usually the same as the compiler
 LD := $(CXX)
 # LDFLAGS: Linker flags.

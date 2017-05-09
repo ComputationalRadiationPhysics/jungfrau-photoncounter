@@ -28,6 +28,7 @@ struct deviceData {
     GainType* gain;
     // Maps
     Gainmap* gain_host;
+	Pedestalmap* pedestal_host;
     // State
     ProcessingState state;
     // Number of frames
@@ -45,6 +46,9 @@ public:
     std::size_t upload(Datamap& data, std::size_t offset);
     void uploadPedestaldata(Datamap& data);
     Photonmap download();
+
+	
+	void downloadPedestalmap();
 
     void synchronize();
     void printDeviceName() const;

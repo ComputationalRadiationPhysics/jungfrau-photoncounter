@@ -124,6 +124,8 @@ int main()
 	
 	up.synchronize();
 
+	up.downloadPedestalmap();
+	
 	std::size_t internal_offset = 0;	
 	while(!up.isEmpty()) {
 		if(!(ready = up.download()).getN())

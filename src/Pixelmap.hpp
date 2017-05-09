@@ -44,3 +44,4 @@ using Datamap = Pixelmap<DataType>;
 using Gainmap = Pixelmap<GainType>;
 using Pedestalmap = Pixelmap<PedestalType>;
 using Photonmap = Pixelmap<PhotonType>;
+using PhotonSumMap = Pixelmap<PhotonSumType>;
