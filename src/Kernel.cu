@@ -40,15 +40,15 @@ __global__ void calculate(uint32_t mapsize, uint64_t* pede, double* gain,
 
                 lPede[0] = lMovAvg / lCounter;
             }
-            energy = (adc - lPede[0]) * lGain[0];
+            energy = (adc - lPede[0]) / lGain[0];
             if (energy < 0) energy = 0;
             break;
         case 1:
-            energy = (lPede[1] - adc) * lGain[1];
+            energy = (-1) * (lPede[1] - adc) / lGain[1];
             if (energy < 0) energy = 0;
             break;
         case 3:
-            energy = (lPede[2] - adc) * lGain[2];
+            energy = (-1) * (lPede[2] - adc) / lGain[2];
             if (energy < 0) energy = 0;
             break;
         default:
