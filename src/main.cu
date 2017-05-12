@@ -7,7 +7,7 @@
 
 const std::size_t NUM_UPLOADS = 2;
 
-template<typename Maptype> void save_image(std::string path, Maptype map, std::size_t frame_number, double divider = 256) {
+template<typename Maptype> void save_image(std::string path, Maptype map, std::size_t frame_number, double divider = 128) {
 	Bitmap::Image img(1024, 512);
 	for(int j = 0; j < 1024; j++) {
 		for(int k=0; k < 512; k++) {
@@ -24,7 +24,7 @@ int main()
     DEBUG("Entering main ...");
     Filecache fc(1024UL * 1024 * 1024 * 16);
     Datamap pedestaldata = fc.loadMaps<Datamap>(
-        "data_pool/px_101016/allpede_250us_1243__B_000000.dat");
+        "data_pool/px_101016/allpede_250us_1243__B_000000.dat", true);
     Datamap data = fc.loadMaps<Datamap>(
         "data_pool/px_101016/Insu_6_tr_1_45d_250us__B_000000.dat", true);
     Gainmap gain =
@@ -124,8 +124,6 @@ int main()
 	
 	up.synchronize();
 
-	up.downloadPedestalmap();
-	
 	std::size_t internal_offset = 0;	
 	while(!up.isEmpty()) {
 		if(!(ready = up.download()).getN())

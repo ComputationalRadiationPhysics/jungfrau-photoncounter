@@ -8,14 +8,13 @@ template<typename Maptype> void save_image(std::string path, Maptype map, std::s
 	Bitmap::Image img(1024, 512);
 	for(int j = 0; j < 1024; j++) {
 		for(int k=0; k < 512; k++) {
-			int h = map(j, k, frame_number) / divider;
+			int h = int(map(j, k, frame_number)&0x000000000000ffff) / divider;
 			Bitmap::Rgb color = {(unsigned char)h, (unsigned char)h, (unsigned char)h};
 			img(j, k) = color;
 		}
 	}
 	img.writeToFile(path);
 }
-
 
 std::size_t Uploader::nextFree = 0;
 std::vector<deviceData> Uploader::devices;
@@ -214,22 +213,20 @@ void Uploader::downloadGainmap(struct deviceData stream)
                                  cudaMemcpyDeviceToHost));
 }
 
-void Uploader::downloadPedestalmap()
+void Uploader::downloadPedestalmap(deviceData* stream)
 {
-	struct deviceData stream = devices[nextFree];
-	
 	std::size_t s = DIMX * DIMY * 3 * sizeof(PedestalType);
 	PedestalType* pedestal_host = (PedestalType*)malloc(s);
 	if(!pedestal_host)
 		return;
-    HANDLE_CUDA_ERROR(cudaSetDevice(stream.device));
-    HANDLE_CUDA_ERROR(cudaMemcpy(pedestal_host, stream.pedestal,
+    HANDLE_CUDA_ERROR(cudaSetDevice(stream->device));
+    HANDLE_CUDA_ERROR(cudaMemcpy(pedestal_host, stream->pedestal,
                                  s, cudaMemcpyDeviceToHost));
 
 	Pedestalmap pm(3, pedestal_host, false);
-	save_image<Pedestalmap>(std::string("pedestal0.bmp"), pm, 0, 1);
-	save_image<Pedestalmap>(std::string("pedestal1.bmp"), pm, 1, 1);
-	save_image<Pedestalmap>(std::string("pedestal2.bmp"), pm, 2, 1);
+	save_image<Pedestalmap>(std::string("pedestal0.bmp"), pm, 0);
+	save_image<Pedestalmap>(std::string("pedestal1.bmp"), pm, 1);
+	save_image<Pedestalmap>(std::string("pedestal2.bmp"), pm, 2);
 }
 
 int Uploader::calcFrames(Datamap& data)
@@ -310,15 +307,10 @@ void Uploader::uploadPedestaldata(Datamap& pedestaldata)
     std::size_t offset = 0;
     std::size_t map_size = pedestaldata.getPixelsPerFrame();
 
-    if (pedestaldata.getN() != 3000) {
-        fputs("FATAL ERROR (pedestal init data): Unexpected size!\n", stderr);
-        exit(EXIT_FAILURE);
-    }
-	
     // upload and process data package efficiently
     // TODO test; at least 2999 frames for pedestals
     while (offset <= pedestaldata.getN() - GPU_FRAMES) {
-        Datamap current(GPU_FRAMES, pedestaldata.data() + offset * map_size, false);
+        Datamap current(GPU_FRAMES, pedestaldata.data() + offset * map_size, true);
         if (!calcPedestals(current, offset))
             return;
 
@@ -329,7 +321,7 @@ void Uploader::uploadPedestaldata(Datamap& pedestaldata)
 
     // flush the remaining data
     if (offset < pedestaldata.getN()) {
-        Datamap current(GPU_FRAMES, pedestaldata.data() + offset * map_size, false);
+        Datamap current(GPU_FRAMES, pedestaldata.data() + offset * map_size, true);
         calcPedestals(current, offset);
     }
 }
@@ -376,6 +368,8 @@ int Uploader::calcPedestals(Datamap& pedestaldata, uint32_t num)
         fputs("FATAL ERROR (RingBuffer): Unexpected size!\n", stderr);
         exit(EXIT_FAILURE);
     }
+    
+    downloadPedestalmap(dev);
 
     // return number of processed frames
     return GPU_FRAMES;

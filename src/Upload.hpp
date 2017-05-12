@@ -48,7 +48,7 @@ public:
     Photonmap download();
 
 	
-	void downloadPedestalmap();
+	void downloadPedestalmap(deviceData* stream);
 
     void synchronize();
     void printDeviceName() const;

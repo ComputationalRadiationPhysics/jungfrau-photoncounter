@@ -1,4 +1,4 @@
-#include "Kernel.hpp"
+#include "Kernel.hpp" 
 
 __global__ void calculate(uint32_t mapsize, uint64_t* pede, double* gain,
                           uint16_t* data, uint32_t num, uint16_t* photon,
@@ -6,7 +6,7 @@ __global__ void calculate(uint32_t mapsize, uint64_t* pede, double* gain,
 {
     // locally save gain/ped values for the associated pixel
     uint16_t lPede[3];
-    uint16_t lMovAvg;
+    uint32_t lMovAvg;
     uint32_t lCounter;
     double lGain[3];
  
@@ -24,7 +24,7 @@ __global__ void calculate(uint32_t mapsize, uint64_t* pede, double* gain,
 
     // calc the energy value for one pixel in each frame
     for (int i = 0; i < num; ++i) {
-        // 8*(i++) is the header of each frame
+        // 8*(i++) is the header612 of each frame
         uint16_t dataword = data[(mapsize * i) + id + (8 * (i + 1))];
         uint16_t adc = dataword & 0x3fff;
         float energy;
@@ -40,14 +40,16 @@ __global__ void calculate(uint32_t mapsize, uint64_t* pede, double* gain,
 
                 lPede[0] = lMovAvg / lCounter;
             }
-            else
-                energy = (adc - lPede[0]) * lGain[0];
+            energy = (adc - lPede[0]) * lGain[0];
+            if (energy < 0) energy = 0;
             break;
         case 1:
             energy = (lPede[1] - adc) * lGain[1];
+            if (energy < 0) energy = 0;
             break;
         case 3:
             energy = (lPede[2] - adc) * lGain[2];
+            if (energy < 0) energy = 0;
             break;
         default:
             energy = 0;
@@ -80,51 +82,60 @@ __global__ void calibrate(uint32_t mapsize, uint32_t num, uint32_t currentnum,
     // 32 bit counter; 16 bit moving average; 16 bit offset
     // for calibration only average = offset
     uint32_t counter;
-    uint16_t average;
+    uint32_t average;
+    uint32_t i = currentnum;
 
+    // initialize values
     if (currentnum == 0) {
-        counter = 0;
-        average = 0;
-    } else {
+       pede[id] = 0;
+       pede[mapsize + id] = 0;
+       pede[(2 * mapsize) + id] = 0;
+    } 
+
+    // base value for pedestal stage 0
+    if (i < 1000){
         counter = pede[id] & 0xffffffff00000000;
         average = pede[id] & 0x00000000ffff0000;
     }
-
-    // base value for pedestal stage 0
-    for (int i = currentnum; i < 1000 && i < num; i++) {
-        average += data[(mapsize * i) + id] & 0x3fff;
+    for (; i < 1000 && i < num; i++) {
+        average += data[(mapsize * i) + id + (8 * (i + 1))] & 0x3fff;
         counter++;
     }
-
-    average = round((double)average / counter);
-
-    // combine all values into one 64 bit dataword, so we only need one map
-    pede[id] = ((uint64_t)counter << 32) | ((uint64_t)average << 16) |
-               (uint64_t)average;
+    if (currentnum < 1000){
+        // combine all values into one 64 bit dataword, so we only need one map
+        if(i == 1000) average = round((double)average / counter);
+        pede[id] = (((uint64_t)counter) << 32) | (((uint64_t)average) << 16) |
+                   (uint64_t)average;
+    }
 
     // base value for pedestal stage 1
-    average = 0;
-    counter = 0;
-    for (int i = currentnum; i > 999 && i < 2000 && i < (999 + num); i++) {
-        average += data[(mapsize * (i - currentnum)) + id] & 0x3fff;
+    if (i > 999 && i < 2000) {
+        counter = pede[mapsize + id] & 0xffffffff00000000;
+        average = pede[mapsize + id] & 0x00000000ffff0000;
+    }
+    for (; i > 999 && i < 2000 && i < (1000 + num); i++) {
+        average += data[(mapsize * (i - currentnum)) + id + (8 * (i + 1))] & 0x3fff;
         counter++;
     }
-
-    average = round((double)average / counter);
-
-    pede[mapsize + id] = ((uint64_t)counter << 32) | ((uint64_t)average << 16) |
-                         (uint64_t)average;
+    if (currentnum > 999 && currentnum < 2000) {
+        if(i == 2000) average = round((double)average / counter);
+        pede[mapsize + id] = (((uint64_t)counter) << 32) |
+                             (((uint64_t)average) << 16) | (uint64_t)average;
+    }
 
     // base value for pedestal stage 3
-    average = 0;
-    counter = 0;
-    for (int i = currentnum; i > 1999 && i < 2999 && i < (1999 + num); i++) {
-        average += data[(mapsize * (i - currentnum)) + id] & 0x3fff;
+    if (i > 1999 && i < 3000) {
+        counter = pede[(2 * mapsize) + id] & 0xffffffff00000000;
+        average = pede[(2 * mapsize) + id] & 0x00000000ffff0000;
+    }
+    for (; i > 1999 && i < 3000 && i < (2000 + num); i++) {
+        average += data[(mapsize * (i - currentnum)) + id + (8 * (i + 1))] & 0x3fff;
         counter++;
     }
-
-    average = round((double)average / counter);
-
-    pede[(mapsize * 2) + id] = ((uint64_t)counter << 32) |
-                               ((uint64_t)average << 16) | (uint64_t)average;
+    if (currentnum > 1999 && currentnum < 3000) {
+        if(i == 3000) average = round((double)average / counter);
+        pede[(mapsize * 2) + id] = (((uint64_t)counter) << 32) |
+                                   (((uint64_t)average) << 16) |
+                                   (uint64_t)average;
+    }
 }
