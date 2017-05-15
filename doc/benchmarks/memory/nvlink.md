@@ -3,7 +3,7 @@ NVLink Memory Benchmark
 
 Test System:
  - Linux 3.10.0
- - 160 x POWER8NVL @ 4.023GHz
+ - POWER8NVL @ 4.023GHz (160 cores)
  - 4 x Tesla P100-SXM2-16GB
  - 256GB RAM
 
@@ -109,7 +109,7 @@ Running on...
 ```
 
 multiple GPUs
-=============
+-------------
 
 ```
 [CUDA Bandwidth Test] - Starting...
