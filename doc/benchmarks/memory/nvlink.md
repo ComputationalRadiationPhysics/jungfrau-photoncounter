@@ -4,7 +4,7 @@ NVLink Memory Benchmark
 Test System:
  - Linux 3.10.0
  - 160 x POWER8NVL @ 4.023GHz
- - 8 x Tesla P100-SXM2-16GB
+ - 4 x Tesla P100-SXM2-16GB
  - 256GB RAM
 
 Further details on the GPU:
