@@ -107,3 +107,36 @@ Running on...
    Transfer Size (Bytes)	Bandwidth(MB/s)
    33554432			500596.4
 ```
+
+multiple GPUs
+=============
+
+```
+[CUDA Bandwidth Test] - Starting...
+
+!!!!!Cumulative Bandwidth to be computed from all the devices !!!!!!
+
+Running on...
+
+ Device 0: Tesla P100-SXM2-16GB
+ Device 1: Tesla P100-SXM2-16GB
+ Device 2: Tesla P100-SXM2-16GB
+ Device 3: Tesla P100-SXM2-16GB
+ Quick Mode
+
+ Host to Device Bandwidth, 4 Device(s)
+ PINNED Memory Transfers
+   Transfer Size (Bytes)	Bandwidth(MB/s)
+   33554432			127305.9
+
+ Device to Host Bandwidth, 4 Device(s)
+ PINNED Memory Transfers
+   Transfer Size (Bytes)	Bandwidth(MB/s)
+   33554432			108332.4
+
+ Device to Device Bandwidth, 4 Device(s)
+ PINNED Memory Transfers
+   Transfer Size (Bytes)	Bandwidth(MB/s)
+   33554432			1989760.4
+
+```
