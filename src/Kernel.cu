@@ -74,7 +74,7 @@ __global__ void calculate(uint32_t mapsize, uint64_t* pede, double* gain,
                (uint64_t)lPede[0];
 }
 
-__global__ void calibrate(uint32_t mapsize, uint32_t num, uint32_t currentnum,
+/*__global__ void calibrate(uint32_t mapsize, uint32_t num, uint32_t currentnum,
                           uint16_t* data, uint64_t* pede)
 {
     uint32_t id = blockIdx.x * blockDim.x + threadIdx.x;
@@ -138,4 +138,4 @@ __global__ void calibrate(uint32_t mapsize, uint32_t num, uint32_t currentnum,
                                    (((uint64_t)average) << 16) |
                                    (uint64_t)average;
     }
-}
+}*/
