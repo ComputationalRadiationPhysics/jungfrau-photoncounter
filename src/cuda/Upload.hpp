@@ -1,10 +1,12 @@
 #pragma once
 
-#include "Config.hpp"
-#include "CudaHeader.hpp"
-#include "Kernel.hpp"
-#include "Pixelmap.hpp"
-#include "RingBuffer.hpp"
+#include "../Config.hpp"
+#include "../CudaHeader.hpp"
+#include "CalculationKernel.hpp"
+#include "CalibrationKernel.hpp"
+#include "SummationKernel.hpp"
+#include "../Pixelmap.hpp"
+#include "../RingBuffer.hpp"
 #include <cmath>
 
 enum ProcessingState { FREE, PROCESSING, READY };
@@ -73,5 +75,5 @@ private:
     void downloadGainmap(struct deviceData stream);
 
     int calcFrames(Datamap& data);
-    int calcPedestals(Datamap& data, uint32_t num);
+    int calcPedestals(Datamap& data);
 };

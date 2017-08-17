@@ -1,18 +1,20 @@
 #include "Bitmap.hpp"
 #include "Filecache.hpp"
-#include "Upload.hpp"
+#include "cuda/Upload.hpp"
 #include <iomanip>
 #include <iostream>
 #include <string>
 
-const std::size_t NUM_UPLOADS = 2;
+const std::size_t NUM_UPLOADS = 1;
 
 template<typename Maptype> void save_image(std::string path, Maptype map, std::size_t frame_number, double divider = 128) {
 	Bitmap::Image img(1024, 512);
 	for(int j = 0; j < 1024; j++) {
 		for(int k=0; k < 512; k++) {
 			int h = map(j, k, frame_number) / divider;
-			Bitmap::Rgb color = {(unsigned char)h, (unsigned char)h, (unsigned char)h};
+             Bitmap::Rgb color = {(unsigned char)(h & 255), 
+                (unsigned char)((h >> 8) & 255),
+                (unsigned char)((h >> 16) & 255)};
 			img(j, k) = color;
 		}
 	}
@@ -31,34 +33,7 @@ int main()
         fc.loadMaps<Gainmap>("data_pool/px_101016/gainMaps_M022.bin");
     DEBUG("Maps loaded!");
 
-    save_image<Datamap>(std::string("test.bmp"), data, std::size_t(0));
-    save_image<Datamap>(std::string("test1.bmp"), data, std::size_t(1));
-    save_image<Datamap>(std::string("test2.bmp"), data, std::size_t(2));
-    save_image<Datamap>(std::string("test3.bmp"), data, std::size_t(3));
-    save_image<Datamap>(std::string("test4.bmp"), data, std::size_t(4));
-    save_image<Datamap>(std::string("test5.bmp"), data, std::size_t(5));
-    save_image<Datamap>(std::string("test6.bmp"), data, std::size_t(6));
-    save_image<Datamap>(std::string("test7.bmp"), data, std::size_t(7));
-    save_image<Datamap>(std::string("test8.bmp"), data, std::size_t(8));
-    save_image<Datamap>(std::string("test9.bmp"), data, std::size_t(9));
-    save_image<Datamap>(std::string("test10.bmp"), data, std::size_t(10));
-    save_image<Datamap>(std::string("test11.bmp"), data, std::size_t(11));
-    save_image<Datamap>(std::string("test12.bmp"), data, std::size_t(12));
-    save_image<Datamap>(std::string("test13.bmp"), data, std::size_t(13));
-    save_image<Datamap>(std::string("test14.bmp"), data, std::size_t(14));
-    save_image<Datamap>(std::string("test15.bmp"), data, std::size_t(15));
-    save_image<Datamap>(std::string("test16.bmp"), data, std::size_t(16));
-    save_image<Datamap>(std::string("test17.bmp"), data, std::size_t(17));
-    save_image<Datamap>(std::string("test18.bmp"), data, std::size_t(18));
-    save_image<Datamap>(std::string("test19.bmp"), data, std::size_t(19));
-    save_image<Datamap>(std::string("test20.bmp"), data, std::size_t(20));
     save_image<Datamap>(std::string("test21.bmp"), data, std::size_t(21));
-    save_image<Datamap>(std::string("test22.bmp"), data, std::size_t(22));
-    save_image<Datamap>(std::string("test23.bmp"), data, std::size_t(23));
-    save_image<Datamap>(std::string("test24.bmp"), data, std::size_t(24));
-    save_image<Datamap>(std::string("test500.bmp"), data, std::size_t(500));
-    save_image<Datamap>(std::string("test999.bmp"), data, std::size_t(999));
-    save_image<Datamap>(std::string("test1000.bmp"), data, std::size_t(1000));
 
     int num = 0;
     HANDLE_CUDA_ERROR(cudaGetDeviceCount(&num));

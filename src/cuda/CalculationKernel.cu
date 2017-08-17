@@ -1,8 +1,6 @@
 #include "CalculationKernel.hpp"
-#include "Settinge.hpp"
-#include <limits>
 
-__global__ void calculate(uint16_t* data, uint64_t* pede, double* gain,
+__global__ void calculate(uint16_t* data, pedestal* pede, double* gainmap,
                             uint32_t num, uint16_t* photon)
 {
     uint32_t id = blockIdx.x * blockDim.x + threadIdx.x;
@@ -10,16 +8,15 @@ __global__ void calculate(uint16_t* data, uint64_t* pede, double* gain,
     uint16_t pedestal[3];
     uint32_t pCounter;
     uint32_t pMovAvg;
-    uint32_t max = std::numeric_limits<uint32_t>::max();
 
-    double gain[3]
+    double gain[3];
 
     for(int i = 0; i < 3; i++) {
         pedestal[i] = pede[(i * MAPSIZE) + id].value;
-        gain[i] = gain[(i * MAPSIZE) + id].value;
+        gain[i] = gainmap[(i * MAPSIZE) + id];
     }
-    pCounter = pede[0].counter;
-    pMovAvg = pede[0].movAvg;
+    pCounter = pede[id].counter;
+    pMovAvg = pede[id].movAvg;
 
     uint16_t dataword;
     uint16_t adc;
@@ -34,28 +31,28 @@ __global__ void calculate(uint16_t* data, uint64_t* pede, double* gain,
             if (adc < 100) {
                 // calibration for dark pixels
                 pMovAvg = pMovAvg + adc - (pMovAvg / pCounter);
-                if (lCounter < max)
-                    lCounter++;
+                if (pCounter < MAXINT)
+                    pCounter++;
 
-                lPede[0] = lMovAvg / lCounter;
+                pedestal[0] = pMovAvg / pCounter;
             }
-            energy = (adc - pedestal[0]) / gain[0];
+            energy = (adc - pedestal[0]);
             if (energy < 0) energy = 0;
             break;
         case 1:
-            energy = (-1) * (pedestal[1] - adc) / gain[1];
+            energy = (-1) * (pedestal[1] - adc);
             if (energy < 0) energy = 0;
             break;
         case 3:
-            energy = (-1) * (pedestal[2] - adc) / gain[2];
+            energy = (-1) * (pedestal[2] - adc);
             if (energy < 0) energy = 0;
             break;
         default:
             energy = 0;
             break;
         }
-        photon[(MAPSIZE * i) + id + (FRAMEOFFSET * (i + 1))] = 
-            int((energy + BEAMCONST) * PHOTONCONST);
+        photon[(MAPSIZE * i) + id + (FRAMEOFFSET * (i + 1))] = photon[0]; 
+            //int((energy + BEAMCONST) * PHOTONCONST);
         
         // copy the header
         if (threadIdx.x < 8) {
@@ -64,7 +61,7 @@ __global__ void calculate(uint16_t* data, uint64_t* pede, double* gain,
         }
     }
     // save new pedestal value
-    pede[id] = ((uint64_t)lCounter << 32) | ((uint64_t)lMovAvg << 16) |
-               (uint64_t)lPede[0];
-
+    pede[id].value = pedestal[0];
+    pede[id].counter = pCounter;
+    pede[id].movAvg = pMovAvg;
 }

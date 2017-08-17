@@ -1,19 +1,23 @@
+#include "../Bitmap.hpp"
 #include "Upload.hpp"
-#include "Bitmap.hpp"
 #include <iomanip>
 #include <iostream>
 #include <string>
 
-template<typename Maptype> void save_image(std::string path, Maptype map, std::size_t frame_number, double divider = 256) {
-	Bitmap::Image img(1024, 512);
-	for(int j = 0; j < 1024; j++) {
-		for(int k=0; k < 512; k++) {
-			int h = int(map(j, k, frame_number)&0x000000000000ffff) / divider;
-			Bitmap::Rgb color = {(unsigned char)h, (unsigned char)h, (unsigned char)h};
-			img(j, k) = color;
-		}
-	}
-	img.writeToFile(path);
+template <typename Maptype>
+void save_image(std::string path, Maptype map, std::size_t frame_number)
+{
+    Bitmap::Image img(1024, 512);
+    for (int j = 0; j < 1024; j++) {
+        for (int k = 0; k < 512; k++) {
+            int h = int(map(j, k, frame_number) & 0x000000000000ffff)/SUM_FRAMES;
+            Bitmap::Rgb color = {(unsigned char)(h & 255), 
+                (unsigned char)((h >> 8) & 255),
+                (unsigned char)((h >> 16) & 255)};
+            img(j, k) = color;
+        }
+    }
+    img.writeToFile(path);
 }
 
 std::size_t Uploader::nextFree = 0;
@@ -84,20 +88,22 @@ std::size_t Uploader::upload(Datamap& data, std::size_t offset)
     while (ret <= data.getN() - GPU_FRAMES) {
         DEBUG("-->current offset is "
               << ret * map_size << " (max: " << data.getSizeBytes() << ")");
-        Datamap current(GPU_FRAMES, data.data() + ret * map_size / sizeof(DataType), true);
+        Datamap current(GPU_FRAMES,
+                        data.data() + ret * map_size / sizeof(DataType), true);
 
         // TODO: (below) is this even a valid state???
         if (!calcFrames(current))
             return ret;
-		
-		ret += GPU_FRAMES;
+
+        ret += GPU_FRAMES;
     }
 
     // flush the remaining data
     if (ret < data.getN()) {
         DEBUG("-->last offset is " << ret * map_size
                                    << " (max: " << data.getSizeBytes() << ")");
-        Datamap current(ret - data.getN(), data.data() + ret * map_size / sizeof(DataType), true);
+        Datamap current(ret - data.getN(),
+                        data.data() + ret * map_size / sizeof(DataType), true);
         ret += calcFrames(current);
     }
 
@@ -118,12 +124,10 @@ Photonmap Uploader::download()
 
     dev->state = FREE;
 
+    // TODO: fix this
+    PhotonSumMap psm(10, dev->photonsum_pinned, false);
+    save_image<PhotonSumMap>(std::string("sum0.bmp"), psm, std::size_t(0));
 
-	//TODO: fix this
-	PhotonSumMap psm(10, dev->photonsum_pinned, false);
-    save_image<PhotonSumMap>(std::string("sum0.bmp"), psm, std::size_t(0), SUM_FRAMES * 255);
-
-	
     if (!resources.push(&devices[current])) {
         fputs("FATAL ERROR (RingBuffer): Unexpected size!\n", stderr);
         exit(EXIT_FAILURE);
@@ -155,12 +159,12 @@ void Uploader::initGPUs()
         devices[i].pedestal = allocateFrames<PedestalType>(false, false, 3);
         devices[i].data = allocateFrames<DataType>(true, false, GPU_FRAMES);
         devices[i].photon = allocateFrames<PhotonType>(true, false, GPU_FRAMES);
-        devices[i].photonsum = 
-            allocateFrames<PhotonSumType>(false, false, GPU_FRAMES/SUM_FRAMES);
+        devices[i].photonsum = allocateFrames<PhotonSumType>(
+            false, false, GPU_FRAMES / SUM_FRAMES);
         devices[i].photon_pinned =
             allocateFrames<PhotonType>(true, true, GPU_FRAMES);
         devices[i].photonsum_pinned =
-            allocateFrames<PhotonSumType>(false, true, GPU_FRAMES/SUM_FRAMES);
+            allocateFrames<PhotonSumType>(false, true, GPU_FRAMES / SUM_FRAMES);
 
         uploadGainmap(devices[i]);
 
@@ -215,18 +219,13 @@ void Uploader::downloadGainmap(struct deviceData stream)
 
 void Uploader::downloadPedestalmap(deviceData* stream)
 {
-	std::size_t s = DIMX * DIMY * 3 * sizeof(PedestalType);
-	PedestalType* pedestal_host = (PedestalType*)malloc(s);
-	if(!pedestal_host)
-		return;
+    std::size_t s = MAPSIZE * 3 * sizeof(PedestalType);
+    PedestalType* pedestal_host = (PedestalType*)malloc(s);
+    if (!pedestal_host)
+        return;
     HANDLE_CUDA_ERROR(cudaSetDevice(stream->device));
-    HANDLE_CUDA_ERROR(cudaMemcpy(pedestal_host, stream->pedestal,
-                                 s, cudaMemcpyDeviceToHost));
-
-	Pedestalmap pm(3, pedestal_host, false);
-	save_image<Pedestalmap>(std::string("pedestal0.bmp"), pm, 0);
-	save_image<Pedestalmap>(std::string("pedestal1.bmp"), pm, 1);
-	save_image<Pedestalmap>(std::string("pedestal2.bmp"), pm, 2);
+    HANDLE_CUDA_ERROR(
+        cudaMemcpy(pedestal_host, stream->pedestal, s, cudaMemcpyDeviceToHost));
 }
 
 int Uploader::calcFrames(Datamap& data)
@@ -251,28 +250,29 @@ int Uploader::calcFrames(Datamap& data)
     // select device
     HANDLE_CUDA_ERROR(cudaSetDevice(dev->device));
 
-	//upload data to GPU
-	HANDLE_CUDA_ERROR(cudaMemcpyAsync(dev->data, data.data(),
-                                  num_pixels * sizeof(DataType),
-								  cudaMemcpyHostToDevice, dev->str));
- 
+    // upload data to GPU
+    HANDLE_CUDA_ERROR(cudaMemcpyAsync(dev->data, data.data(),
+                                      num_pixels * sizeof(DataType),
+                                      cudaMemcpyHostToDevice, dev->str));
+
     // delay further actions until previos kernel finished
-    HANDLE_CUDA_ERROR(cudaStreamWaitEvent(dev->str,
-        devices[(dev->id - 1) % devices.size()].event, 0));
+    HANDLE_CUDA_ERROR(cudaStreamWaitEvent(
+        dev->str, devices[(dev->id - 1) % devices.size()].event, 0));
 
     // transfer pedestal data from last device
-    HANDLE_CUDA_ERROR(cudaMemcpyPeerAsync(
-        dev->pedestal,
-        dev->device, 
-        devices[(dev->id - 1) % devices.size()].pedestal,
-        devices[(dev->id - 1) % devices.size()].device, 
-        3 * DIMX * DIMY * sizeof(PedestalType), dev->str));
+    HANDLE_CUDA_ERROR(
+        cudaMemcpyPeerAsync(dev->pedestal, dev->device,
+                            devices[(dev->id - 1) % devices.size()].pedestal,
+                            devices[(dev->id - 1) % devices.size()].device,
+                            3 * DIMX * DIMY * sizeof(PedestalType), dev->str));
 
     // calculate photon data and check for kernel errors
-    calculate<<<DIMX, DIMY, 0, dev->str>>>(DIMX * DIMY, dev->pedestal,
-                                           dev->gain, dev->data,
-                                           dev->num_frames, dev->photon,
-                                           SUM_FRAMES, dev->photonsum);
+    calculate<<<DIMX, DIMY, 0, dev->str>>>(dev->data, dev->pedestal, dev->gain,
+                                           dev->num_frames, dev->photon);
+
+    sum<<<DIMX, DIMY, 0, dev->str>>>(dev->photon, SUM_FRAMES, dev->num_frames,
+                                     dev->photonsum);
+
     CHECK_CUDA_KERNEL;
 
     // record new event
@@ -285,16 +285,18 @@ int Uploader::calcFrames(Datamap& data)
 
     // download sum data from GPU to pinned memory
     HANDLE_CUDA_ERROR(cudaMemcpyAsync(dev->photonsum_pinned, dev->photonsum,
-                                        DIMX * DIMY * GPU_FRAMES / SUM_FRAMES * 
-                                      sizeof(PhotonSumType),
+                                      DIMX * DIMY * GPU_FRAMES / SUM_FRAMES *
+                                          sizeof(PhotonSumType),
                                       cudaMemcpyDeviceToHost, dev->str));
 
     // download data from GPU to pinned memory
     HANDLE_CUDA_ERROR(cudaMemcpyAsync(dev->photon_host, dev->photon_pinned,
                                       num_pixels * sizeof(PhotonType),
                                       cudaMemcpyHostToHost, dev->str));
+
     // create callback function
     DEBUG("Creating callback ...");
+
     HANDLE_CUDA_ERROR(
         cudaStreamAddCallback(dev->str, Uploader::callback, &dev->id, 0));
 
@@ -310,28 +312,31 @@ void Uploader::uploadPedestaldata(Datamap& pedestaldata)
     // upload and process data package efficiently
     // TODO test; at least 2999 frames for pedestals
     while (offset <= pedestaldata.getN() - GPU_FRAMES) {
-        Datamap current(GPU_FRAMES, pedestaldata.data() + offset * map_size, true);
-        if (!calcPedestals(current, offset))
+        Datamap current(GPU_FRAMES, pedestaldata.data() + offset * map_size,
+                        true);
+        if (!calcPedestals(current))
             return;
 
         DEBUG("Frames " << offset << " von " << (pedestaldata.getN()));
-		
-		offset += GPU_FRAMES;
+
+        offset += GPU_FRAMES;
     }
 
     // flush the remaining data
     if (offset < pedestaldata.getN()) {
-        Datamap current(GPU_FRAMES, pedestaldata.data() + offset * map_size, true);
-        calcPedestals(current, offset);
+        Datamap current(GPU_FRAMES, pedestaldata.data() + offset * map_size,
+                        true);
+        calcPedestals(current);
     }
 }
 
-int Uploader::calcPedestals(Datamap& pedestaldata, uint32_t num)
+int Uploader::calcPedestals(Datamap& pedestaldata)
 {
 
-	DEBUG("mapsize: " << pedestaldata.getSizeBytes());
+    DEBUG("mapsize: " << pedestaldata.getSizeBytes());
     // load available device and number of frames
-    std::size_t num_pixels = pedestaldata.getPixelsPerFrame() * pedestaldata.getN();
+    std::size_t num_pixels =
+        pedestaldata.getPixelsPerFrame() * pedestaldata.getN();
     struct deviceData* dev;
     if (!resources.pop(dev))
         return false;
@@ -344,22 +349,19 @@ int Uploader::calcPedestals(Datamap& pedestaldata, uint32_t num)
     HANDLE_CUDA_ERROR(cudaSetDevice(dev->device));
 
     // upload data to GPU
-    HANDLE_CUDA_ERROR(cudaMemcpy(
-        dev->data, pedestaldata.data(),
-        num_pixels * sizeof(DataType), cudaMemcpyHostToDevice));
-
+    HANDLE_CUDA_ERROR(cudaMemcpy(dev->data, pedestaldata.data(),
+                                 num_pixels * sizeof(DataType),
+                                 cudaMemcpyHostToDevice));
 
     // transfer pedestal data from last device
-    HANDLE_CUDA_ERROR(cudaMemcpyPeer(
-        dev->pedestal,
-        dev->device, 
-        devices[(dev->id - 1) % devices.size()].pedestal,
-        devices[(dev->id - 1) % devices.size()].device, 
-        3 * DIMX * DIMY * sizeof(PedestalType)));
+    HANDLE_CUDA_ERROR(
+        cudaMemcpyPeer(dev->pedestal, dev->device,
+                       devices[(dev->id - 1) % devices.size()].pedestal,
+                       devices[(dev->id - 1) % devices.size()].device,
+                       3 * DIMX * DIMY * sizeof(PedestalType)));
 
-    // calculate photon data and check for kernel errors
-    calibrate<<<DIMX, DIMY, 0, dev->str>>>(DIMX * DIMY, dev->num_frames, num,
-                                           dev->data, dev->pedestal);
+    // calculate pedestal data
+    calibrate<<<DIMX, DIMY, 0, dev->str>>>(dev->data, dev->pedestal, dev->num_frames);
     CHECK_CUDA_KERNEL;
 
     dev->state = FREE;
@@ -368,8 +370,6 @@ int Uploader::calcPedestals(Datamap& pedestaldata, uint32_t num)
         fputs("FATAL ERROR (RingBuffer): Unexpected size!\n", stderr);
         exit(EXIT_FAILURE);
     }
-    
-    downloadPedestalmap(dev);
 
     // return number of processed frames
     return GPU_FRAMES;
