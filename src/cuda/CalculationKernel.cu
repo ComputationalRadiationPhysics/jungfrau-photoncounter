@@ -36,15 +36,15 @@ __global__ void calculate(uint16_t* data, pedestal* pede, double* gainmap,
 
                 pedestal[0] = pMovAvg / pCounter;
             }
-            energy = (adc - pedestal[0]) * gain[0];
+            energy = (adc - pedestal[0]) / gain[0];
             if (energy < 0) energy = 0;
             break;
         case 1:
-            energy = (pedestal[1] - adc) * gain[1];
+            energy = (-1) * (pedestal[1] - adc) / gain[1];
             if (energy < 0) energy = 0;
             break;
         case 3:
-            energy = (pedestal[2] - adc) * gain[2];
+            energy = (-1) * (pedestal[2] - adc) / gain[2];
             if (energy < 0) energy = 0;
             break;
         default:

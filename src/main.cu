@@ -14,7 +14,7 @@ void save_image(std::string path, Maptype map, std::size_t frame_number,
     Bitmap::Image img(1024, 512);
     for (int j = 0; j < 1024; j++) {
         for (int k = 0; k < 512; k++) {
-            int h = map(j, k, frame_number);
+            int h = map(j, k, frame_number)*10;
             Bitmap::Rgb color = {(unsigned char)(h & 255),
                                  (unsigned char)((h >> 8) & 255),
                                  (unsigned char)((h >> 16) & 255)};
