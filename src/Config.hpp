@@ -20,8 +20,6 @@ struct pedestal{
     uint32_t counter;
     uint16_t value;
     uint32_t movAvg;
-
-    pedestal() : counter(0), value(0), movAvg(0) {}
 };
 
 using DataType = uint16_t;

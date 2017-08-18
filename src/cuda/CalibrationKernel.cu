@@ -1,19 +1,22 @@
 #include "CalibrationKernel.hpp"
 #include <iostream>
 
-__global__ void calibrate(uint16_t* data, pedestal* pede, uint32_t currentnum)
+__global__ void calibrate(uint16_t* data, pedestal* pede, uint32_t numframes)
 {
     uint32_t id = blockIdx.x * blockDim.x + threadIdx.x;
 
-    size_t counter = currentnum;
+    size_t counter = 0;
+    uint16_t stage = 0;
 
-    while (counter - currentnum < GPU_FRAMES) {
-        uint16_t stage = counter / FRAMESPERSTAGE;
+    while (counter < numframes) {
+        for (size_t i = 0; i < 3; i++) {
+            if (pede[(i * MAPSIZE) + id].counter == FRAMESPERSTAGE) stage++;
+        }
 
         while (counter < ((stage + 1) * FRAMESPERSTAGE) &&
-               counter < ((stage * FRAMESPERSTAGE) + GPU_FRAMES)) {
+               counter < ((stage * FRAMESPERSTAGE) + numframes)) {
             pede[(stage * MAPSIZE) + id].movAvg +=
-                data[(MAPSIZE * (counter - currentnum)) + id +
+                data[(MAPSIZE * (counter)) + id +
                      (FRAMEOFFSET * (counter + 1))] &
                 0x3fff;
             pede[(stage * MAPSIZE) + id].counter ++;

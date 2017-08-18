@@ -7,7 +7,7 @@ __global__ void sum(uint16_t* data, uint16_t amount, uint32_t num,
     uint64_t summation = 0;
 
     for (int i = 0; i < num; i++) {
-        summation += data[(i * MAPSIZE) + id];
+        summation += data[(i * MAPSIZE) + id + ((i + 1) * FRAMEOFFSET)];
         if (i % amount) {
             sum[((i / amount) * MAPSIZE) + id] = summation;
             summation = 0;
