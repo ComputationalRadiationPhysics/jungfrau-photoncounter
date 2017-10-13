@@ -1,4 +1,3 @@
-#include "CudaHeader.hpp"
 #include "Filecache.hpp"
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -15,10 +14,9 @@ Filecache::Filecache(std::size_t sizeBytes)
     : buffer(
           [sizeBytes]() {
               void* p;
-              HANDLE_CUDA_ERROR(cudaMallocHost(&p, sizeBytes));
+              alpaka::mem::buf::alloc(&p, sizeBytes);
               return reinterpret_cast<char*>(p);
-          }(),
-          cudaFreeHost),
+          }),
       bufferPointer(buffer.get()), sizeBytes(sizeBytes)
 {
 }

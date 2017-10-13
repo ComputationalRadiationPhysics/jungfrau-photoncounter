@@ -5,7 +5,7 @@
 
 class Filecache {
 private:
-    std::unique_ptr<char, decltype(cudaFreeHost)*> buffer;
+    auto buffer;
     char* bufferPointer;
     const std::size_t sizeBytes;
     off_t getFileSize(const std::string path) const;
