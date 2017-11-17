@@ -1,7 +1,9 @@
 #include "Bitmap.hpp"
+
 #include <fstream>
 #include <iostream>
 #include <ostream>
+
 
 namespace Bitmap {
 
@@ -45,7 +47,7 @@ void Image::writeToFile(const std::string& path)
     file.write(reinterpret_cast<const char*>(&fheader), sizeof(fheader));
     file.write(reinterpret_cast<const char*>(&iheader), sizeof(iheader));
     file.write(reinterpret_cast<const char*>(pixels.data()),
-               pixels.size() * sizeof(Rgb));
+               static_cast<signed>(pixels.size() * sizeof(Rgb)));
     file.close();
 }
 

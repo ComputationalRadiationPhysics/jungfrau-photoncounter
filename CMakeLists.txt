@@ -4,6 +4,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(_TARGET_NAME "jungfrau-photoncounter")
 project(${_TARGET_NAME})
 
+SET(alpaka_DIR "~/Files/Libs/alpaka") 
 
 find_package(Boost QUIET COMPONENTS unit_test_framework)
 if(NOT Boost_UNIT_TEST_FRAMEWORK_FOUND)
@@ -36,16 +37,25 @@ endif()
 
 alpaka_add_executable(  
     ${_TARGET_NAME}
-    src/Bitmap.cpp     src/Bitmap.hpp
-    src/Filecache.cu   src/Filecache.hpp
-    src/Pixelmap.hpp    src/RingBuffer.hpp
-    src/Config.hpp      src/main.cu)
+    src/main.cpp            src/Config.hpp
+    src/Filecache.cpp       src/Filecache.hpp
+    src/Devicefinder.cpp    src/Devicefinder.hpp
+    src/Dispenser.cpp       src/Dispenser.hpp
+    src/Bitmap.cpp          src/Bitmap.hpp
+    src/Ringbuffer.hpp
+    src/kernel/Calibration.hpp
+    src/kernel/Correction.hpp
+    src/kernel/Summation.hpp)
+
 target_compile_options(
     ${_TARGET_NAME}
-    PRIVATE ${_DEFINITIONS_PRIVATE})
+    PRIVATE ${_DEFINITIONS_PRIVATE}
+    PRIVATE ${ALPAKA_DEV_COMPILE_OPTIONS})
 target_include_directories(
     ${_TARGET_NAME}
-    PRIVATE ${_INCLUDE_DIRECTORIES_PRIVATE})
+    PRIVATE ${_INCLUDE_DIRECTORIES_PRIVATE}
+    ~/Files/Libs/alpaka/include)
 target_link_libraries(
     ${_TARGET_NAME}
-    PRIVATE common ${_LINK_LIBRARIES_PRIVATE})
+    PUBLIC "alpaka"
+    PRIVATE ${_LINK_LIBRARIES_PRIVATE})

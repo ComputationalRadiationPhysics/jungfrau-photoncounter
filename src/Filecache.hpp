@@ -1,36 +1,41 @@
 #pragma once
-#include "Pixelmap.hpp"
+
+#include "Config.hpp"
+
 #include <fstream>
 #include <memory>
 
+
 class Filecache {
 private:
-    auto buffer;
+    std::unique_ptr<char> buffer;
     char* bufferPointer;
     const std::size_t sizeBytes;
-    off_t getFileSize(const std::string path) const;
+    auto getFileSize(const std::string path) const -> off_t;
 
 public:
-    Filecache(std::size_t sizeBytes);
-    template <typename Maptype> Maptype loadMaps(const std::string& path, bool header = false);
+    Filecache(std::size_t size);
+    template <typename TData>
+    auto loadMaps(const std::string& path, bool header = false) -> Maps<TData>;
 };
 
-template <typename Maptype> Maptype Filecache::loadMaps(const std::string& path, bool header)
+template <typename TData>
+auto Filecache::loadMaps(const std::string& path, bool header) -> Maps<TData>
 {
     auto fileSize = getFileSize(path);
-    auto mapSize =
-        Maptype::elementSize * DIMX * DIMY + (header ? FRAME_HEADER_SIZE : 0);
-    auto numMaps = fileSize / mapSize;
-	
+    auto mapSize = sizeof(TData) * MAPSIZE + (header ? FRAME_HEADER_SIZE : 0);
+    auto numMaps = fileSize / static_cast<unsigned>(mapSize);
+
     std::ifstream file;
     file.open(path, std::ios::in | std::ios::binary);
     file.read(bufferPointer, fileSize);
     file.close();
 
-    Maptype maps(numMaps,
-                 reinterpret_cast<typename Maptype::contentT*>(bufferPointer), header);
+    Maps<TData> maps{static_cast<unsigned>(numMaps),
+                     reinterpret_cast<TData*>(bufferPointer),
+                     header};
 
-	bufferPointer += fileSize;
+    bufferPointer += fileSize;
 
     return maps;
 }
