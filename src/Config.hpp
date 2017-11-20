@@ -66,11 +66,7 @@ void save_image(std::string path, TBuffer* data, std::size_t frame_number)
 #endif
 }
 
-// TODO:DrawMaps
-
 /*
-//#ifdef ALPAKA_ACC_CPU_B_SEQ_T_SEQ_ENABLED
-//#endif
 
 #include <limits>
 

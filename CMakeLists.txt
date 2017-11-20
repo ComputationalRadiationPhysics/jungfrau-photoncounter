@@ -39,10 +39,10 @@ alpaka_add_executable(
     ${_TARGET_NAME}
     src/main.cpp            src/Config.hpp
     src/Filecache.cpp       src/Filecache.hpp
-    src/Devicefinder.cpp    src/Devicefinder.hpp
     src/Dispenser.cpp       src/Dispenser.hpp
     src/Bitmap.cpp          src/Bitmap.hpp
     src/Ringbuffer.hpp
+    src/Alpakaconfig.hpp
     src/kernel/Calibration.hpp
     src/kernel/Correction.hpp
     src/kernel/Summation.hpp)

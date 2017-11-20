@@ -32,22 +32,6 @@ auto main() -> int
 
     // TODO: this will be redone for multiple devices after the kernels work
     // alpaka specific types, CPU serial, make struct out of all of them, vec
-    save_image<Data>(
-        static_cast<std::string>("TestframeInput.bmp"),
-        data.dataPointer,
-        1ul);
-
-
-    using Dim = alpaka::dim::DimInt<1u>;
-    using Size = std::size_t;
-    using Host = alpaka::acc::AccCpuSerial<Dim, Size>;
-    using Acc = alpaka::acc::AccCpuSerial<Dim, Size>;
-    using DevHost = alpaka::dev::Dev<Host>;
-    using DevAcc = alpaka::dev::Dev<Acc>;
-    using PltfHost = alpaka::pltf::Pltf<DevHost>;
-    using PltfAcc = alpaka::pltf::Pltf<DevAcc>;
-    using WorkDiv = alpaka::workdiv::WorkDivMembers<Dim, Size>;
-    using DevStream = alpaka::stream::StreamCpuSync;
 
     // later use vector -> ringbuffer
     DevAcc const devAcc(alpaka::pltf::getDevByIdx<PltfAcc>(0u));
