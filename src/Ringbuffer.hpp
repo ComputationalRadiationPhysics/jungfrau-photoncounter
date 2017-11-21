@@ -55,7 +55,6 @@ public:
         return true;
     }
 
-protected:
 private:
     std::unique_ptr<T[]> data;
     std::size_t size;

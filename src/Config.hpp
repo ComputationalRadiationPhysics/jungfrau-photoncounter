@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Alpakaconfig.hpp"
+
 #include <alpaka/alpaka.hpp>
 
 
@@ -11,6 +13,10 @@ const std::size_t DIMX = 1024;
 const std::size_t DIMY = 512;
 const std::size_t MAPSIZE = DIMX * DIMY;
 const std::size_t SUM_FRAMES = 100;
+const std::size_t GPU_FRAMES = 1000;
+const std::size_t STREAMS_PER_GPU = 2;
+const std::size_t PEDEMAPS = 3;
+const std::size_t GAINMAPS = 3;
 const float BEAMCONST = 6.2;
 const float PHOTONCONST = (1. / 12.4);
 const std::size_t MAXINT = std::numeric_limits<uint32_t>::max();
@@ -65,11 +71,3 @@ void save_image(std::string path, TBuffer* data, std::size_t frame_number)
     img.writeToFile(path);
 #endif
 }
-
-/*
-
-#include <limits>
-
-const std::size_t GPU_FRAMES = 1000;
-const std::size_t STREAMS_PER_GPU = 2;
-*/
