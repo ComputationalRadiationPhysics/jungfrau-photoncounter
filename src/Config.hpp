@@ -1,7 +1,5 @@
 #pragma once
 
-#include "Alpakaconfig.hpp"
-
 #include <alpaka/alpaka.hpp>
 
 

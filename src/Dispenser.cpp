@@ -18,41 +18,6 @@
     alpaka::mem::view::copy(stream, memBufAccB, memBufHostB, extent);
     */
 
-    CalibrationKernel calibrationKernel;
-    CorrectionKernel correctionKernel;
-    SummationKernel summationKernel;
-
-    auto const calibration(
-        alpaka::exec::create<Acc>(workdiv,
-                                  calibrationKernel,
-                                  alpaka::mem::view::getPtrNative(pedestal_d),
-                                  alpaka::mem::view::getPtrNative(pedestal_c),
-                                  3000u));
-    auto const correction(
-        alpaka::exec::create<Acc>(workdiv,
-                                  correctionKernel,
-                                  alpaka::mem::view::getPtrNative(data_d),
-                                  alpaka::mem::view::getPtrNative(pedestal_c),
-                                  alpaka::mem::view::getPtrNative(gain_d),
-                                  1000u,
-                                  alpaka::mem::view::getPtrNative(photon_c)));
-    auto const summation(
-        alpaka::exec::create<Acc>(workdiv,
-                                  summationKernel,
-                                  alpaka::mem::view::getPtrNative(photon_c),
-                                  SUM_FRAMES,
-                                  1000u,
-                                  alpaka::mem::view::getPtrNative(sum_c)));
-
-    alpaka::stream::enqueue(stream, calibration);
-    alpaka::wait::wait(stream);
-
-    alpaka::stream::enqueue(stream, correction);
-    alpaka::wait::wait(stream);
-
-    alpaka::stream::enqueue(stream, summation);
-    alpaka::wait::wait(stream);
-
     save_image<Photon>(
         static_cast<std::string>("Testframe500.bmp"),
         alpaka::mem::view::getPtrNative(photon_c),

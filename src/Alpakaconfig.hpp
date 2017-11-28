@@ -32,10 +32,14 @@ struct CpuSerial {
     using WorkDiv = alpaka::workdiv::WorkDivMembers<Dim, Size>;
     using Stream = alpaka::stream::StreamCpuSync;
 
-    alpaka::vec::Vec<Dim, Size> const elementsPerThread(static_cast<Size>(1u));
-    alpaka::vec::Vec<Dim, Size> const threadsPerBlock(static_cast<Size>(1u));
-    alpaka::vec::Vec<Dim, Size> const blocksPerGrid(static_cast<Size>(MAPSIZE));
-    WorkDiv const workdiv(blocksPerGrid, threadsPerBlock, elementsPerThread);
+    const alpaka::vec::Vec<Dim, Size> 
+        elementsPerThread =  static_cast<Size>(1u);
+    const alpaka::vec::Vec<Dim, Size>
+        threadsPerBlock = static_cast<Size>(1u);
+    const alpaka::vec::Vec<Dim, Size>
+        blocksPerGrid = static_cast<Size>(MAPSIZE);
+    const WorkDiv
+        workdiv{blocksPerGrid, threadsPerBlock, elementsPerThread};
 };
 #endif
 
