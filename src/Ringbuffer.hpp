@@ -5,21 +5,21 @@
 #include <mutex>
 
 
-template <class T> class RingBuffer {
+template <class T> class Ringbuffer {
 public:
-    RingBuffer(std::size_t maxElements)
+    Ringbuffer(std::size_t maxElements)
         : size(maxElements), full(false), data(new T[size]), head(0), tail(0)
     {
     }
 
-    RingBuffer(const RingBuffer& other)
+    Ringbuffer(const Ringbuffer& other)
         : size(other.size), full(other.full), data(new T[size]),
           head(other.head), tail(other.tail)
     {
         memcpy(other.data, data, size * sizeof(T));
     }
 
-    RingBuffer& operator=(const RingBuffer& other) = delete;
+    Ringbuffer& operator=(const Ringbuffer& other) = delete;
 
     auto getSize() const -> std::size_t { return size; }
 
