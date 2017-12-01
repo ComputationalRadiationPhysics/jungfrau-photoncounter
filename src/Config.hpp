@@ -45,7 +45,7 @@ struct Pedestal {
 #define DEBUG(msg)                                                             \
     (std::cout << __FILE__ << "[" << __LINE__ << "]:\n\t" << msg << std::endl)
 #else
-#define DEBUG(msg) (;)
+#define DEBUG(msg) 
 #endif
 
 #if (SHOW_DEBUG)

@@ -25,6 +25,10 @@ auto main() -> int
     DEBUG(gain.numMaps << " gain maps loaded");
 
     ///////////////////////////////////////////////////////////////////////////
+    /*save_image<Photon>(
+        static_cast<std::string>("Testframe500.bmp"),
+        alpaka::mem::view::getPtrNative(photon_c),
+        500ul);*/
 
     return 0;
 }

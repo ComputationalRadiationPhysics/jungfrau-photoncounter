@@ -39,8 +39,8 @@ alpaka_add_executable(
     ${_TARGET_NAME}
     src/main.cpp            src/Config.hpp
     src/Filecache.cpp       src/Filecache.hpp
-    src/Dispenser.cpp       src/Dispenser.hpp
     src/Bitmap.cpp          src/Bitmap.hpp
+    src/Dispenser.hpp
     src/Ringbuffer.hpp
     src/Alpakaconfig.hpp
     src/kernel/Calibration.hpp
