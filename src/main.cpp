@@ -1,4 +1,5 @@
 #include "Config.hpp"
+#include "Alpakaconfig.hpp"
 #include "Filecache.hpp"
 #include "Dispenser.hpp"
 
@@ -24,11 +25,26 @@ auto main() -> int
         fc.loadMaps<Gain>("../data_pool/px_101016/gainMaps_M022.bin"));
     DEBUG(gain.numMaps << " gain maps loaded");
 
-    ///////////////////////////////////////////////////////////////////////////
-    /*save_image<Photon>(
-        static_cast<std::string>("Testframe500.bmp"),
-        alpaka::mem::view::getPtrNative(photon_c),
-        500ul);*/
+    CpuSerial alpkStr;
+    Dispenser<CpuSerial> dispenser(&gain, alpkStr);
+    
+    dispenser.uploadPedestaldata(&pedestaldata);
+    dispenser.uploadData(&data);
+
+    Maps<Photon>* photon{};
+    Maps<PhotonSum>* sum{};
+    std::size_t downloaded = 0;
+    while(downloaded < data.numMaps) {
+        DEBUG("downloading...");
+        if(dispenser.downloadData(photon, sum)){
+            downloaded += DEV_FRAMES; 
+        }
+    }
+
+    save_image<Photon>(
+        static_cast<std::string>("TestframeLast.bmp"),
+        photon->dataPointer,
+        DEV_FRAMES);
 
     return 0;
 }

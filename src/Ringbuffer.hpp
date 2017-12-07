@@ -8,13 +8,16 @@
 template <class T> class Ringbuffer {
 public:
     Ringbuffer(std::size_t maxElements)
-        : size(maxElements), full(false), data(new T[size]), head(0), tail(0)
+        : data(new T[size]), size(maxElements), head(0), tail(0), full(false)
     {
     }
 
     Ringbuffer(const Ringbuffer& other)
-        : size(other.size), full(other.full), data(new T[size]),
-          head(other.head), tail(other.tail)
+        : size(other.size),
+          full(other.full),
+          data(new T[size]),
+          head(other.head),
+          tail(other.tail)
     {
         memcpy(other.data, data, size * sizeof(T));
     }
@@ -38,7 +41,7 @@ public:
         if (full)
             return false;
         data[tail] = element;
-        tail = (++tail) % size;
+        tail = (tail + 1) % size;
         if (head == tail)
             full = true;
         return true;
@@ -51,7 +54,7 @@ public:
             return false;
         full = false;
         element = data[head];
-        head = (++head) % size;
+        head = (head + 1) % size;
         return true;
     }
 

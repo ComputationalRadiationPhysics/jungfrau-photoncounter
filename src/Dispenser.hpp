@@ -19,16 +19,57 @@ template <typename TAlpaka> struct DeviceData {
     typename TAlpaka::Stream stream;
     typename TAlpaka::Event event;
     State state;
-    Data* data;
-    Gain* gain;
-    Pedestal* pedestal;
-    Photon* photon;
-    PhotonSum* sum;
+    alpaka::mem::buf::Buf<typename TAlpaka::DevHost,
+                          Data,
+                          typename TAlpaka::Dim,
+                          typename TAlpaka::Size>
+        data;
+    alpaka::mem::buf::Buf<typename TAlpaka::DevHost,
+                          Gain,
+                          typename TAlpaka::Dim,
+                          typename TAlpaka::Size>
+        gain;
+    alpaka::mem::buf::Buf<typename TAlpaka::DevHost,
+                          Pedestal,
+                          typename TAlpaka::Dim,
+                          typename TAlpaka::Size>
+        pedestal;
+    alpaka::mem::buf::Buf<typename TAlpaka::DevHost,
+                          Photon,
+                          typename TAlpaka::Dim,
+                          typename TAlpaka::Size>
+        photon;
+    alpaka::mem::buf::Buf<typename TAlpaka::DevHost,
+                          PhotonSum,
+                          typename TAlpaka::Dim,
+                          typename TAlpaka::Size>
+        sum;
+
+    DeviceData()
+        : id(0),
+          numMaps(0),
+          device(alpaka::pltf::getDevByIdx<typename TAlpaka::PltfAcc>(0u)),
+          stream(device),
+          event(device),
+          state(FREE),
+          data(alpaka::mem::buf::alloc<Data, typename TAlpaka::Size>(device,
+                                                                     0lu)),
+          gain(alpaka::mem::buf::alloc<Gain, typename TAlpaka::Size>(device,
+                                                                     0lu)),
+          pedestal(
+              alpaka::mem::buf::alloc<Pedestal, typename TAlpaka::Size>(device,
+                                                                        0lu)),
+          photon(alpaka::mem::buf::alloc<Photon, typename TAlpaka::Size>(device,
+                                                                         0lu)),
+          sum(alpaka::mem::buf::alloc<PhotonSum, typename TAlpaka::Size>(device,
+                                                                         0lu))
+    {
+    }
 };
 
 template <typename TAlpaka> class Dispenser {
 public:
-    Dispenser(Maps<Gain> gainmap, TAlpaka workdivSruct);
+    Dispenser(Maps<Gain>* gainmap, TAlpaka workdivSruct);
     Dispenser(const Dispenser& other) = delete;
     Dispenser& operator=(const Dispenser& other) = delete;
     ~Dispenser();
@@ -36,31 +77,35 @@ public:
     auto synchronize() -> void;
     auto uploadPedestaldata(Maps<Data>* data) -> void;
     auto uploadData(Maps<Data>* data) -> void;
-    auto downloadData(Maps<Photon>* photon, Maps<PhotonSum>* sum) -> void;
+    auto downloadData(Maps<Photon>* photon, Maps<PhotonSum>* sum) -> bool;
 
 private:
     Maps<Gain>* gain;
     Ringbuffer<DeviceData<TAlpaka>*> ringbuffer;
     std::vector<DeviceData<TAlpaka>> devices;
+    typename TAlpaka::DevHost host;
     TAlpaka workdiv;
 
     std::mutex mutex;
     std::size_t nextFree;
 
-    auto initDevices(std::vector<typename TAlpaka::PltfAcc> devs) -> void;
+    auto initDevices(std::vector<typename TAlpaka::DevAcc> devs) -> void;
     auto calcPedestaldata(Data* data, std::size_t numMaps) -> std::size_t;
     auto calcData(Data* data, std::size_t numMaps) -> std::size_t;
 };
 
 template <typename TAlpaka>
-Dispenser<TAlpaka>::Dispenser(Maps<Gain> gainmap, TAlpaka workdivStruct)
-    : gain(gainmap), workdiv(workdivStruct), nextFree(0)
+Dispenser<TAlpaka>::Dispenser(Maps<Gain>* gainmap, TAlpaka workdivStruct)
+    : gain(gainmap),
+      ringbuffer(STREAMS_PER_DEV *
+                 alpaka::pltf::getDevCount<typename TAlpaka::PltfAcc>()),
+      host(alpaka::pltf::getDevByIdx<typename TAlpaka::PltfHost>(0u)),
+      workdiv(workdivStruct), nextFree(0)
 {
-    std::vector<typename TAlpaka::PltfAcc> devs(
+    std::vector<typename TAlpaka::DevAcc> devs(
         alpaka::pltf::getDevs<typename TAlpaka::PltfAcc>());
 
-    ringbuffer(Ringbuffer<DeviceData<TAlpaka>*>(STREAMS_PER_GPU * devs.size()));
-    devices.resize(devs.getSize());
+    devices.resize(devs.size());
 
     initDevices(devs);
 }
@@ -69,30 +114,44 @@ template <typename TAlpaka> Dispenser<TAlpaka>::~Dispenser() {}
 
 template <typename TAlpaka>
 auto Dispenser<TAlpaka>::initDevices(
-    std::vector<typename TAlpaka::PltfAcc> devs) -> void
+    std::vector<typename TAlpaka::DevAcc> devs) -> void
 {
-    for (size_t num = 0; num < devs.size() * STREAMS_PER_GPU; ++num) {
+    for (size_t num = 0; num < devs.size() * STREAMS_PER_DEV; ++num) {
         devices[num].id = num;
-        devices[num].device(devs[num / STREAMS_PER_GPU]);
-        devices[num].stream(TAlpaka::DevAcc);
-        devices[num].state(FREE);
-        devices[num].data(alpaka::mem::view::getPtrNative(
+        devices[num].device = devs[num / STREAMS_PER_DEV];
+        devices[num].stream = devs[num];
+        devices[num].event = devs[num];
+        devices[num].state = FREE;
+        devices[num].data = 
             alpaka::mem::buf::alloc<Data, typename TAlpaka::Size>(
-                devices[num].DevAcc, GPU_FRAMES * MAPSIZE)));
-        devices[num].gain(alpaka::mem::view::getPtrNative(
+                devs[num], DEV_FRAMES * (MAPSIZE + FRAMEOFFSET));
+        devices[num].gain = 
             alpaka::mem::buf::alloc<Gain, typename TAlpaka::Size>(
-                devices[num].DevAcc, GAINMAPS * MAPSIZE)));
+                devs[num], GAINMAPS * MAPSIZE);
         alpaka::mem::view::copy(
-            devices[num].stream, gain, devices[num].gain, MAPSIZE * GAINMAPS);
-        devices[num].pedestal(alpaka::mem::view::getPtrNative(
+            devices[num].stream,
+            devices[num].gain,
+            alpaka::mem::view::ViewPlainPtr<typename TAlpaka::DevHost,
+                                            Gain,
+                                            typename TAlpaka::Dim,
+                                            typename TAlpaka::Size>(
+                gain->dataPointer, host, MAPSIZE * GAINMAPS),
+            MAPSIZE * GAINMAPS);
+        devices[num].pedestal = 
             alpaka::mem::buf::alloc<Pedestal, typename TAlpaka::Size>(
-                devices[num].DevAcc, PEDEMAPS * MAPSIZE)));
-        devices[num].photon(alpaka::mem::view::getPtrNative(
+                devs[num], PEDEMAPS * MAPSIZE);
+        devices[num].photon = 
             alpaka::mem::buf::alloc<Photon, typename TAlpaka::Size>(
-                devices[num].DevAcc, GPU_FRAMES * MAPSIZE)));
-        devices[num].sum(alpaka::mem::view::getPtrNative(
+                devs[num], DEV_FRAMES * (MAPSIZE + FRAMEOFFSET));
+        devices[num].sum = 
             alpaka::mem::buf::alloc<PhotonSum, typename TAlpaka::Size>(
-                devices[num].DevAcc, (GPU_FRAMES / SUM_FRAMES) * MAPSIZE)));
+                devs[num], (DEV_FRAMES / SUM_FRAMES) * MAPSIZE);
+
+        if (!ringbuffer.push(&devices[num])) {
+            fputs("FATAL ERROR (RingBuffer): Unexpected size!\n", stderr);
+            exit(EXIT_FAILURE);
+        }
+        DEBUG("Device # " << (num + 1) << " init");
     }
 }
 
@@ -106,13 +165,16 @@ template <typename TAlpaka>
 auto Dispenser<TAlpaka>::uploadPedestaldata(Maps<Data>* data) -> void
 {
     std::size_t offset = 0;
+    DEBUG("uploading pedestaldata...");
 
-    while (offset <= data->numMaps - GPU_FRAMES) {
-        offset += calcPedestaldata(data->dataPointer + offset, GPU_FRAMES);
+    while (offset <= data->numMaps - DEV_FRAMES) {
+        offset += calcPedestaldata(data->dataPointer + offset, DEV_FRAMES);
+        DEBUG(offset << "/" << data->numMaps << " pedestalframes uploaded");
     }
-    while (offset /= data->numMaps) {
+    if (offset != data->numMaps) {
         offset += calcPedestaldata(data->dataPointer + offset,
-                                   data->numMaps - GPU_FRAMES);
+                                   data->numMaps % DEV_FRAMES);
+        DEBUG(offset << "/" << data->numMaps << " pedestalframes uploaded");
     }
 }
 
@@ -120,7 +182,7 @@ template <typename TAlpaka>
 auto Dispenser<TAlpaka>::calcPedestaldata(Data* data, std::size_t numMaps)
     -> std::size_t
 {
-    struct deviceData* dev;
+    DeviceData<TAlpaka>* dev;
     if (!ringbuffer.pop(dev))
         return 0;
 
@@ -128,19 +190,31 @@ auto Dispenser<TAlpaka>::calcPedestaldata(Data* data, std::size_t numMaps)
     dev->numMaps = numMaps;
 
     alpaka::mem::view::copy(
-        TAlpaka::Stream, data, dev->data, numMaps * (MAPSIZE + FRAMEOFFSET));
+        dev->stream,
+        dev->data,
+        alpaka::mem::view::ViewPlainPtr<typename TAlpaka::DevHost,
+                                        Data,
+                                        typename TAlpaka::Dim,
+                                        typename TAlpaka::Size>(
+            data, host, (numMaps * (MAPSIZE + FRAMEOFFSET))),
+        numMaps * (MAPSIZE + FRAMEOFFSET));
     alpaka::mem::view::copy(dev->stream,
-                            devices[(dev->id - 1) % devices.size()].pedestal,
                             dev->pedestal,
-                            GAINMAPS * MAPSIZE);
+                            devices[(dev->id - 1) % devices.size()].pedestal,
+                            PEDEMAPS * MAPSIZE);
 
     CalibrationKernel calibrationKernel;
 
     auto const calibration(alpaka::exec::create<typename TAlpaka::Acc>(
-        workdiv.workdiv, calibrationKernel, data, dev->pedestal, GPU_FRAMES));
+        workdiv.workdiv, 
+        calibrationKernel, 
+        data, 
+        alpaka::mem::view::getPtrNative(dev->pedestal), 
+        dev->numMaps));
 
     alpaka::stream::enqueue(dev->stream, calibration);
     alpaka::wait::wait(dev->stream);
+    DEBUG("device " << dev->id << " finished");
 
     dev->state = FREE;
 
@@ -149,20 +223,23 @@ auto Dispenser<TAlpaka>::calcPedestaldata(Data* data, std::size_t numMaps)
         exit(EXIT_FAILURE);
     }
 
-    return GPU_FRAMES;
+    return numMaps;
 }
 
 template <typename TAlpaka>
 auto Dispenser<TAlpaka>::uploadData(Maps<Data>* data) -> void
 {
     std::size_t offset = 0;
+    DEBUG("uploading data...");
 
-    while (offset <= data->numMaps - GPU_FRAMES) {
-        offset += calcData(data->dataPointer + offset, GPU_FRAMES);
+    while (offset <= data->numMaps - DEV_FRAMES) {
+        offset += calcData(data->dataPointer + offset, DEV_FRAMES);
+        DEBUG(offset << "/" << data->numMaps << " frames uploaded");
     }
-    while (offset /= data->numMaps) {
+    if (offset != data->numMaps) {
         offset +=
-            calcData(data->dataPointer + offset, data->numMaps - GPU_FRAMES);
+            calcData(data->dataPointer + offset, data->numMaps % DEV_FRAMES);
+        DEBUG(offset << "/" << data->numMaps << " frames uploaded");
     }
 }
 
@@ -171,7 +248,7 @@ template <typename TAlpaka>
 auto Dispenser<TAlpaka>::calcData(Data* data, std::size_t numMaps)
     -> std::size_t
 {
-    struct deviceData* dev;
+    DeviceData<TAlpaka>* dev;
     if (!ringbuffer.pop(dev))
         return 0;
 
@@ -179,24 +256,33 @@ auto Dispenser<TAlpaka>::calcData(Data* data, std::size_t numMaps)
     dev->numMaps = numMaps;
 
     alpaka::mem::view::copy(
-        TAlpaka::Stream, data, dev->data, numMaps * (MAPSIZE + FRAMEOFFSET));
+        dev->stream, 
+        dev->data,
+        alpaka::mem::view::ViewPlainPtr<typename TAlpaka::DevHost,
+                                        Data,
+                                        typename TAlpaka::Dim,
+                                        typename TAlpaka::Size>(
+            data, host, (numMaps * (MAPSIZE + FRAMEOFFSET))),
+        numMaps * (MAPSIZE + FRAMEOFFSET));
     alpaka::wait::wait(dev->stream,
-                       devices[(dev->id - 1) % ringbuffer->getSize()]->event);
-    devices[(dev->id - 1) % ringbuffer->getSize()]->state = READY;
+                       devices[(dev->id - 1) % ringbuffer.getSize()].event);
+    DEBUG("device " << devices[(dev->id - 1) % ringbuffer.getSize()].id
+                    << " finished");
+    devices[(dev->id - 1) % ringbuffer.getSize()].state = READY;
     alpaka::mem::view::copy(dev->stream,
-                            devices[(dev->id - 1) % devices.size()].pedestal,
                             dev->pedestal,
-                            GAINMAPS * MAPSIZE);
+                            devices[(dev->id - 1) % devices.size()].pedestal,
+                            PEDEMAPS * MAPSIZE);
 
     CorrectionKernel correctionKernel;
     auto const correction(alpaka::exec::create<typename TAlpaka::Acc>(
         workdiv.workdiv,
         correctionKernel,
         data,
-        dev->pedestal,
-        dev->gain,
-        GPU_FRAMES,
-        alpaka::mem::view::getPtrNative(dev->photon_c)));
+        alpaka::mem::view::getPtrNative(dev->pedestal),
+        alpaka::mem::view::getPtrNative(dev->gain),
+        dev->numMaps,
+        alpaka::mem::view::getPtrNative(dev->photon)));
 
     alpaka::stream::enqueue(dev->stream, correction);
     alpaka::wait::wait(dev->stream);
@@ -205,52 +291,60 @@ auto Dispenser<TAlpaka>::calcData(Data* data, std::size_t numMaps)
     auto const summation(alpaka::exec::create<typename TAlpaka::Acc>(
         workdiv.workdiv,
         summationKernel,
-        alpaka::mem::view::getPtrNative(dev->photon_c),
+        alpaka::mem::view::getPtrNative(dev->photon),
         SUM_FRAMES,
-        1000u,
-        alpaka::mem::view::getPtrNative(dev->sum_c)));
+        dev->numMaps,
+        alpaka::mem::view::getPtrNative(dev->sum)));
 
     alpaka::stream::enqueue(dev->stream, summation);
     alpaka::wait::wait(dev->stream);
 
-    dev->event(alpaka::event::Event<typename TAlpaka::Stream>(dev->device));
     alpaka::stream::enqueue(dev->stream, dev->event);
 
-    return GPU_FRAMES;
+    return numMaps;
 }
 
 template <typename TAlpaka>
 auto Dispenser<TAlpaka>::downloadData(Maps<Photon>* photon, Maps<PhotonSum>* sum)
-    -> void
+    -> bool
 {
     std::lock_guard<std::mutex> lock(mutex); 
     struct DeviceData<TAlpaka>* dev = &Dispenser::devices[nextFree];
 
     if (dev->state != READY)
-        return;
+        return false;
 
-    photon->dataPointer = alpaka::mem::view::getPtrNative(
+    auto photonHost = 
         alpaka::mem::buf::alloc<Photon, typename TAlpaka::Size>(
-            TAlpaka::DevHost, dev->numFrames * MAPSIZE));
+            host, dev->numMaps * (MAPSIZE + FRAMEOFFSET));
 
-    sum->dataPointer = alpaka::mem::view::getPtrNative(
-        alpaka::mem::buf::alloc<Photon, typename TAlpaka::Size>(
-            TAlpaka::DevHost, dev->numMaps * MAPSIZE));
+    auto sumHost = 
+        alpaka::mem::buf::alloc<PhotonSum, typename TAlpaka::Size>(
+            host, dev->numMaps * MAPSIZE);
+            DEBUG("joar ne");
 
     photon->numMaps = dev->numMaps;
-    alpaka::mem::view::copy(dev->stream,
-                            photon->dataPointer,
-                            dev->photon_c,
-                            dev->numMaps * MAPSIZE);
+    alpaka::mem::view::copy(
+        dev->stream,
+        photonHost,
+        dev->photon,
+        dev->numMaps * (MAPSIZE + FRAMEOFFSET));
+            DEBUG("suckt");
+    photon->dataPointer =  alpaka::mem::view::getPtrNative(photonHost);
     photon->header = true;
-    
+
     sum->numMaps = dev->numMaps / SUM_FRAMES;
-    alpaka::mem::view::copy(dev->stream,
-                            sum->dataPointer,
-                            dev->sum_c,
-                            dev->numMaps * MAPSIZE);
+    alpaka::mem::view::copy(
+        dev->stream,
+        sumHost,
+        dev->sum,
+        dev->numMaps * MAPSIZE);
+    sum->dataPointer = alpaka::mem::view::getPtrNative(sumHost);
     sum->header = true;
 
     dev->state = FREE;
     nextFree = (nextFree+1) % ringbuffer.getSize();
+    DEBUG("device " << dev->id << " freed");
+    
+    return true;
 }

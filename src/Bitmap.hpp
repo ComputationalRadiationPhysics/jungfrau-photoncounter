@@ -52,7 +52,9 @@ private:
 
 public:
     Image(std::size_t widthIn, std::size_t heightIn)
-        : width(widthIn), height(heightIn), fheader(createFileHeader()),
+        : width(widthIn),
+          height(heightIn),
+          fheader(createFileHeader()),
           iheader(createInfoHeader(widthIn, heightIn)),
           pixels(widthIn * heightIn)
     {

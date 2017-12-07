@@ -17,6 +17,7 @@ Filecache::Filecache(std::size_t size)
           void* p(malloc(size));
           return reinterpret_cast<char*>(p);
       }()),
-      bufferPointer(buffer.get()), sizeBytes(size)
+      bufferPointer(buffer.get()),
+      sizeBytes(size)
 {
 }

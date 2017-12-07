@@ -10,4 +10,5 @@ PointerAlignment: Left
 ColumnLimit: 80
 UseTab: Never
 BreakBeforeBraces: Stroustrup
+ConstructorInitializerAllOnOneLineOrOnePerLine: true
 MaxEmptyLinesToKeep: 2

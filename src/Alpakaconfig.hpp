@@ -31,15 +31,15 @@ struct CpuSerial {
     using PltfAcc = alpaka::pltf::Pltf<DevAcc>;
     using WorkDiv = alpaka::workdiv::WorkDivMembers<Dim, Size>;
     using Stream = alpaka::stream::StreamCpuSync;
-    using Event = alpaka::event::EventCpu;
+    using Event = alpaka::event::Event<Stream>;
 
-    const alpaka::vec::Vec<Dim, Size> 
+    alpaka::vec::Vec<Dim, Size> 
         elementsPerThread =  static_cast<Size>(1u);
-    const alpaka::vec::Vec<Dim, Size>
+    alpaka::vec::Vec<Dim, Size>
         threadsPerBlock = static_cast<Size>(1u);
-    const alpaka::vec::Vec<Dim, Size>
+    alpaka::vec::Vec<Dim, Size>
         blocksPerGrid = static_cast<Size>(MAPSIZE);
-    const WorkDiv
+    WorkDiv
         workdiv{blocksPerGrid, threadsPerBlock, elementsPerThread};
 };
 #endif
