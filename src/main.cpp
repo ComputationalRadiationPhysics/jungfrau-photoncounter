@@ -31,20 +31,21 @@ auto main() -> int
     dispenser.uploadPedestaldata(&pedestaldata);
     dispenser.uploadData(&data);
 
-    Maps<Photon>* photon{};
-    Maps<PhotonSum>* sum{};
+    Maps<Photon> photon{};
+    Maps<PhotonSum> sum{};
     std::size_t downloaded = 0;
     while(downloaded < data.numMaps) {
         DEBUG("downloading...");
-        if(dispenser.downloadData(photon, sum)){
+        if(dispenser.downloadData(&photon, &sum)){
             downloaded += DEV_FRAMES; 
+            DEBUG(downloaded << "/" << data.numMaps << " downloaded");
         }
     }
 
     save_image<Photon>(
         static_cast<std::string>("TestframeLast.bmp"),
-        photon->dataPointer,
-        DEV_FRAMES);
+        photon.dataPointer,
+        1);
 
     return 0;
 }

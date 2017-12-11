@@ -15,39 +15,52 @@ enum State { FREE, PROCESSING, READY };
 template <typename TAlpaka> struct DeviceData {
     std::size_t id;
     std::size_t numMaps;
+    typename TAlpaka::DevHost host;
     typename TAlpaka::DevAcc device;
     typename TAlpaka::Stream stream;
     typename TAlpaka::Event event;
     State state;
-    alpaka::mem::buf::Buf<typename TAlpaka::DevHost,
+    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc,
                           Data,
                           typename TAlpaka::Dim,
                           typename TAlpaka::Size>
         data;
-    alpaka::mem::buf::Buf<typename TAlpaka::DevHost,
+    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc,
                           Gain,
                           typename TAlpaka::Dim,
                           typename TAlpaka::Size>
         gain;
-    alpaka::mem::buf::Buf<typename TAlpaka::DevHost,
+    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc,
                           Pedestal,
                           typename TAlpaka::Dim,
                           typename TAlpaka::Size>
         pedestal;
-    alpaka::mem::buf::Buf<typename TAlpaka::DevHost,
+    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc,
                           Photon,
                           typename TAlpaka::Dim,
                           typename TAlpaka::Size>
         photon;
-    alpaka::mem::buf::Buf<typename TAlpaka::DevHost,
+    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc,
                           PhotonSum,
                           typename TAlpaka::Dim,
                           typename TAlpaka::Size>
         sum;
+    alpaka::mem::buf::Buf<typename TAlpaka::DevHost,
+                          Photon,
+                          typename TAlpaka::Dim,
+                          typename TAlpaka::Size>
+        photonHost;
+    alpaka::mem::buf::Buf<typename TAlpaka::DevHost,
+                          PhotonSum,
+                          typename TAlpaka::Dim,
+                          typename TAlpaka::Size>
+        sumHost;
+
 
     DeviceData()
         : id(0),
           numMaps(0),
+          host(alpaka::pltf::getDevByIdx<typename TAlpaka::PltfHost>(0u)),
           device(alpaka::pltf::getDevByIdx<typename TAlpaka::PltfAcc>(0u)),
           stream(device),
           event(device),
@@ -62,6 +75,12 @@ template <typename TAlpaka> struct DeviceData {
           photon(alpaka::mem::buf::alloc<Photon, typename TAlpaka::Size>(device,
                                                                          0lu)),
           sum(alpaka::mem::buf::alloc<PhotonSum, typename TAlpaka::Size>(device,
+                                                                         0lu)),
+          photonHost(
+              alpaka::mem::buf::alloc<Photon, typename TAlpaka::Size>(host,
+                                                                      0lu)),
+          sumHost(
+              alpaka::mem::buf::alloc<PhotonSum, typename TAlpaka::Size>(host,
                                                                          0lu))
     {
     }
@@ -140,12 +159,20 @@ auto Dispenser<TAlpaka>::initDevices(
         devices[num].pedestal = 
             alpaka::mem::buf::alloc<Pedestal, typename TAlpaka::Size>(
                 devs[num], PEDEMAPS * MAPSIZE);
-        devices[num].photon = 
+        devices[num].photon =
             alpaka::mem::buf::alloc<Photon, typename TAlpaka::Size>(
                 devs[num], DEV_FRAMES * (MAPSIZE + FRAMEOFFSET));
-        devices[num].sum = 
+        devices[num].sum =
             alpaka::mem::buf::alloc<PhotonSum, typename TAlpaka::Size>(
                 devs[num], (DEV_FRAMES / SUM_FRAMES) * MAPSIZE);
+        devices[num].photonHost =
+            alpaka::mem::buf::alloc<Photon, typename TAlpaka::Size>(
+                host, DEV_FRAMES * (MAPSIZE + FRAMEOFFSET));
+
+        devices[num].sumHost =
+            alpaka::mem::buf::alloc<PhotonSum, typename TAlpaka::Size>(
+                host, (DEV_FRAMES / SUM_FRAMES) * MAPSIZE);
+
 
         if (!ringbuffer.push(&devices[num])) {
             fputs("FATAL ERROR (RingBuffer): Unexpected size!\n", stderr);
@@ -314,32 +341,20 @@ auto Dispenser<TAlpaka>::downloadData(Maps<Photon>* photon, Maps<PhotonSum>* sum
     if (dev->state != READY)
         return false;
 
-    auto photonHost = 
-        alpaka::mem::buf::alloc<Photon, typename TAlpaka::Size>(
-            host, dev->numMaps * (MAPSIZE + FRAMEOFFSET));
-
-    auto sumHost = 
-        alpaka::mem::buf::alloc<PhotonSum, typename TAlpaka::Size>(
-            host, dev->numMaps * MAPSIZE);
-            DEBUG("joar ne");
-
     photon->numMaps = dev->numMaps;
-    alpaka::mem::view::copy(
-        dev->stream,
-        photonHost,
-        dev->photon,
-        dev->numMaps * (MAPSIZE + FRAMEOFFSET));
-            DEBUG("suckt");
-    photon->dataPointer =  alpaka::mem::view::getPtrNative(photonHost);
+    alpaka::mem::view::copy(dev->stream,
+                            dev->photonHost,
+                            dev->photon,
+                            dev->numMaps * (MAPSIZE + FRAMEOFFSET));
+    photon->dataPointer = alpaka::mem::view::getPtrNative(dev->photonHost);
     photon->header = true;
 
     sum->numMaps = dev->numMaps / SUM_FRAMES;
-    alpaka::mem::view::copy(
-        dev->stream,
-        sumHost,
-        dev->sum,
-        dev->numMaps * MAPSIZE);
-    sum->dataPointer = alpaka::mem::view::getPtrNative(sumHost);
+    alpaka::mem::view::copy(dev->stream,
+                            dev->sumHost,
+                            dev->sum,
+                            (dev->numMaps / SUM_FRAMES) * MAPSIZE);
+    sum->dataPointer = alpaka::mem::view::getPtrNative(dev->sumHost);
     sum->header = true;
 
     dev->state = FREE;
