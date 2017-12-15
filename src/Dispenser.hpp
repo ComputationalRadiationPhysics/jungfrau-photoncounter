@@ -309,17 +309,15 @@ auto Dispenser<TAlpaka>::calcData(Data* data, std::size_t numMaps)
     if(nextFree.size() > 0) {
         alpaka::wait::wait(dev->stream,
                            devices[nextFree.back()].event);
-        DEBUG("device " << devices[nextFree.back()].id
-                        << " finished");
+        DEBUG("device " << devices[nextFree.back()].id << " finished");
+
+        devices[nextFree.back()].state = READY;
+        alpaka::mem::view::copy(dev->stream,
+                                dev->pedestal,
+                                devices[nextFree.back()].pedestal,
+                                PEDEMAPS * MAPSIZE);
     }
     nextFree.push_back(dev->id);
-    
-    devices[(dev->id - 1) % ringbuffer.getSize()].state = READY;
-    alpaka::mem::view::copy(
-        dev->stream,
-        dev->pedestal,
-        devices[(dev->id - 1) % ringbuffer.getSize()].pedestal,
-        PEDEMAPS * MAPSIZE);
 
     CorrectionKernel correctionKernel;
     auto const correction(alpaka::exec::create<typename TAlpaka::Acc>(

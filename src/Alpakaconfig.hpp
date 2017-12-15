@@ -67,11 +67,11 @@ struct GpuCudaRt {
     using Event = alpaka::event::Event<Stream>;
 
     alpaka::vec::Vec<Dim, Size> 
-        elementsPerThread =  static_cast<Size>(1u);
+        elementsPerThread =  static_cast<Size>(4u);
     alpaka::vec::Vec<Dim, Size>
-        threadsPerBlock = static_cast<Size>(512u);
+        threadsPerBlock = static_cast<Size>(1024u);
     alpaka::vec::Vec<Dim, Size>
-        blocksPerGrid = static_cast<Size>(1024u);
+        blocksPerGrid = static_cast<Size>(512u);
     WorkDiv
         workdiv{blocksPerGrid, threadsPerBlock, elementsPerThread};
 };
