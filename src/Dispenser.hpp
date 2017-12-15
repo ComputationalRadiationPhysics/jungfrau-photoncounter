@@ -203,7 +203,6 @@ auto Dispenser<TAlpaka>::uploadPedestaldata(Maps<Data> data) -> void
                                    data.numMaps % DEV_FRAMES);
         DEBUG(offset << "/" << data.numMaps << " pedestalframes uploaded");
     }
-    nextFree.clear();
 }
 
 template <typename TAlpaka>
@@ -235,6 +234,7 @@ auto Dispenser<TAlpaka>::calcPedestaldata(Data* data, std::size_t numMaps)
             dev->pedestal,
             devices[nextFree.back()].pedestal,
             PEDEMAPS * MAPSIZE);
+        nextFree.pop_front();
     }
     nextFree.push_back(dev->id);
 
@@ -306,17 +306,15 @@ auto Dispenser<TAlpaka>::calcData(Data* data, std::size_t numMaps)
         numMaps * (MAPSIZE + FRAMEOFFSET));
     
     std::lock_guard<std::mutex> lock(mutex);
-    if(nextFree.size() > 0) {
-        alpaka::wait::wait(dev->stream,
-                           devices[nextFree.back()].event);
-        DEBUG("device " << devices[nextFree.back()].id << " finished");
+    alpaka::wait::wait(dev->stream,
+                       devices[nextFree.back()].event);
+    DEBUG("device " << devices[nextFree.back()].id << " finished");
 
-        devices[nextFree.back()].state = READY;
-        alpaka::mem::view::copy(dev->stream,
-                                dev->pedestal,
-                                devices[nextFree.back()].pedestal,
-                                PEDEMAPS * MAPSIZE);
-    }
+    devices[nextFree.back()].state = READY;
+    alpaka::mem::view::copy(dev->stream,
+                            dev->pedestal,
+                            devices[nextFree.back()].pedestal,
+                            PEDEMAPS * MAPSIZE);
     nextFree.push_back(dev->id);
 
     CorrectionKernel correctionKernel;
