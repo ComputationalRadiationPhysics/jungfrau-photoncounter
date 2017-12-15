@@ -63,7 +63,7 @@ struct GpuCudaRt {
     using PltfHost = alpaka::pltf::Pltf<DevHost>;
     using PltfAcc = alpaka::pltf::Pltf<DevAcc>;
     using WorkDiv = alpaka::workdiv::WorkDivMembers<Dim, Size>;
-    using Stream = alpaka::stream::StreamCudaRtSync;
+    using Stream = alpaka::stream::StreamCudaRtAsync;
     using Event = alpaka::event::Event<Stream>;
 
     alpaka::vec::Vec<Dim, Size> 

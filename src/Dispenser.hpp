@@ -195,11 +195,13 @@ auto Dispenser<TAlpaka>::uploadPedestaldata(Maps<Data> data) -> void
     DEBUG("uploading pedestaldata...");
 
     while (offset <= data.numMaps - DEV_FRAMES) {
-        offset += calcPedestaldata(data.dataPointer + offset, DEV_FRAMES);
+        offset += calcPedestaldata(
+            data.dataPointer + (offset * (MAPSIZE + FRAMEOFFSET)), DEV_FRAMES);
         DEBUG(offset << "/" << data.numMaps << " pedestalframes uploaded");
     }
     if (offset != data.numMaps) {
-        offset += calcPedestaldata(data.dataPointer + offset,
+        offset += calcPedestaldata(data.dataPointer +
+                                       (offset * (MAPSIZE + FRAMEOFFSET)),
                                    data.numMaps % DEV_FRAMES);
         DEBUG(offset << "/" << data.numMaps << " pedestalframes uploaded");
     }
@@ -267,13 +269,18 @@ auto Dispenser<TAlpaka>::uploadData(Maps<Data> data, std::size_t offset)
 {
     if (!ringbuffer.isEmpty()) {
         if (offset <= data.numMaps - DEV_FRAMES) {
-            offset += calcData(data.dataPointer + offset, DEV_FRAMES);
-            DEBUG(offset << "/" << data.numMaps << " frames uploaded");
-        } else if (offset != data.numMaps) {
             offset +=
-                calcData(data.dataPointer + offset, data.numMaps % DEV_FRAMES);
+                calcData(data.dataPointer + (offset * (MAPSIZE + FRAMEOFFSET)),
+                         DEV_FRAMES);
             DEBUG(offset << "/" << data.numMaps << " frames uploaded");
-        } else {
+        }
+        else if (offset != data.numMaps) {
+            offset +=
+                calcData(data.dataPointer + (offset * (MAPSIZE + FRAMEOFFSET)),
+                         data.numMaps % DEV_FRAMES);
+            DEBUG(offset << "/" << data.numMaps << " frames uploaded");
+        }
+        else {
             alpaka::wait::wait(devices[nextFree.front()].stream,
                                devices[nextFree.front()].event);
             devices[nextFree.front()].state = READY;
@@ -340,6 +347,11 @@ auto Dispenser<TAlpaka>::calcData(Data* data, std::size_t numMaps)
         alpaka::mem::view::getPtrNative(dev->sum)));
 
     alpaka::stream::enqueue(dev->stream, summation);
+
+    save_image<Data>(
+        static_cast<std::string>(std::to_string(dev->id) + "data.bmp"),
+        data,
+        DEV_FRAMES - 1);
 
     alpaka::stream::enqueue(dev->stream, dev->event);
 
