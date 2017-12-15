@@ -88,25 +88,25 @@ template <typename TAlpaka> struct DeviceData {
 
 template <typename TAlpaka> class Dispenser {
 public:
-    Dispenser(Maps<Gain>* gainmap, TAlpaka workdivSruct);
+    Dispenser(Maps<Gain> gainmap, TAlpaka workdivSruct);
     Dispenser(const Dispenser& other) = delete;
     Dispenser& operator=(const Dispenser& other) = delete;
     ~Dispenser();
 
     auto synchronize() -> void;
-    auto uploadPedestaldata(Maps<Data>* data) -> void;
-    auto uploadData(Maps<Data>* data) -> void;
+    auto uploadPedestaldata(Maps<Data> data) -> void;
+    auto uploadData(Maps<Data> data, std::size_t offset) -> std::size_t;
     auto downloadData(Maps<Photon>* photon, Maps<PhotonSum>* sum) -> bool;
 
 private:
-    Maps<Gain>* gain;
+    Maps<Gain> gain;
     Ringbuffer<DeviceData<TAlpaka>*> ringbuffer;
     std::vector<DeviceData<TAlpaka>> devices;
     typename TAlpaka::DevHost host;
     TAlpaka workdiv;
 
     std::mutex mutex;
-    std::size_t nextFree;
+    std::deque<std::size_t> nextFree;
 
     auto initDevices(std::vector<typename TAlpaka::DevAcc> devs) -> void;
     auto calcPedestaldata(Data* data, std::size_t numMaps) -> std::size_t;
@@ -114,12 +114,12 @@ private:
 };
 
 template <typename TAlpaka>
-Dispenser<TAlpaka>::Dispenser(Maps<Gain>* gainmap, TAlpaka workdivStruct)
+Dispenser<TAlpaka>::Dispenser(Maps<Gain> gainmap, TAlpaka workdivStruct)
     : gain(gainmap),
       ringbuffer(STREAMS_PER_DEV *
                  alpaka::pltf::getDevCount<typename TAlpaka::PltfAcc>()),
       host(alpaka::pltf::getDevByIdx<typename TAlpaka::PltfHost>(0u)),
-      workdiv(workdivStruct), nextFree(0)
+      workdiv(workdivStruct)
 {
     std::vector<typename TAlpaka::DevAcc> devs(
         alpaka::pltf::getDevs<typename TAlpaka::PltfAcc>());
@@ -132,8 +132,8 @@ Dispenser<TAlpaka>::Dispenser(Maps<Gain>* gainmap, TAlpaka workdivStruct)
 template <typename TAlpaka> Dispenser<TAlpaka>::~Dispenser() {}
 
 template <typename TAlpaka>
-auto Dispenser<TAlpaka>::initDevices(
-    std::vector<typename TAlpaka::DevAcc> devs) -> void
+auto Dispenser<TAlpaka>::initDevices(std::vector<typename TAlpaka::DevAcc> devs)
+    -> void
 {
     for (size_t num = 0; num < devs.size() * STREAMS_PER_DEV; ++num) {
         devices[num].id = num;
@@ -141,10 +141,10 @@ auto Dispenser<TAlpaka>::initDevices(
         devices[num].stream = devs[num];
         devices[num].event = devs[num];
         devices[num].state = FREE;
-        devices[num].data = 
+        devices[num].data =
             alpaka::mem::buf::alloc<Data, typename TAlpaka::Size>(
                 devs[num], DEV_FRAMES * (MAPSIZE + FRAMEOFFSET));
-        devices[num].gain = 
+        devices[num].gain =
             alpaka::mem::buf::alloc<Gain, typename TAlpaka::Size>(
                 devs[num], GAINMAPS * MAPSIZE);
         alpaka::mem::view::copy(
@@ -154,9 +154,9 @@ auto Dispenser<TAlpaka>::initDevices(
                                             Gain,
                                             typename TAlpaka::Dim,
                                             typename TAlpaka::Size>(
-                gain->dataPointer, host, MAPSIZE * GAINMAPS),
+                gain.dataPointer, host, MAPSIZE * GAINMAPS),
             MAPSIZE * GAINMAPS);
-        devices[num].pedestal = 
+        devices[num].pedestal =
             alpaka::mem::buf::alloc<Pedestal, typename TAlpaka::Size>(
                 devs[num], PEDEMAPS * MAPSIZE);
         devices[num].photon =
@@ -189,20 +189,21 @@ template <typename TAlpaka> auto Dispenser<TAlpaka>::synchronize() -> void
 }
 
 template <typename TAlpaka>
-auto Dispenser<TAlpaka>::uploadPedestaldata(Maps<Data>* data) -> void
+auto Dispenser<TAlpaka>::uploadPedestaldata(Maps<Data> data) -> void
 {
     std::size_t offset = 0;
     DEBUG("uploading pedestaldata...");
 
-    while (offset <= data->numMaps - DEV_FRAMES) {
-        offset += calcPedestaldata(data->dataPointer + offset, DEV_FRAMES);
-        DEBUG(offset << "/" << data->numMaps << " pedestalframes uploaded");
+    while (offset <= data.numMaps - DEV_FRAMES) {
+        offset += calcPedestaldata(data.dataPointer + offset, DEV_FRAMES);
+        DEBUG(offset << "/" << data.numMaps << " pedestalframes uploaded");
     }
-    if (offset != data->numMaps) {
-        offset += calcPedestaldata(data->dataPointer + offset,
-                                   data->numMaps % DEV_FRAMES);
-        DEBUG(offset << "/" << data->numMaps << " pedestalframes uploaded");
+    if (offset != data.numMaps) {
+        offset += calcPedestaldata(data.dataPointer + offset,
+                                   data.numMaps % DEV_FRAMES);
+        DEBUG(offset << "/" << data.numMaps << " pedestalframes uploaded");
     }
+    nextFree.clear();
 }
 
 template <typename TAlpaka>
@@ -225,18 +226,25 @@ auto Dispenser<TAlpaka>::calcPedestaldata(Data* data, std::size_t numMaps)
                                         typename TAlpaka::Size>(
             data, host, (numMaps * (MAPSIZE + FRAMEOFFSET))),
         numMaps * (MAPSIZE + FRAMEOFFSET));
-    alpaka::mem::view::copy(dev->stream,
-                            dev->pedestal,
-                            devices[(dev->id - 1) % devices.size()].pedestal,
-                            PEDEMAPS * MAPSIZE);
+    
+    std::lock_guard<std::mutex> lock(mutex);
+    if(nextFree.size() > 0) {
+        alpaka::wait::wait(devices[nextFree.back()].stream);
+        alpaka::mem::view::copy(
+            dev->stream,
+            dev->pedestal,
+            devices[nextFree.back()].pedestal,
+            PEDEMAPS * MAPSIZE);
+    }
+    nextFree.push_back(dev->id);
 
     CalibrationKernel calibrationKernel;
 
     auto const calibration(alpaka::exec::create<typename TAlpaka::Acc>(
-        workdiv.workdiv, 
-        calibrationKernel, 
-        data, 
-        alpaka::mem::view::getPtrNative(dev->pedestal), 
+        workdiv.workdiv,
+        calibrationKernel,
+        alpaka::mem::view::getPtrNative(dev->data),
+        alpaka::mem::view::getPtrNative(dev->pedestal),
         dev->numMaps));
 
     alpaka::stream::enqueue(dev->stream, calibration);
@@ -254,20 +262,25 @@ auto Dispenser<TAlpaka>::calcPedestaldata(Data* data, std::size_t numMaps)
 }
 
 template <typename TAlpaka>
-auto Dispenser<TAlpaka>::uploadData(Maps<Data>* data) -> void
+auto Dispenser<TAlpaka>::uploadData(Maps<Data> data, std::size_t offset)
+    -> std::size_t
 {
-    std::size_t offset = 0;
-    DEBUG("uploading data...");
+    if (!ringbuffer.isEmpty()) {
+        if (offset <= data.numMaps - DEV_FRAMES) {
+            offset += calcData(data.dataPointer + offset, DEV_FRAMES);
+            DEBUG(offset << "/" << data.numMaps << " frames uploaded");
+        } else if (offset != data.numMaps) {
+            offset +=
+                calcData(data.dataPointer + offset, data.numMaps % DEV_FRAMES);
+            DEBUG(offset << "/" << data.numMaps << " frames uploaded");
+        } else {
+            alpaka::wait::wait(devices[nextFree.front()].stream,
+                               devices[nextFree.front()].event);
+            devices[nextFree.front()].state = READY;
+        }
+    }
 
-    while (offset <= data->numMaps - DEV_FRAMES) {
-        offset += calcData(data->dataPointer + offset, DEV_FRAMES);
-        DEBUG(offset << "/" << data->numMaps << " frames uploaded");
-    }
-    if (offset != data->numMaps) {
-        offset +=
-            calcData(data->dataPointer + offset, data->numMaps % DEV_FRAMES);
-        DEBUG(offset << "/" << data->numMaps << " frames uploaded");
-    }
+    return offset;
 }
 
 
@@ -283,7 +296,7 @@ auto Dispenser<TAlpaka>::calcData(Data* data, std::size_t numMaps)
     dev->numMaps = numMaps;
 
     alpaka::mem::view::copy(
-        dev->stream, 
+        dev->stream,
         dev->data,
         alpaka::mem::view::ViewPlainPtr<typename TAlpaka::DevHost,
                                         Data,
@@ -291,21 +304,28 @@ auto Dispenser<TAlpaka>::calcData(Data* data, std::size_t numMaps)
                                         typename TAlpaka::Size>(
             data, host, (numMaps * (MAPSIZE + FRAMEOFFSET))),
         numMaps * (MAPSIZE + FRAMEOFFSET));
-    alpaka::wait::wait(dev->stream,
-                       devices[(dev->id - 1) % ringbuffer.getSize()].event);
-    DEBUG("device " << devices[(dev->id - 1) % ringbuffer.getSize()].id
-                    << " finished");
+    
+    std::lock_guard<std::mutex> lock(mutex);
+    if(nextFree.size() > 0) {
+        alpaka::wait::wait(dev->stream,
+                           devices[nextFree.back()].event);
+        DEBUG("device " << devices[nextFree.back()].id
+                        << " finished");
+    }
+    nextFree.push_back(dev->id);
+    
     devices[(dev->id - 1) % ringbuffer.getSize()].state = READY;
-    alpaka::mem::view::copy(dev->stream,
-                            dev->pedestal,
-                            devices[(dev->id - 1) % devices.size()].pedestal,
-                            PEDEMAPS * MAPSIZE);
+    alpaka::mem::view::copy(
+        dev->stream,
+        dev->pedestal,
+        devices[(dev->id - 1) % ringbuffer.getSize()].pedestal,
+        PEDEMAPS * MAPSIZE);
 
     CorrectionKernel correctionKernel;
     auto const correction(alpaka::exec::create<typename TAlpaka::Acc>(
         workdiv.workdiv,
         correctionKernel,
-        data,
+        alpaka::mem::view::getPtrNative(dev->data),
         alpaka::mem::view::getPtrNative(dev->pedestal),
         alpaka::mem::view::getPtrNative(dev->gain),
         dev->numMaps,
@@ -324,7 +344,6 @@ auto Dispenser<TAlpaka>::calcData(Data* data, std::size_t numMaps)
         alpaka::mem::view::getPtrNative(dev->sum)));
 
     alpaka::stream::enqueue(dev->stream, summation);
-    alpaka::wait::wait(dev->stream);
 
     alpaka::stream::enqueue(dev->stream, dev->event);
 
@@ -332,12 +351,12 @@ auto Dispenser<TAlpaka>::calcData(Data* data, std::size_t numMaps)
 }
 
 template <typename TAlpaka>
-auto Dispenser<TAlpaka>::downloadData(Maps<Photon>* photon, Maps<PhotonSum>* sum)
-    -> bool
+auto Dispenser<TAlpaka>::downloadData(Maps<Photon>* photon,
+                                      Maps<PhotonSum>* sum) -> bool
 {
-    std::lock_guard<std::mutex> lock(mutex); 
-    struct DeviceData<TAlpaka>* dev = &Dispenser::devices[nextFree];
-
+    std::lock_guard<std::mutex> lock(mutex);
+    struct DeviceData<TAlpaka>* dev = &Dispenser::devices[nextFree.front()];
+    
     if (dev->state != READY)
         return false;
 
@@ -358,8 +377,20 @@ auto Dispenser<TAlpaka>::downloadData(Maps<Photon>* photon, Maps<PhotonSum>* sum
     sum->header = true;
 
     dev->state = FREE;
-    nextFree = (nextFree+1) % ringbuffer.getSize();
+    nextFree.pop_front();
+    ringbuffer.push(dev);
     DEBUG("device " << dev->id << " freed");
-    
+
+
+    save_image<Photon>(
+        static_cast<std::string>(std::to_string(dev->id) + "First.bmp"),
+        photon->dataPointer,
+        0);
+    save_image<Photon>(
+        static_cast<std::string>(std::to_string(dev->id) + "Last.bmp"),
+        photon->dataPointer,
+        DEV_FRAMES - 1);
+
+
     return true;
 }

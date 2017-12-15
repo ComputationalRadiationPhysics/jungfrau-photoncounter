@@ -4,8 +4,6 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(_TARGET_NAME "jungfrau-photoncounter")
 project(${_TARGET_NAME})
 
-SET(alpaka_DIR "~/Files/Libs/alpaka") 
-
 find_package(Boost QUIET COMPONENTS unit_test_framework)
 if(NOT Boost_UNIT_TEST_FRAMEWORK_FOUND)
     message(FATAL_ERROR i
