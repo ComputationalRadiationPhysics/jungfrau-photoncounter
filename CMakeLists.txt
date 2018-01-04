@@ -47,12 +47,13 @@ alpaka_add_executable(
 
 target_compile_options(
     ${_TARGET_NAME}
+    PRIVATE -fsanitize=address -lasan 
     PRIVATE ${_DEFINITIONS_PRIVATE}
-    PRIVATE ${ALPAKA_DEV_COMPILE_OPTIONS})
+    PRIVATE ${ALPAKA_DEV_COMPILE_OPTIONS}
+    )
 target_include_directories(
     ${_TARGET_NAME}
-    PRIVATE ${_INCLUDE_DIRECTORIES_PRIVATE}
-    ~/Files/Libs/alpaka/include)
+    PRIVATE ${_INCLUDE_DIRECTORIES_PRIVATE})
 target_link_libraries(
     ${_TARGET_NAME}
     PUBLIC "alpaka"

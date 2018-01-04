@@ -124,7 +124,7 @@ Dispenser<TAlpaka>::Dispenser(Maps<Gain> gainmap, TAlpaka workdivStruct)
     std::vector<typename TAlpaka::DevAcc> devs(
         alpaka::pltf::getDevs<typename TAlpaka::PltfAcc>());
 
-    devices.resize(devs.size());
+    devices.resize(devs.size() * STREAMS_PER_DEV);
 
     initDevices(devs);
 }
@@ -138,15 +138,16 @@ auto Dispenser<TAlpaka>::initDevices(std::vector<typename TAlpaka::DevAcc> devs)
     for (size_t num = 0; num < devs.size() * STREAMS_PER_DEV; ++num) {
         devices[num].id = num;
         devices[num].device = devs[num / STREAMS_PER_DEV];
-        devices[num].stream = devs[num];
-        devices[num].event = devs[num];
+        devices[num].stream = devs[num / STREAMS_PER_DEV];
+        devices[num].event = devs[num / STREAMS_PER_DEV];
         devices[num].state = FREE;
         devices[num].data =
             alpaka::mem::buf::alloc<Data, typename TAlpaka::Size>(
-                devs[num], DEV_FRAMES * (MAPSIZE + FRAMEOFFSET));
+                devs[num / STREAMS_PER_DEV],
+                DEV_FRAMES * (MAPSIZE + FRAMEOFFSET));
         devices[num].gain =
             alpaka::mem::buf::alloc<Gain, typename TAlpaka::Size>(
-                devs[num], GAINMAPS * MAPSIZE);
+                devs[num / STREAMS_PER_DEV], GAINMAPS * MAPSIZE);
         alpaka::mem::view::copy(
             devices[num].stream,
             devices[num].gain,
@@ -158,20 +159,30 @@ auto Dispenser<TAlpaka>::initDevices(std::vector<typename TAlpaka::DevAcc> devs)
             MAPSIZE * GAINMAPS);
         devices[num].pedestal =
             alpaka::mem::buf::alloc<Pedestal, typename TAlpaka::Size>(
-                devs[num], PEDEMAPS * MAPSIZE);
+                devs[num / STREAMS_PER_DEV], PEDEMAPS * MAPSIZE);
         devices[num].photon =
             alpaka::mem::buf::alloc<Photon, typename TAlpaka::Size>(
-                devs[num], DEV_FRAMES * (MAPSIZE + FRAMEOFFSET));
+                devs[num / STREAMS_PER_DEV],
+                DEV_FRAMES * (MAPSIZE + FRAMEOFFSET));
         devices[num].sum =
             alpaka::mem::buf::alloc<PhotonSum, typename TAlpaka::Size>(
-                devs[num], (DEV_FRAMES / SUM_FRAMES) * MAPSIZE);
+                devs[num / STREAMS_PER_DEV],
+                (DEV_FRAMES / SUM_FRAMES) * MAPSIZE);
         devices[num].photonHost =
             alpaka::mem::buf::alloc<Photon, typename TAlpaka::Size>(
                 host, DEV_FRAMES * (MAPSIZE + FRAMEOFFSET));
-
         devices[num].sumHost =
             alpaka::mem::buf::alloc<PhotonSum, typename TAlpaka::Size>(
                 host, (DEV_FRAMES / SUM_FRAMES) * MAPSIZE);
+#if (SHOW_DEBUG == false) 
+        alpaka::mem::buf::pin(devices[num].data);
+        alpaka::mem::buf::pin(devices[num].gain);
+        alpaka::mem::buf::pin(devices[num].pedestal);
+        alpaka::mem::buf::pin(devices[num].photon);
+        alpaka::mem::buf::pin(devices[num].sum);
+        alpaka::mem::buf::pin(devices[num].photonHost);
+        alpaka::mem::buf::pin(devices[num].sumHost);
+#endif
 
 
         if (!ringbuffer.push(&devices[num])) {

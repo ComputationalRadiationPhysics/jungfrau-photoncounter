@@ -12,7 +12,7 @@ const std::size_t DIMY = 512;
 const std::size_t MAPSIZE = DIMX * DIMY;
 const std::size_t SUM_FRAMES = 100;
 const std::size_t DEV_FRAMES = 1000;
-const std::size_t STREAMS_PER_DEV = 1;
+const std::size_t STREAMS_PER_DEV = 2;
 const std::size_t PEDEMAPS = 3;
 const std::size_t GAINMAPS = 3;
 const float BEAMCONST = 6.2;
@@ -38,7 +38,7 @@ struct Pedestal {
 };
 
 // debug statements
-#define SHOW_DEBUG true
+#define SHOW_DEBUG false
 
 #if (SHOW_DEBUG)
 #include <iostream>
