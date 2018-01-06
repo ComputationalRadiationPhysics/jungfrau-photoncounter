@@ -20,10 +20,20 @@ const float PHOTONCONST = (1. / 12.4);
 const std::size_t MAXINT = std::numeric_limits<uint32_t>::max();
 
 // data types
-template <typename TData> struct Maps {
+template <typename TData, typename TAlpaka> struct Maps {
     long unsigned int numMaps;
-    TData* dataPointer;
+    alpaka::mem::buf::Buf<typename TAlpaka::DevHost,
+                          TData,
+                          typename TAlpaka::Dim,
+                          typename TAlpaka::Size>
+        data;
     bool header;
+    Maps()
+        : numMaps(0),
+          data(alpaka::mem::buf::alloc<TData, typename TAlpaka::Size>(
+              alpaka::pltf::getDevByIdx<typename TAlpaka::PltfHost>(0u),
+              0lu)),
+          header(false){};
 };
 
 using Data = std::uint16_t;
@@ -38,7 +48,7 @@ struct Pedestal {
 };
 
 // debug statements
-#define SHOW_DEBUG false
+#define SHOW_DEBUG true
 
 #if (SHOW_DEBUG)
 #include <iostream>
