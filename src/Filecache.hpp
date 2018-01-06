@@ -40,6 +40,9 @@ auto Filecache::loadMaps(const std::string& path, bool header)
     maps.data = alpaka::mem::buf::alloc<TData, typename TAlpaka::Size>(
         alpaka::pltf::getDevByIdx<typename TAlpaka::PltfHost>(0u),
         numMaps * (MAPSIZE + (header ? FRAMEOFFSET : 0)));
+#if (SHOW_DEBUG == false)
+    alpaka::mem::buf::pin(maps.data);
+#endif
 
     alpaka::stream::StreamCpuSync streamBuf = 
         alpaka::pltf::getDevByIdx<typename TAlpaka::PltfHost>(0u);

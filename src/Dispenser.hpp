@@ -88,7 +88,7 @@ template <typename TAlpaka> struct DeviceData {
 
 template <typename TAlpaka> class Dispenser {
 public:
-    Dispenser(Maps<Gain, TAlpaka> gainmap, TAlpaka workdivSruct);
+    Dispenser(Maps<Gain, TAlpaka>* gainmap, TAlpaka workdivSruct);
     Dispenser(const Dispenser& other) = delete;
     Dispenser& operator=(const Dispenser& other) = delete;
     ~Dispenser();
@@ -101,7 +101,7 @@ public:
                       Maps<PhotonSum, TAlpaka>* sum) -> bool;
 
 private:
-    Maps<Gain, TAlpaka> gain;
+    Maps<Gain, TAlpaka>* gain;
     Ringbuffer<DeviceData<TAlpaka>*> ringbuffer;
     std::vector<DeviceData<TAlpaka>> devices;
     typename TAlpaka::DevHost host;
@@ -116,7 +116,7 @@ private:
 };
 
 template <typename TAlpaka>
-Dispenser<TAlpaka>::Dispenser(Maps<Gain, TAlpaka> gainmap,
+Dispenser<TAlpaka>::Dispenser(Maps<Gain, TAlpaka>* gainmap,
                               TAlpaka workdivStruct)
     : gain(gainmap),
       ringbuffer(STREAMS_PER_DEV *
@@ -153,7 +153,7 @@ auto Dispenser<TAlpaka>::initDevices(std::vector<typename TAlpaka::DevAcc> devs)
                 devs[num / STREAMS_PER_DEV], GAINMAPS * MAPSIZE);
         alpaka::mem::view::copy(devices[num].stream,
                                 devices[num].gain,
-                                gain.data,
+                                gain->data,
                                 MAPSIZE * GAINMAPS);
         devices[num].pedestal =
             alpaka::mem::buf::alloc<Pedestal, typename TAlpaka::Size>(
@@ -357,7 +357,7 @@ auto Dispenser<TAlpaka>::calcData(Data* data, std::size_t numMaps)
     alpaka::stream::enqueue(dev->stream, summation);
 
     save_image<Data>(
-        static_cast<std::string>(std::to_string(dev->id) + "data.bmp"),
+        static_cast<std::string>(std::to_string(dev->id) + "data" + std::to_string(std::rand()%1000) +  ".bmp"),
         data,
         DEV_FRAMES - 1);
 
@@ -399,11 +399,11 @@ auto Dispenser<TAlpaka>::downloadData(Maps<Photon, TAlpaka>* photon,
 
 
     save_image<Photon>(
-        static_cast<std::string>(std::to_string(dev->id) + "First.bmp"),
+        static_cast<std::string>(std::to_string(dev->id) + "First" + std::to_string(std::rand()%1000) +  ".bmp"),
         alpaka::mem::view::getPtrNative(photon->data),
         0);
     save_image<Photon>(
-        static_cast<std::string>(std::to_string(dev->id) + "Last.bmp"),
+        static_cast<std::string>(std::to_string(dev->id) + "Last" + std::to_string(std::rand()%1000) +  ".bmp"),
         alpaka::mem::view::getPtrNative(photon->data),
         DEV_FRAMES - 1);
 

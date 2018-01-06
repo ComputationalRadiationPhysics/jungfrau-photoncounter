@@ -23,14 +23,9 @@ struct SummationKernel {
 
         auto id = linearizedGlobalThreadIdx[0u];
 
-        TSum summation = 0;
-
         for (std::size_t i = 0; i < num; ++i) {
-            summation += data[(i * MAPSIZE) + id + ((i + 1u) * FRAMEOFFSET)];
-            if (i % amount) {
-                sum[((i / amount) * MAPSIZE) + id] = summation;
-                summation = 0;
-            }
+            sum[((i / amount) * MAPSIZE) + id] +=
+                data[(i * MAPSIZE) + id + ((i + 1u) * FRAMEOFFSET)];
         }
     }
 };

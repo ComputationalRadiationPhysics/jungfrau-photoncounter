@@ -74,8 +74,9 @@ auto main() -> int
                                             std::size_t>>>>()));
 
     Accelerator alpkStr;
-    Dispenser<Accelerator>* dispenser = new Dispenser<Accelerator>(gain, alpkStr);
+    Dispenser<Accelerator>* dispenser = new Dispenser<Accelerator>(&gain, alpkStr);
 
+DEBUG("fück");
     dispenser->uploadPedestaldata(pedestaldata);
 
     Maps<Photon, Accelerator> photon{};
@@ -89,6 +90,6 @@ auto main() -> int
             DEBUG(downloaded << "/" << data.numMaps << " downloaded");
         }
 }
-DEBUG("möp");
+
     return 0;
 }

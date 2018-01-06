@@ -47,7 +47,6 @@ alpaka_add_executable(
 
 target_compile_options(
     ${_TARGET_NAME}
-    PRIVATE -fsanitize=address -lasan 
     PRIVATE ${_DEFINITIONS_PRIVATE}
     PRIVATE ${ALPAKA_DEV_COMPILE_OPTIONS}
     )

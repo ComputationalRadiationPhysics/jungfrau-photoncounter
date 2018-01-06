@@ -18,11 +18,11 @@ struct CalibrationKernel {
 
         auto id = linearizedGlobalThreadIdx[0u];
 
-        size_t counter = 0;
+        std::size_t counter = 0;
         uint16_t stage = 0;
 
         while (counter < numframes) {
-            for (size_t i = 0; i < 3; ++i) {
+            for (std::size_t i = 0; i < 3; ++i) {
                 if (pede[(i * MAPSIZE) + id].counter == FRAMESPERSTAGE)
                     stage++;
             }
