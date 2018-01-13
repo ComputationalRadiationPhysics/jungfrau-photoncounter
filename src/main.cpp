@@ -3,49 +3,7 @@
 #include "Dispenser.hpp"
 #include "Filecache.hpp"
 
-//#include <thread>
-
 using Accelerator = GpuCudaRt;
-
-    /*    Accelerator alpkStr;
-        std::shared_ptr<Dispenser<Accelerator>> dispenserPtr =
-            std::make_shared<Dispenser<Accelerator>>(gain, alpkStr);
-
-        dispenserPtr->uploadPedestaldata(pedestaldata);
-
-        std::thread t1(upload, dispenserPtr, data);
-        std::thread t2(download, dispenserPtr, data.numMaps);
-        dispenserPtr.reset();
-
-        t1.join();
-        t2.join();
-    */
-/*auto upload(std::shared_ptr<Dispenser<Accelerator>> disp, Maps<Data> data)
-    -> void
-{
-    std::shared_ptr<Dispenser<Accelerator>> dispenser = disp;
-    std::size_t offset = 0;
-    while (offset < data.numMaps) {
-        offset = dispenser->uploadData(data, offset);
-    }
-    return;
-}
-
-auto download(std::shared_ptr<Dispenser<Accelerator>> disp, std::size_t numMaps)
-    -> void
-{
-    std::shared_ptr<Dispenser<Accelerator>> dispenser = disp;
-    Maps<Photon> photon{};
-    Maps<PhotonSum> sum{};
-    std::size_t downloaded = 0;
-    while (downloaded < numMaps) {
-        if (dispenser->downloadData(&photon, &sum)) {
-            downloaded += DEV_FRAMES;
-            DEBUG(downloaded << "/" << numMaps << " downloaded");
-        }
-    }
-    return;
-}*/
 
 auto main() -> int
 {
@@ -73,10 +31,8 @@ auto main() -> int
                   alpaka::acc::AccGpuCudaRt<alpaka::dim::DimInt<1u>,
                                             std::size_t>>>>()));
 
-    Accelerator alpkStr;
-    Dispenser<Accelerator>* dispenser = new Dispenser<Accelerator>(&gain, alpkStr);
+    Dispenser<Accelerator>* dispenser = new Dispenser<Accelerator>(&gain);
 
-DEBUG("fück");
     dispenser->uploadPedestaldata(pedestaldata);
 
     Maps<Photon, Accelerator> photon{};

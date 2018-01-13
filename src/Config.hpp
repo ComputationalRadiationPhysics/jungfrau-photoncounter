@@ -48,7 +48,7 @@ struct Pedestal {
 };
 
 // debug statements
-#define SHOW_DEBUG false
+#define SHOW_DEBUG true
 
 #if (SHOW_DEBUG)
 #include <iostream>

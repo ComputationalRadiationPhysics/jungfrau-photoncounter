@@ -88,7 +88,7 @@ template <typename TAlpaka> struct DeviceData {
 
 template <typename TAlpaka> class Dispenser {
 public:
-    Dispenser(Maps<Gain, TAlpaka>* gainmap, TAlpaka workdivSruct);
+    Dispenser(Maps<Gain, TAlpaka>* gainmap);
     Dispenser(const Dispenser& other) = delete;
     Dispenser& operator=(const Dispenser& other) = delete;
     ~Dispenser();
@@ -116,13 +116,12 @@ private:
 };
 
 template <typename TAlpaka>
-Dispenser<TAlpaka>::Dispenser(Maps<Gain, TAlpaka>* gainmap,
-                              TAlpaka workdivStruct)
+Dispenser<TAlpaka>::Dispenser(Maps<Gain, TAlpaka>* gainmap)
     : gain(gainmap),
       ringbuffer(STREAMS_PER_DEV *
                  alpaka::pltf::getDevCount<typename TAlpaka::PltfAcc>()),
       host(alpaka::pltf::getDevByIdx<typename TAlpaka::PltfHost>(0u)),
-      workdiv(workdivStruct)
+      workdiv(TAlpaka())
 {
     std::vector<typename TAlpaka::DevAcc> devs(
         alpaka::pltf::getDevs<typename TAlpaka::PltfAcc>());
