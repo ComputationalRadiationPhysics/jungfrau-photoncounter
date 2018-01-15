@@ -24,7 +24,7 @@ if(NOT alpaka_FOUND)
         "Required alpaka test common dependency alpaka could not be found!")
 else()
     include("${_ALPAKA_ROOT_DIR}/cmake/dev.cmake")
-    list(APPEND _DEFINITIONS_PRIVATE ${ALPAKA_DEV_COMPILE_OPTIONS})
+#    list(APPEND _DEFINITIONS_PRIVATE ${ALPAKA_DEV_COMPILE_OPTIONS})
 endif()
 if(ALPAKA_ACC_GPU_CUDA_ENABLE)
     list(APPEND _LINK_LIBRARIES_PRIVATE "general;${CUDA_CUDA_LIBRARY}")
@@ -48,8 +48,8 @@ alpaka_add_executable(
 target_compile_options(
     ${_TARGET_NAME}
     PRIVATE ${_DEFINITIONS_PRIVATE}
-    PRIVATE ${ALPAKA_DEV_COMPILE_OPTIONS}
-    )
+#    PRIVATE ${ALPAKA_DEV_COMPILE_OPTIONS})
+)
 target_include_directories(
     ${_TARGET_NAME}
     PRIVATE ${_INCLUDE_DIRECTORIES_PRIVATE})

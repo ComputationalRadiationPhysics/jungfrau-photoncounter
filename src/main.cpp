@@ -3,35 +3,42 @@
 #include "Dispenser.hpp"
 #include "Filecache.hpp"
 
-using Accelerator = GpuCudaRt;
+using Accelerator = CpuSerial;
 
 auto main() -> int
 {
-    Filecache fc(1024UL * 1024 * 1024 * 16);
+    Filecache* fc = new Filecache(1024UL * 1024 * 1024 * 16);
     DEBUG("filecache created");
 
     Maps<Data, Accelerator> pedestaldata(
-        fc.loadMaps<Data, Accelerator>("../../jungfrau-photoncounter/data_pool/px_101016/"
+        fc->loadMaps<Data, Accelerator>("../../jungfrau-photoncounter/data_pool/px_101016/"
                           "allpede_250us_1243__B_000000.dat",
                           true));
     DEBUG(pedestaldata.numMaps << " pedestaldata maps loaded");
 
     Maps<Data, Accelerator> data(
-        fc.loadMaps<Data, Accelerator>("../../jungfrau-photoncounter/data_pool/px_101016/"
+        fc->loadMaps<Data, Accelerator>("../../jungfrau-photoncounter/data_pool/px_101016/"
                           "Insu_6_tr_1_45d_250us__B_000000.dat",
                           true));
     DEBUG(data.numMaps << " data maps loaded");
 
-    Maps<Gain, Accelerator> gain(fc.loadMaps<Gain, Accelerator>(
+    Maps<Gain, Accelerator> gain(fc->loadMaps<Gain, Accelerator>(
         "../../jungfrau-photoncounter/data_pool/px_101016/gainMaps_M022.bin"));
     DEBUG(gain.numMaps << " gain maps loaded");
+    delete(fc);
 
+#ifdef ALPAKA_ACC_GPU_CUDA_ENABLED
     DEBUG("gpu count: "
           << (alpaka::pltf::getDevCount<alpaka::pltf::Pltf<alpaka::dev::Dev<
                   alpaka::acc::AccGpuCudaRt<alpaka::dim::DimInt<1u>,
                                             std::size_t>>>>()));
+#endif
+    DEBUG("cpu count: "
+          << (alpaka::pltf::getDevCount<alpaka::pltf::Pltf<typename Accelerator::Host>>()));
 
-    Dispenser<Accelerator>* dispenser = new Dispenser<Accelerator>(&gain);
+    DEBUG(alpaka::mem::view::getPtrNative(gain.data)[0]);
+
+    Dispenser<Accelerator>* dispenser = new Dispenser<Accelerator>(gain);
 
     dispenser->uploadPedestaldata(pedestaldata);
 

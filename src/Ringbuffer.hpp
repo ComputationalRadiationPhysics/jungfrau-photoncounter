@@ -8,7 +8,7 @@
 template <class T> class Ringbuffer {
 public:
     Ringbuffer(std::size_t maxElements)
-        : data(new T[size]), size(maxElements), head(0), tail(0), full(false)
+        : data(new T[maxElements]), size(maxElements), head(0), tail(0), full(false)
     {
     }
 
