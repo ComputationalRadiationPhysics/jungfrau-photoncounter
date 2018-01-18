@@ -1,7 +1,12 @@
 #pragma once
 
 #include <alpaka/alpaka.hpp>
+#include <chrono>
 
+
+typedef std::chrono::high_resolution_clock Clock;
+typedef std::chrono::milliseconds ms;
+static Clock::time_point t;
 
 // general settings
 const std::size_t FRAMESPERSTAGE = 1000;
@@ -52,7 +57,7 @@ struct Pedestal {
 #if (SHOW_DEBUG)
 #include <iostream>
 #define DEBUG(msg)                                                             \
-    (std::cout << __FILE__ << "[" << __LINE__ << "]:\n\t" << msg << std::endl)
+    (std::cout << __FILE__ << "[" << __LINE__ << "]:\n\t" << (std::chrono::duration_cast<ms>((Clock::now() - t))).count() << " ms\n\t" << msg << std::endl)
 #else
 #define DEBUG(msg) 
 #endif

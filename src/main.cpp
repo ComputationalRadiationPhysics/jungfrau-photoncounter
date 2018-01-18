@@ -3,10 +3,11 @@
 #include "Dispenser.hpp"
 #include "Filecache.hpp"
 
-using Accelerator = CpuSerial;
+using Accelerator = CpuOmp2Blocks;
 
 auto main() -> int
 {
+    t = Clock::now();
     Filecache* fc = new Filecache(1024UL * 1024 * 1024 * 16);
     DEBUG("filecache created");
 
@@ -34,7 +35,7 @@ auto main() -> int
                                             std::size_t>>>>()));
 #endif
     DEBUG("cpu count: "
-          << (alpaka::pltf::getDevCount<alpaka::pltf::Pltf<typename Accelerator::Host>>()));
+          << (alpaka::pltf::getDevCount<alpaka::pltf::Pltf<typename Accelerator::Acc>>()));
 
     DEBUG(alpaka::mem::view::getPtrNative(gain.data)[0]);
 

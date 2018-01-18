@@ -11,7 +11,7 @@ struct CpuFibers {};
 struct CpuOmp2Blocks {
     using Dim = alpaka::dim::DimInt<1u>;
     using Size = std::size_t;
-    using Host = alpaka::acc::AccCpuSerial<Dim, Size>;
+    using Host = alpaka::acc::AccCpuOmp2Blocks<Dim, Size>;
     using Acc = alpaka::acc::AccCpuOmp2Blocks<Dim, Size>;
     using DevHost = alpaka::dev::Dev<Host>;
     using DevAcc = alpaka::dev::Dev<Acc>;
@@ -100,7 +100,7 @@ struct CpuTbbBlocks {};
 struct CpuThreads {
     using Dim = alpaka::dim::DimInt<1u>;
     using Size = std::size_t;
-    using Host = alpaka::acc::AccCpuSerial<Dim, Size>;
+    using Host = alpaka::acc::AccCpuThreads<Dim, Size>;
     using Acc = alpaka::acc::AccCpuThreads<Dim, Size>;
     using DevHost = alpaka::dev::Dev<Host>;
     using DevAcc = alpaka::dev::Dev<Acc>;
