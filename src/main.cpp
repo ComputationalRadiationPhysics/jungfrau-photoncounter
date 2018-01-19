@@ -3,11 +3,17 @@
 #include "Dispenser.hpp"
 #include "Filecache.hpp"
 
-using Accelerator = CpuOmp2Blocks;
+/**
+ * only change this line to change the backend
+ * see Alpakaconfig.hpp for all available 
+ */
+uing Accelerator = CpuOmp2Blocks;
 
 auto main() -> int
 {
+    //t is used in all debug-messages
     t = Clock::now();
+
     Filecache* fc = new Filecache(1024UL * 1024 * 1024 * 16);
     DEBUG("filecache created");
 
@@ -37,8 +43,6 @@ auto main() -> int
     DEBUG("cpu count: "
           << (alpaka::pltf::getDevCount<alpaka::pltf::Pltf<typename Accelerator::Acc>>()));
 
-    DEBUG(alpaka::mem::view::getPtrNative(gain.data)[0]);
-
     Dispenser<Accelerator>* dispenser = new Dispenser<Accelerator>(gain);
 
     dispenser->uploadPedestaldata(pedestaldata);
@@ -47,6 +51,7 @@ auto main() -> int
     Maps<PhotonSum, Accelerator> sum{};
     std::size_t offset = 0;
     std::size_t downloaded = 0;
+
     while (downloaded < data.numMaps) {
         offset = dispenser->uploadData(data, offset);
         if (dispenser->downloadData(&photon, &sum)) {

@@ -4,10 +4,6 @@
 #include <chrono>
 
 
-typedef std::chrono::high_resolution_clock Clock;
-typedef std::chrono::milliseconds ms;
-static Clock::time_point t;
-
 // general settings
 const std::size_t FRAMESPERSTAGE = 1000;
 const std::size_t FRAME_HEADER_SIZE = 16;
@@ -52,6 +48,10 @@ struct Pedestal {
 };
 
 // debug statements
+typedef std::chrono::high_resolution_clock Clock;
+typedef std::chrono::milliseconds ms;
+static Clock::time_point t;
+
 #define SHOW_DEBUG true
 
 #if (SHOW_DEBUG)
