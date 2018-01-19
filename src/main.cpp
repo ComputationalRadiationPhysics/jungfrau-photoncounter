@@ -7,7 +7,7 @@
  * only change this line to change the backend
  * see Alpakaconfig.hpp for all available 
  */
-uing Accelerator = CpuOmp2Blocks;
+using Accelerator = CpuOmp2Blocks;
 
 auto main() -> int
 {
