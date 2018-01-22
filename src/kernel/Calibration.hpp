@@ -21,11 +21,13 @@ struct CalibrationKernel {
         std::size_t counter = 0;
         uint16_t stage = 0;
 
+        for (std::size_t i = 0; i < 3; ++i) {
+            if (pede[(i * MAPSIZE) + id].counter == FRAMESPERSTAGE)
+                stage = i;
+        }
+
         while (counter < numframes) {
-            for (std::size_t i = 0; i < 3; ++i) {
-                if (pede[(i * MAPSIZE) + id].counter == FRAMESPERSTAGE)
-                    stage++;
-            }
+           stage++; 
 
             while (counter < ((stage + 1u) * FRAMESPERSTAGE) &&
                    counter < ((stage * FRAMESPERSTAGE) + numframes)) {
