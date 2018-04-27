@@ -106,11 +106,6 @@ public:
      */
     Dispenser& operator=(const Dispenser& other) = delete;
     /**
-     * Dispenser destructor
-     */
-    ~Dispenser();
-
-    /**
      * Synchronizes all streams with one function call.
      */
     auto synchronize() -> void;
@@ -175,12 +170,10 @@ Dispenser<TAlpaka>::Dispenser(Maps<Gain, TAlpaka> gainmap)
     std::vector<typename TAlpaka::DevAcc> devs(
         alpaka::pltf::getDevs<typename TAlpaka::PltfAcc>());
 
-    devices.resize(devs.size() * workdiv.STREAMS_PER_DEV);
-
+	devices.resize(devs.size() * workdiv.STREAMS_PER_DEV);
+	
     initDevices(devs);
 }
-
-template <typename TAlpaka> Dispenser<TAlpaka>::~Dispenser() {}
 
 template <typename TAlpaka>
 auto Dispenser<TAlpaka>::initDevices(std::vector<typename TAlpaka::DevAcc> devs)
@@ -381,7 +374,7 @@ auto Dispenser<TAlpaka>::calcData(Data* data, std::size_t numMaps)
             data, host, (numMaps * (MAPSIZE + FRAMEOFFSET))),
         numMaps * (MAPSIZE + FRAMEOFFSET));
 
-    //capy offset data from last device uploaded to
+    //copy offset data from last device uploaded to
     std::lock_guard<std::mutex> lock(mutex);
     alpaka::wait::wait(dev->stream, devices[nextFree.back()].event);
     DEBUG("device " << devices[nextFree.back()].id << " finished");

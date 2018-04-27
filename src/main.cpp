@@ -7,7 +7,7 @@
  * only change this line to change the backend
  * see Alpakaconfig.hpp for all available 
  */
-using Accelerator = CpuOmp2Blocks;
+using Accelerator = GpuCudaRt;
 
 auto main() -> int
 {
@@ -17,6 +17,7 @@ auto main() -> int
     Filecache* fc = new Filecache(1024UL * 1024 * 1024 * 16);
     DEBUG("filecache created");
 
+	//load maps
     Maps<Data, Accelerator> pedestaldata(
         fc->loadMaps<Data, Accelerator>("../../jungfrau-photoncounter/data_pool/px_101016/"
                           "allpede_250us_1243__B_000000.dat",
@@ -45,6 +46,7 @@ auto main() -> int
 
     Dispenser<Accelerator>* dispenser = new Dispenser<Accelerator>(gain);
 
+	//upload and calculate pedestal data
     dispenser->uploadPedestaldata(pedestaldata);
 
     Maps<Photon, Accelerator> photon{};
@@ -52,13 +54,14 @@ auto main() -> int
     std::size_t offset = 0;
     std::size_t downloaded = 0;
 
+	//process data maps
     while (downloaded < data.numMaps) {
         offset = dispenser->uploadData(data, offset);
         if (dispenser->downloadData(&photon, &sum)) {
             downloaded += DEV_FRAMES;
             DEBUG(downloaded << "/" << data.numMaps << " downloaded");
         }
-}
+	}
 
     return 0;
 }

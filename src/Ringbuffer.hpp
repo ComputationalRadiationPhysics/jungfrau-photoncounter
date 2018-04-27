@@ -30,9 +30,21 @@ public:
     }
 
     /**
-     * Assign constructor deleted
+     * Assignment operator
      **/
-    Ringbuffer& operator=(const Ringbuffer& other) = delete;
+    Ringbuffer& operator=(const Ringbuffer& other)
+	{
+		size = other.size;
+		full = other.full;
+		head = other.head;
+		tail = other.tail;
+
+		// delete old data and allocate space for the new data 
+		delete(data);
+		data = new T[other.size];
+		
+		memcpy(other.data, data, size * sizeof(T));
+	}
 
     /**
      * Returns max number of elements

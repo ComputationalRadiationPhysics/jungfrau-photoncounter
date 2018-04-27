@@ -24,12 +24,26 @@ template <typename TData, typename TAlpaka>
 auto Filecache::loadMaps(const std::string& path, bool header)
     -> Maps<TData, TAlpaka>
 {
+	//allocate space
     auto fileSize = getFileSize(path);
     auto mapSize = sizeof(TData) * MAPSIZE + (header ? FRAME_HEADER_SIZE : 0);
     auto numMaps = fileSize / static_cast<unsigned>(mapSize);
 
+	if(fileSize + bufferPointer >= buffer.get() + sizeBytes)
+	{
+		std::cerr << "Error: Not enough memory allocated!\n";
+		exit(EXIT_FAILURE);
+	}
+
+	//load file content
     std::ifstream file;
     file.open(path, std::ios::in | std::ios::binary);
+	if(!file.is_open())
+	{
+		std::cerr << "Error: Couldn't open file " << path << "!\n";
+		exit(EXIT_FAILURE);
+	}
+	
     file.read(bufferPointer, fileSize);
     file.close();
 
@@ -37,6 +51,7 @@ auto Filecache::loadMaps(const std::string& path, bool header)
     maps.numMaps = static_cast<unsigned>(numMaps); 
     maps.header = header;
 
+	//allocate alpaka memory
     maps.data = alpaka::mem::buf::alloc<TData, typename TAlpaka::Size>(
         alpaka::pltf::getDevByIdx<typename TAlpaka::PltfHost>(0u),
         numMaps * (MAPSIZE + (header ? FRAMEOFFSET : 0)));
@@ -51,6 +66,7 @@ auto Filecache::loadMaps(const std::string& path, bool header)
 
     TData* dataBuf = reinterpret_cast<TData*>(bufferPointer);
 
+	//copy data into alpaca memory
     alpaka::mem::view::copy(
         streamBuf,
         maps.data,
