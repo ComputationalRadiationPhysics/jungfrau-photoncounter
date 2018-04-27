@@ -35,6 +35,7 @@ auto main() -> int
     DEBUG(gain.numMaps << " gain maps loaded");
     delete(fc);
 
+	//print info
 #ifdef ALPAKA_ACC_GPU_CUDA_ENABLED
     DEBUG("gpu count: "
           << (alpaka::pltf::getDevCount<alpaka::pltf::Pltf<alpaka::dev::Dev<
@@ -43,8 +44,11 @@ auto main() -> int
 #endif
     DEBUG("cpu count: "
           << (alpaka::pltf::getDevCount<alpaka::pltf::Pltf<typename Accelerator::Acc>>()));
-
+	
     Dispenser<Accelerator>* dispenser = new Dispenser<Accelerator>(gain);
+	
+	DEBUG("Devices size: " << dispenser->getMemSize());
+	DEBUG("Free sapce: " << dispenser->getFreeMem());
 
 	//upload and calculate pedestal data
     dispenser->uploadPedestaldata(pedestaldata);

@@ -8,6 +8,7 @@
 #include "kernel/Summation.hpp"
 
 #include <mutex>
+#include <limits>
 
 /**
  * This class manages the upload and download of data packages to all
@@ -129,7 +130,16 @@ public:
      */
     auto downloadData(Maps<Photon, TAlpaka>* photon,
                       Maps<PhotonSum, TAlpaka>* sum) -> bool;
-
+	/**
+	 * Returns memory size in bytes from the smallest device. 
+	 * @return size size of the smallest device in bytes
+	 */
+	auto getMemSize() -> std::size_t;
+	/**
+	 * Returns the least amount of free memory of the devices in bytes. 
+	 * @return size amount of free memory 
+	 */
+	auto getFreeMem() -> std::size_t;
 private:
     Maps<Gain, TAlpaka> gain;
     TAlpaka workdiv;
@@ -469,4 +479,28 @@ auto Dispenser<TAlpaka>::downloadData(Maps<Photon, TAlpaka>* photon,
 
 
     return true;
+}
+
+template <typename TAlpaka>
+auto Dispenser<TAlpaka>::getMemSize() -> std::size_t
+{
+	std::size_t size = std::numeric_limits<size_t>::max();
+	for(auto device : devices)
+	{
+		size = std::min(size, alpaka::dev::getMemBytes(device.device));
+	}
+
+	return size;
+}
+
+template <typename TAlpaka>
+auto Dispenser<TAlpaka>::getFreeMem() -> std::size_t
+{
+	std::size_t size = std::numeric_limits<size_t>::max();
+	for(auto device : devices)
+	{
+		size = std::min(size, alpaka::dev::getFreeMemBytes(device.device));
+	}
+
+	return size;
 }

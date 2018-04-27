@@ -34,6 +34,8 @@ public:
      **/
     Ringbuffer& operator=(const Ringbuffer& other)
 	{
+		if(&other == this)
+			return this;
 		size = other.size;
 		full = other.full;
 		head = other.head;
@@ -44,6 +46,8 @@ public:
 		data = new T[other.size];
 		
 		memcpy(other.data, data, size * sizeof(T));
+
+		return this;
 	}
 
     /**
