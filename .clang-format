@@ -3,7 +3,12 @@ IndentWidth: 4
 AccessModifierOffset: -4
 Language: Cpp
 DerivePointerAlignment: false
+BinPackArguments: false
+BinPackParameters: false
+AllowAllParametersOfDeclarationOnNextLine: false
 PointerAlignment: Left
 ColumnLimit: 80
 UseTab: Never
 BreakBeforeBraces: Stroustrup
+ConstructorInitializerAllOnOneLineOrOnePerLine: true
+MaxEmptyLinesToKeep: 2
