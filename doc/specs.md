@@ -16,17 +16,20 @@
 
 ### Pedestal callibration
 
-See [Issue #16](https://github.com/ComputationalRadiationPhysics/jungfrau-photoncounter/issues/16).
+- take ~1000 dark frames for each gain stage (not necessarily successive)
+- calculate RMS
+- only gain stage 0 pedestal values updatable since the other stages are only switched to when an actual signal is detected
 
 ### Online pedestal correction
 
-See [Issue #16](https://github.com/ComputationalRadiationPhysics/jungfrau-photoncounter/issues/16).
-Additionally:
+- update pedestal values with every frame using its dark pixels
+- use moving average as described by [John D. Cook](https://www.johndcook.com/blog/standard_deviation/)
 - log difference between initial calibration and the current state of the pedestal maps
 - resetable by user (stop online correction afterwards and fall back to initial callibration data)
 - if a recallibration is needed, restart the program
 
 ### Pixel Mask
+
 - a pixel mask map is linked to every JF module, in the same way that each JF module has 3 pedestal maps and 3 gains maps
 - the map is composed of 0 (=mask) and 1 (= do not mask)
 - before calculating stuff for each pixel, check it isn't masked.
@@ -45,9 +48,7 @@ Additionally:
 
 ### Clustering
 
-- use moving average as described by John D. Cook
 - optimize this for GPUs
 - make window size programmable
 - consists of clustering and interpolation (see [Cartier_2015_J._Inst._10_C03022.pdf](https://github.com/ComputationalRadiationPhysics/jungfrau-photoncounter/files/1521193/Cartier_2015_J._Inst._10_C03022.pdf))
-- possible size are 2x2 (Mönch), 3x3 (Jungfrau), 5x5, 7x7, 9x9 and 11x11
-
+- possible size are 3x3 (Mönch), 2x2 (Jungfrau), 5x5, 7x7, 9x9 and 11x11
