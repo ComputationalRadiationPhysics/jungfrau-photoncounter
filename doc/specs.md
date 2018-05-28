@@ -44,7 +44,7 @@
 - show photon maps, current pedestal map, gain stage map and pedestal drift data
 - show highest value
 - displayable on different computer
-- only show 'interesting' frames (frames with a certain amount pixels which are not in gain stage 0)
+- only show 'interesting' frames (frames with a certain amount of pixels which are not in gain stage 0)
 
 ### Clustering
 
