@@ -1,3 +1,5 @@
+# Usage
+
 **Please note that this software is still in develompment and the interface may change at any time!**
 
 ## Current main.cpp
@@ -8,7 +10,19 @@ The current `main.cpp` file is configured to work with CUDA devices. If it is pr
 
 ## Usage
 
-First, the data should be loaded. For this wi provide the class `Filecache` but this is not strictly required. It is also possible to provide other data sources, as long as the memory is pinned using alpaka.
+First, the headers files need to be included and an alpaka Accelerator has to be selected:
+```
+#include "Alpakaconfig.hpp"
+#include "Config.hpp"
+#include "Dispenser.hpp"
+#include "Filecache.hpp"
+
+using Accelerator = GpuCudaRt;
+```
+
+The `Config.hpp` contains project specific configurations like the image size and the package size while the `Alpakaconfig.hpp` contains alpaka specific configurations. 
+
+After this, the data should be loaded. For this we provide the class `Filecache` but this is not strictly required. It is also possible to provide other data sources, as long as the memory is pinned using alpaka.
 ```
 // create a sufficiently large Filecache
 Filecache fc(1024UL * 1024 * 1024 * 16);
