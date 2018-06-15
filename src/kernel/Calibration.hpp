@@ -18,31 +18,26 @@ struct CalibrationKernel {
 
         auto id = linearizedGlobalThreadIdx[0u];
 
-        std::size_t counter = 0;
         uint16_t stage = 0;
 
-        for (std::size_t i = 0; i < 3; ++i) {
-            if (pede[(i * MAPSIZE) + id].counter == FRAMESPERSTAGE)
-                stage = i;
-        }
+        for (std::size_t counter = 0; counter < numframes; ++counter) {
+            while (pede[(stage * MAPSIZE) + id].counter >= FRAMESPERSTAGE) {
+                if (!pede[(stage * MAPSIZE) + id].value) {
+                    pede[(stage * MAPSIZE) + id].movAvg /=
+                        pede[(stage * MAPSIZE) + id].counter;
+                    pede[(stage * MAPSIZE) + id].value =
+                        pede[(stage * MAPSIZE) + id].movAvg;
+                }
 
-        while (counter < numframes) {
-           stage++; 
+                if (stage < 2)
+                    ++stage;
+            }
 
-            while (counter < ((stage + 1u) * FRAMESPERSTAGE) &&
-                   counter < ((stage * FRAMESPERSTAGE) + numframes)) {
-                pede[(stage * MAPSIZE) + id].movAvg +=
-                    data[(MAPSIZE * (counter)) + id +
-                         (FRAMEOFFSET * (counter + 1u))] &
-                    0x3fff;
-                pede[(stage * MAPSIZE) + id].counter++;
-                counter++;
-            }
-            if (pede[(stage * MAPSIZE) + id].counter == FRAMESPERSTAGE) {
-                pede[(stage * MAPSIZE) + id].movAvg /= FRAMESPERSTAGE;
-                pede[(stage * MAPSIZE) + id].value =
-                    pede[(stage * MAPSIZE) + id].movAvg;
-            }
+            pede[(stage * MAPSIZE) + id].movAvg +=
+                data[(MAPSIZE * (counter)) + id +
+                     (FRAMEOFFSET * (counter + 1u))] &
+                0x3fff;
+            pede[(stage * MAPSIZE) + id].counter++;
         }
     }
 };

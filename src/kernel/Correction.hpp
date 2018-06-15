@@ -36,6 +36,7 @@ struct CorrectionKernel {
             pedestal[i] = pede[(i * MAPSIZE) + id].value;
             gain[i] = gainmap[(i * MAPSIZE) + id];
         }
+
         pCounter = pede[id].counter;
         pMovAvg = pede[id].movAvg;
 

@@ -5,6 +5,8 @@
 
 
 // general settings
+// const memory, kein array, boost proprocessor array, weiter googlen, array im
+// kernel definieren, #define, ALPACA_FN_HOST_ACC
 const std::size_t FRAMESPERSTAGE = 1000;
 const std::size_t FRAME_HEADER_SIZE = 16;
 const std::size_t FRAMEOFFSET = FRAME_HEADER_SIZE / 2;
@@ -57,9 +59,11 @@ static Clock::time_point t;
 #if (SHOW_DEBUG)
 #include <iostream>
 #define DEBUG(msg)                                                             \
-    (std::cout << __FILE__ << "[" << __LINE__ << "]:\n\t" << (std::chrono::duration_cast<ms>((Clock::now() - t))).count() << " ms\n\t" << msg << std::endl)
+    (std::cout << __FILE__ << "[" << __LINE__ << "]:\n\t"                      \
+               << (std::chrono::duration_cast<ms>((Clock::now() - t))).count() \
+               << " ms\n\t" << msg << std::endl)
 #else
-#define DEBUG(msg) 
+#define DEBUG(msg)
 #endif
 
 #if (SHOW_DEBUG)
@@ -73,10 +77,11 @@ void save_image(std::string path, TBuffer* data, std::size_t frame_number)
     for (std::size_t j = 0; j < 1024; j++) {
         for (std::size_t k = 0; k < 512; k++) {
             int h = int(data[(frame_number * (MAPSIZE + FRAMEOFFSET)) +
-                             (k * 1024) + j + FRAMEOFFSET]) *10;
+                             (k * 1024) + j + FRAMEOFFSET]) *
+                    10;
             Bitmap::Rgb color = {static_cast<unsigned char>(h & 255),
-                static_cast<unsigned char>((h >> 8) & 255),
-                static_cast<unsigned char>((h >> 16) & 255)};
+                                 static_cast<unsigned char>((h >> 8) & 255),
+                                 static_cast<unsigned char>((h >> 16) & 255)};
             img(j, k) = color;
         }
     }
