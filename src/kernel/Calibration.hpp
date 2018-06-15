@@ -17,11 +17,24 @@ struct CalibrationKernel {
             alpaka::idx::mapIdx<1u>(globalThreadIdx, globalThreadExtent);
 
         auto id = linearizedGlobalThreadIdx[0u];
+        const std::size_t FRAMESPERSTAGE[] = {
+            FRAMESPERSTAGE_G0, FRAMESPERSTAGE_G1, FRAMESPERSTAGE_G2};
 
         uint16_t stage = 0;
 
+        while (pede[(stage * MAPSIZE) + id].counter >= FRAMESPERSTAGE[stage])
+            if (stage < 2)
+                ++stage;
+
         for (std::size_t counter = 0; counter < numframes; ++counter) {
-            while (pede[(stage * MAPSIZE) + id].counter >= FRAMESPERSTAGE) {
+
+            pede[(stage * MAPSIZE) + id].movAvg +=
+                data[(MAPSIZE * (counter)) + id +
+                     (FRAMEOFFSET * (counter + 1u))] &
+                0x3fff;
+            pede[(stage * MAPSIZE) + id].counter++;
+
+            if (pede[(stage * MAPSIZE) + id].counter >= FRAMESPERSTAGE[stage]) {
                 if (!pede[(stage * MAPSIZE) + id].value) {
                     pede[(stage * MAPSIZE) + id].movAvg /=
                         pede[(stage * MAPSIZE) + id].counter;
@@ -32,12 +45,6 @@ struct CalibrationKernel {
                 if (stage < 2)
                     ++stage;
             }
-
-            pede[(stage * MAPSIZE) + id].movAvg +=
-                data[(MAPSIZE * (counter)) + id +
-                     (FRAMEOFFSET * (counter + 1u))] &
-                0x3fff;
-            pede[(stage * MAPSIZE) + id].counter++;
         }
     }
 };

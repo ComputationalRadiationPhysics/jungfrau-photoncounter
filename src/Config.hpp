@@ -7,7 +7,10 @@
 // general settings
 // const memory, kein array, boost proprocessor array, weiter googlen, array im
 // kernel definieren, #define, ALPACA_FN_HOST_ACC
-const std::size_t FRAMESPERSTAGE = 1000;
+const std::size_t FRAMESPERSTAGE_G0 = 1000;
+const std::size_t FRAMESPERSTAGE_G1 = 1000;
+const std::size_t FRAMESPERSTAGE_G2 = 999;
+
 const std::size_t FRAME_HEADER_SIZE = 16;
 const std::size_t FRAMEOFFSET = FRAME_HEADER_SIZE / 2;
 const std::size_t DIMX = 1024;

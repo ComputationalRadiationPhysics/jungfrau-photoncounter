@@ -33,7 +33,7 @@ struct CorrectionKernel {
         TGain gain[3];
 
         for (std::size_t i = 0; i < 3; i++) {
-            pedestal[i] = pede[(i * MAPSIZE) + id].value;
+            pedestal[i] = pede[(i * MAPSIZE) + id].value;	    
             gain[i] = gainmap[(i * MAPSIZE) + id];
         }
 
