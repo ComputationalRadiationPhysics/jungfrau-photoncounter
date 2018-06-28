@@ -27,17 +27,12 @@ struct CorrectionKernel {
 
 
         TPhoton pedestal[3];
-        uint32_t pCounter;
-        uint32_t pMovAvg;
-
         TGain gain[3];
 
         for (std::size_t i = 0; i < 3; i++) {
-            pedestal[i] = pede[(i * MAPSIZE) + id].value;
+            pedestal[i] = pede[(i * MAPSIZE) + id].mean;
             gain[i] = gainmap[(i * MAPSIZE) + id];
         }
-        pCounter = pede[id].counter;
-        pMovAvg = pede[id].movAvg;
 
         uint16_t dataword;
         uint16_t adc;
@@ -49,14 +44,6 @@ struct CorrectionKernel {
 
             switch ((dataword & 0xc000) >> 14) {
             case 0:
-                if (adc < 100) {
-                    // calibration for dark pixels
-                    pMovAvg = pMovAvg + adc - (pMovAvg / pCounter);
-                    if (pCounter < MAXINT)
-                        pCounter++;
-
-                    pedestal[0] = pMovAvg / pCounter;
-                }
                 energy = (adc - pedestal[0]) / gain[0];
                 if (energy < 0)
                     energy = 0;
@@ -84,9 +71,5 @@ struct CorrectionKernel {
                     data[(MAPSIZE * i) + (globalThreadIdx[0u] * (i + 1u))];
             }
         }
-        // save new pedestal value
-        pede[id].value = pedestal[0];
-        pede[id].counter = pCounter;
-        pede[id].movAvg = pMovAvg;
     }
 };

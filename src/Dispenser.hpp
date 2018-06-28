@@ -3,11 +3,13 @@
 #include "Config.hpp"
 #include "Ringbuffer.hpp"
 
-#include "kernel/Calibration.hpp"
+#include "kernel/Statistics.hpp"
 #include "kernel/Correction.hpp"
 #include "kernel/Summation.hpp"
+#include "kernel/Zero.hpp"
 
 #include <mutex>
+#include <iostream>
 
 /**
  * This class manages the upload and download of data packages to all
@@ -39,6 +41,11 @@ template <typename TAlpaka> struct DeviceData {
                           typename TAlpaka::Dim,
                           typename TAlpaka::Size>
         pedestal;
+    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc,
+                          Mask,
+                          typename TAlpaka::Dim,
+                          typename TAlpaka::Size>
+        mask;
     alpaka::mem::buf::Buf<typename TAlpaka::DevAcc,
                           Photon,
                           typename TAlpaka::Dim,
@@ -75,6 +82,9 @@ template <typename TAlpaka> struct DeviceData {
                                                                      0lu)),
           pedestal(
               alpaka::mem::buf::alloc<Pedestal, typename TAlpaka::Size>(device,
+                                                                        0lu)),
+          mask(
+              alpaka::mem::buf::alloc<Mask, typename TAlpaka::Size>(device,
                                                                         0lu)),
           photon(alpaka::mem::buf::alloc<Photon, typename TAlpaka::Size>(device,
                                                                          0lu)),
@@ -116,6 +126,11 @@ public:
      */
     auto uploadPedestaldata(Maps<Data, TAlpaka> data) -> void;
     /**
+     * Downloads the pedestal data.
+     * @return pedestal pedestal data
+     */
+    auto downloadPedestaldata() -> Maps<Pedestal, TAlpaka>;
+    /**
      * Tries to upload one data package.
      * @param Maps-struct with raw data, offset within the package
      * @return number of frames uploaded from the package
@@ -132,7 +147,9 @@ public:
 
 private:
     Maps<Gain, TAlpaka> gain;
+    Maps<Pedestal, TAlpaka> pedestal;
     TAlpaka workdiv;
+    bool init;
     Ringbuffer<DeviceData<TAlpaka>*> ringbuffer;
     std::vector<DeviceData<TAlpaka>> devices;
     typename TAlpaka::DevHost host;
@@ -163,6 +180,7 @@ template <typename TAlpaka>
 Dispenser<TAlpaka>::Dispenser(Maps<Gain, TAlpaka> gainmap)
     : gain(gainmap),
       workdiv(TAlpaka()),
+      init(false),
       ringbuffer(workdiv.STREAMS_PER_DEV *
                  alpaka::pltf::getDevCount<typename TAlpaka::PltfAcc>()),
       host(alpaka::pltf::getDevByIdx<typename TAlpaka::PltfHost>(0u))
@@ -173,6 +191,17 @@ Dispenser<TAlpaka>::Dispenser(Maps<Gain, TAlpaka> gainmap)
 	devices.resize(devs.size() * workdiv.STREAMS_PER_DEV);
 	
     initDevices(devs);
+
+    // make room for live pedestal information
+        pedestal.numMaps = PEDEMAPS;
+        pedestal.data = alpaka::mem::buf::alloc<Pedestal, typename TAlpaka::Size>(
+            host, PEDEMAPS * MAPSIZE);
+
+    #ifdef ALPAKA_ACC_GPU_CUDA_ENABLED
+    #if (SHOW_DEBUG == false)
+        alpaka::mem::buf::pin(pedestal.data);
+    #endif
+    #endif
 }
 
 template <typename TAlpaka>
@@ -202,6 +231,10 @@ auto Dispenser<TAlpaka>::initDevices(std::vector<typename TAlpaka::DevAcc> devs)
         devices[num].pedestal =
             alpaka::mem::buf::alloc<Pedestal, typename TAlpaka::Size>(
                 devs[num / workdiv.STREAMS_PER_DEV], PEDEMAPS * MAPSIZE);
+        devices[num].mask =
+            alpaka::mem::buf::alloc<Mask, typename TAlpaka::Size>(
+                devs[num / workdiv.STREAMS_PER_DEV],
+                DEV_FRAMES * (MAPSIZE));
         devices[num].photon =
             alpaka::mem::buf::alloc<Photon, typename TAlpaka::Size>(
                 devs[num / workdiv.STREAMS_PER_DEV],
@@ -222,6 +255,7 @@ auto Dispenser<TAlpaka>::initDevices(std::vector<typename TAlpaka::DevAcc> devs)
         alpaka::mem::buf::pin(devices[num].data);
         alpaka::mem::buf::pin(devices[num].gain);
         alpaka::mem::buf::pin(devices[num].pedestal);
+        alpaka::mem::buf::pin(devices[num].mask);
         alpaka::mem::buf::pin(devices[num].photon);
         alpaka::mem::buf::pin(devices[num].sum);
         alpaka::mem::buf::pin(devices[num].photonHost);
@@ -297,17 +331,32 @@ auto Dispenser<TAlpaka>::calcPedestaldata(Data* data, std::size_t numMaps)
         nextFree.pop_front();
     }
     nextFree.push_back(dev->id);
+    
+    if(init == false) {
+        ZeroKernel zeroKernel;
+        auto const zero(alpaka::exec::create<typename TAlpaka::Acc>(
+            workdiv.workdiv,
+            zeroKernel,
+            alpaka::mem::view::getPtrNative(dev->pedestal)));
 
-    CalibrationKernel calibrationKernel;
+        alpaka::stream::enqueue(dev->stream, zero);
+        alpaka::wait::wait(dev->stream);
 
-    auto const calibration(alpaka::exec::create<typename TAlpaka::Acc>(
+        init = true;
+    }
+
+
+    StatisticsKernel StatisticsKernel;
+    auto const statistics(alpaka::exec::create<typename TAlpaka::Acc>(
         workdiv.workdiv,
-        calibrationKernel,
+        StatisticsKernel,
         alpaka::mem::view::getPtrNative(dev->data),
+        alpaka::mem::view::getPtrNative(dev->gain),
+        dev->numMaps,
         alpaka::mem::view::getPtrNative(dev->pedestal),
-        dev->numMaps));
+        alpaka::mem::view::getPtrNative(dev->mask)));
 
-    alpaka::stream::enqueue(dev->stream, calibration);
+    alpaka::stream::enqueue(dev->stream, statistics);
 
     alpaka::wait::wait(dev->stream);
     DEBUG("device " << dev->id << " finished");
@@ -318,8 +367,94 @@ auto Dispenser<TAlpaka>::calcPedestaldata(Data* data, std::size_t numMaps)
         fputs("FATAL ERROR (RingBuffer): Unexpected size!\n", stderr);
         exit(EXIT_FAILURE);
     }
+    //
+    //
+    //
+    //
+    //
+    //
+    //
+    //
+    //
+    //
+    //
+    // Maps<Pedestal, Accelerator>
+    auto ipedestalMaps = downloadPedestaldata();
+    Photon* iped = new Photon[MAPSIZE * PEDEMAPS];
+    if (!iped)
+        exit(EXIT_FAILURE);
+
+    for (int y = 0; y < DIMY; ++y) {
+        for (int x = 0; x < DIMX; ++x) {
+            for (int g = 0; g < ipedestalMaps.numMaps; ++g) {
+                iped[g * MAPSIZE + y * DIMX + x] =
+                    alpaka::mem::view::getPtrNative(
+                        ipedestalMaps.data)[g * MAPSIZE + y * DIMX + x]
+                        .mean;
+                    std::cout << 
+                    alpaka::mem::view::getPtrNative(
+                        ipedestalMaps.data)[g * MAPSIZE + y * DIMX + x]
+                        .counter << std::endl;
+            }
+        }
+    }
+
+    save_image<Photon>(
+        "time:" + std::to_string(
+            (std::chrono::duration_cast<ms>((Clock::now() - t))).count()) +
+            ":initial_pedestal0:dev" + std::to_string(nextFree.back()) +
+            ".bmp",
+        iped,
+        0);
+    save_image<Photon>(
+        "time:" + std::to_string(
+            (std::chrono::duration_cast<ms>((Clock::now() - t))).count()) +
+            ":initial_pedestal1:dev" + std::to_string(nextFree.back()) +
+            ".bmp",
+        iped,
+        1);
+    save_image<Photon>(
+        "time:" + std::to_string(
+            (std::chrono::duration_cast<ms>((Clock::now() - t))).count()) +
+            ":initial_pedestal2:dev" + std::to_string(nextFree.back()) +
+            ".bmp",
+        iped,
+        2);
+
+    //
+    //
+    //
+    //
+    //
+    //
+    //
+    //
+    //
+    //
+    //
 
     return numMaps;
+}
+
+template <typename TAlpaka>
+auto Dispenser<TAlpaka>::downloadPedestaldata() -> Maps<Pedestal, TAlpaka>
+{
+    DEBUG("downloading pedestaldata...");
+
+    // create handle for the device with the current version of the pedestal
+    // maps
+    auto current_device = devices[nextFree.back()];
+
+    // get the pedestal data from the device
+    alpaka::mem::view::copy(current_device.stream,
+                            pedestal.data,
+                            current_device.pedestal,
+                            PEDEMAPS * MAPSIZE);
+
+    // wait for copy to finish
+    alpaka::wait::wait(current_device.stream, current_device.event);
+
+    return pedestal;
 }
 
 template <typename TAlpaka>
@@ -385,6 +520,19 @@ auto Dispenser<TAlpaka>::calcData(Data* data, std::size_t numMaps)
                             devices[nextFree.back()].pedestal,
                             PEDEMAPS * MAPSIZE);
     nextFree.push_back(dev->id);
+
+    StatisticsKernel statisticsKernel;
+    auto const statistics(alpaka::exec::create<typename TAlpaka::Acc>(
+        workdiv.workdiv,
+        statisticsKernel,
+        alpaka::mem::view::getPtrNative(dev->data),
+        alpaka::mem::view::getPtrNative(dev->gain),
+        dev->numMaps,
+        alpaka::mem::view::getPtrNative(dev->pedestal),
+        alpaka::mem::view::getPtrNative(dev->mask)));
+
+    alpaka::stream::enqueue(dev->stream, statistics);
+    alpaka::wait::wait(dev->stream);
 
     CorrectionKernel correctionKernel;
     auto const correction(alpaka::exec::create<typename TAlpaka::Acc>(

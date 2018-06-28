@@ -3,7 +3,6 @@
 #include <alpaka/alpaka.hpp>
 #include <chrono>
 
-
 // general settings
 const std::size_t FRAMESPERSTAGE = 1000;
 const std::size_t FRAME_HEADER_SIZE = 16;
@@ -37,14 +36,17 @@ template <typename TData, typename TAlpaka> struct Maps {
 };
 
 using Data = std::uint16_t;
+using Charge = double;
+using Mask = bool; 
 using Gain = double;
 using Photon = std::uint16_t;
 using PhotonSum = std::uint64_t;
 
 struct Pedestal {
-    std::uint32_t counter;
-    Photon value;
-    std::uint32_t movAvg;
+    std::size_t counter;
+    double mean;
+    double M2;
+    double stddev;
 };
 
 // debug statements
