@@ -5,13 +5,11 @@
 struct StatisticsKernel {
     template <typename TAcc, 
               typename TData, 
-              typename TGain, 
               typename TNum,
               typename TPedestal,
               typename TMask>
     ALPAKA_FN_ACC auto operator()(TAcc const& acc, 
                                   TData* const data,
-                                  TGain const* const gainmap,
                                   TNum const num,
                                   TPedestal* const pedestal,
                                   TMask* const mask) const -> void
@@ -27,25 +25,18 @@ struct StatisticsKernel {
         auto id = linearizedGlobalThreadIdx[0u];
 
         //charge correction
-        TGain gain[3];
         uint16_t dataword;
-        uint16_t adc;
-        double charge;
+        uint16_t charge;
 
-        for (std::size_t i = 0; i < 3; i++) {
-            gain[i] = gainmap[(i * MAPSIZE) + id];
-        }
-       
         double delta;
         double delta2;
         std::size_t counter;
 
         for (std::size_t i = 0; i < num; ++i) { 
             dataword = data[(MAPSIZE * i) + id + (FRAMEOFFSET * (i + 1u))];
-            adc = dataword & 0x3fff;
-            uint8_t stage = ((dataword & 0xbfff) >> 14);
+            charge = dataword & 0x3fff;
+            uint8_t stage = (dataword >> 14);
             if(stage == 3) stage = 2;
-            charge = adc / gain[stage];
             
             if(pedestal[(stage * MAPSIZE) + id].counter < 1000) {
                 pedestal[(stage * MAPSIZE) + id].counter += 1;

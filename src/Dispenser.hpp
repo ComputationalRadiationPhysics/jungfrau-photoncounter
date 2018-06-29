@@ -351,7 +351,6 @@ auto Dispenser<TAlpaka>::calcPedestaldata(Data* data, std::size_t numMaps)
         workdiv.workdiv,
         StatisticsKernel,
         alpaka::mem::view::getPtrNative(dev->data),
-        alpaka::mem::view::getPtrNative(dev->gain),
         dev->numMaps,
         alpaka::mem::view::getPtrNative(dev->pedestal),
         alpaka::mem::view::getPtrNative(dev->mask)));
@@ -526,7 +525,6 @@ auto Dispenser<TAlpaka>::calcData(Data* data, std::size_t numMaps)
         workdiv.workdiv,
         statisticsKernel,
         alpaka::mem::view::getPtrNative(dev->data),
-        alpaka::mem::view::getPtrNative(dev->gain),
         dev->numMaps,
         alpaka::mem::view::getPtrNative(dev->pedestal),
         alpaka::mem::view::getPtrNative(dev->mask)));
