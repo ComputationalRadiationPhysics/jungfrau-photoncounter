@@ -401,22 +401,19 @@ auto Dispenser<TAlpaka>::calcPedestaldata(Data* data, std::size_t numMaps)
     save_image<Photon>(
         "time:" + std::to_string(
             (std::chrono::duration_cast<ms>((Clock::now() - t))).count()) +
-            ":initial_pedestal0:dev" + std::to_string(nextFree.back()) +
-            ".bmp",
+            ":initial_pedestal0:dev" + std::to_string(nextFree.back()),
         iped,
         0);
     save_image<Photon>(
         "time:" + std::to_string(
             (std::chrono::duration_cast<ms>((Clock::now() - t))).count()) +
-            ":initial_pedestal1:dev" + std::to_string(nextFree.back()) +
-            ".bmp",
+            ":initial_pedestal1:dev" + std::to_string(nextFree.back()),
         iped,
         1);
     save_image<Photon>(
         "time:" + std::to_string(
             (std::chrono::duration_cast<ms>((Clock::now() - t))).count()) +
-            ":initial_pedestal2:dev" + std::to_string(nextFree.back()) +
-            ".bmp",
+            ":initial_pedestal2:dev" + std::to_string(nextFree.back()),
         iped,
         2);
 
@@ -558,7 +555,7 @@ auto Dispenser<TAlpaka>::calcData(Data* data, std::size_t numMaps)
 
     save_image<Data>(
         static_cast<std::string>(std::to_string(dev->id) + "data" +
-                                 std::to_string(std::rand() % 1000) + ".bmp"),
+                                 std::to_string(std::rand() % 1000)),
         data,
         DEV_FRAMES - 1);
 
@@ -604,12 +601,12 @@ auto Dispenser<TAlpaka>::downloadData(Maps<Photon, TAlpaka>* photon,
 
     save_image<Photon>(
         static_cast<std::string>(std::to_string(dev->id) + "First" +
-                                 std::to_string(std::rand() % 1000) + ".bmp"),
+                                 std::to_string(std::rand() % 1000)),
         alpaka::mem::view::getPtrNative(photon->data),
         0);
     save_image<Photon>(
         static_cast<std::string>(std::to_string(dev->id) + "Last" +
-                                 std::to_string(std::rand() % 1000) + ".bmp"),
+                                 std::to_string(std::rand() % 1000)),
         alpaka::mem::view::getPtrNative(photon->data),
         DEV_FRAMES - 1);
 

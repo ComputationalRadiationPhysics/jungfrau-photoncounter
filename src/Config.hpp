@@ -2,6 +2,8 @@
 
 #include <alpaka/alpaka.hpp>
 #include <chrono>
+#include <iostream>
+#include <fstream>
 
 // general settings
 const std::size_t FRAMESPERSTAGE = 1000;
@@ -71,17 +73,16 @@ template <typename TBuffer>
 void save_image(std::string path, TBuffer* data, std::size_t frame_number)
 {
 #if (SHOW_DEBUG)
-    Bitmap::Image img(1024ul, 512ul);
-    for (std::size_t j = 0; j < 1024; j++) {
-        for (std::size_t k = 0; k < 512; k++) {
+    std::ofstream img;
+    img.open (path + ".txt");
+    for (std::size_t j = 0; j < 512; j++) {
+        for (std::size_t k = 0; k < 1024; k++) {
             int h = int(data[(frame_number * (MAPSIZE + FRAMEOFFSET)) +
-                             (k * 1024) + j + FRAMEOFFSET]) *10;
-            Bitmap::Rgb color = {static_cast<unsigned char>(h & 255),
-                static_cast<unsigned char>((h >> 8) & 255),
-                static_cast<unsigned char>((h >> 16) & 255)};
-            img(j, k) = color;
+                             (j * 1024) + k + FRAMEOFFSET]) *10;
+            img << h << " ";
         }
+    img << "\n";
     }
-    img.writeToFile(path);
+    img.close();
 #endif
 }
