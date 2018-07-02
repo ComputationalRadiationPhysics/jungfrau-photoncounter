@@ -65,7 +65,6 @@ struct StatisticsKernel {
 
                 pedestal[(stage * MAPSIZE) +id].stddev = 
                     sqrt(pedestal[(stage * MAPSIZE) +id].M2 / counter);
-                data[(MAPSIZE * i) + id + (FRAMEOFFSET * (i + 1u))] = -1;
 
                 //set masking pixel
                 mask[(MAPSIZE * i) + id] = false;

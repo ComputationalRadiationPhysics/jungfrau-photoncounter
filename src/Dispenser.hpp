@@ -47,6 +47,11 @@ template <typename TAlpaka> struct DeviceData {
                           typename TAlpaka::Size>
         mask;
     alpaka::mem::buf::Buf<typename TAlpaka::DevAcc,
+                          Mask,
+                          typename TAlpaka::Dim,
+                          typename TAlpaka::Size>
+        manualMask;
+    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc,
                           Photon,
                           typename TAlpaka::Dim,
                           typename TAlpaka::Size>
@@ -86,6 +91,9 @@ template <typename TAlpaka> struct DeviceData {
           mask(
               alpaka::mem::buf::alloc<Mask, typename TAlpaka::Size>(device,
                                                                         0lu)),
+          manualMask(
+              alpaka::mem::buf::alloc<Mask, typename TAlpaka::Size>(device,
+                                                                        0lu)),
           photon(alpaka::mem::buf::alloc<Photon, typename TAlpaka::Size>(device,
                                                                          0lu)),
           sum(alpaka::mem::buf::alloc<PhotonSum, typename TAlpaka::Size>(device,
@@ -106,7 +114,7 @@ public:
      * Dispenser constructor
      * @param Maps-Struct with initial gain
      */
-    Dispenser(Maps<Gain, TAlpaka> gainmap);
+    Dispenser(Maps<Gain, TAlpaka> gainmap, Maps<Mask, TAlpaka> mask);
     /**
      * copy constructor deleted
      */
@@ -147,6 +155,7 @@ public:
 
 private:
     Maps<Gain, TAlpaka> gain;
+    Maps<Mask, TAlpaka> manualMask;
     Maps<Pedestal, TAlpaka> pedestal;
     TAlpaka workdiv;
     bool init;
@@ -177,8 +186,9 @@ private:
 };
 
 template <typename TAlpaka>
-Dispenser<TAlpaka>::Dispenser(Maps<Gain, TAlpaka> gainmap)
+Dispenser<TAlpaka>::Dispenser(Maps<Gain, TAlpaka> gainmap, Maps<Mask, TAlpaka> mask)
     : gain(gainmap),
+      manualMask(mask),
       workdiv(TAlpaka()),
       init(false),
       ringbuffer(workdiv.STREAMS_PER_DEV *
@@ -232,6 +242,10 @@ auto Dispenser<TAlpaka>::initDevices(std::vector<typename TAlpaka::DevAcc> devs)
             alpaka::mem::buf::alloc<Pedestal, typename TAlpaka::Size>(
                 devs[num / workdiv.STREAMS_PER_DEV], PEDEMAPS * MAPSIZE);
         devices[num].mask =
+            alpaka::mem::buf::alloc<Mask, typename TAlpaka::Size>(
+                devs[num / workdiv.STREAMS_PER_DEV],
+                DEV_FRAMES * (MAPSIZE));
+        devices[num].manualMask =
             alpaka::mem::buf::alloc<Mask, typename TAlpaka::Size>(
                 devs[num / workdiv.STREAMS_PER_DEV],
                 DEV_FRAMES * (MAPSIZE));
@@ -390,10 +404,6 @@ auto Dispenser<TAlpaka>::calcPedestaldata(Data* data, std::size_t numMaps)
                     alpaka::mem::view::getPtrNative(
                         ipedestalMaps.data)[g * MAPSIZE + y * DIMX + x]
                         .mean;
-                    std::cout << 
-                    alpaka::mem::view::getPtrNative(
-                        ipedestalMaps.data)[g * MAPSIZE + y * DIMX + x]
-                        .counter << std::endl;
             }
         }
     }
@@ -537,7 +547,9 @@ auto Dispenser<TAlpaka>::calcData(Data* data, std::size_t numMaps)
         alpaka::mem::view::getPtrNative(dev->pedestal),
         alpaka::mem::view::getPtrNative(dev->gain),
         dev->numMaps,
-        alpaka::mem::view::getPtrNative(dev->photon)));
+        alpaka::mem::view::getPtrNative(dev->photon),
+        alpaka::mem::view::getPtrNative(dev->manualMask),
+        alpaka::mem::view::getPtrNative(dev->mask)));
 
     alpaka::stream::enqueue(dev->stream, correction);
     alpaka::wait::wait(dev->stream);
