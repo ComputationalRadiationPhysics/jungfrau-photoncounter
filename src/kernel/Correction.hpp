@@ -1,5 +1,4 @@
 #include "../Config.hpp"
-#include <stdio.h>
 
 
 struct CorrectionKernel {
