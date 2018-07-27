@@ -17,10 +17,10 @@ struct ZeroKernel {
         auto id = linearizedGlobalThreadIdx[0u];
 
         for(std::size_t i = 0; i < 3; ++i) {
-            pedestal[(i * MAPSIZE) + id].counter = 0;
-            pedestal[(i * MAPSIZE) + id].mean = 0;
-            pedestal[(i * MAPSIZE) + id].M2 = 0;
-            pedestal[(i * MAPSIZE) + id].stddev = 0;
+            pedestal[i][id].counter = 0;
+            pedestal[i][id].mean = 0;
+            pedestal[i][id].M2 = 0;
+            pedestal[i][id].stddev = 0;
         } 
     }
 };

@@ -24,8 +24,7 @@ struct SummationKernel {
         auto id = linearizedGlobalThreadIdx[0u];
 
         for (decltype(id) i = 0; i < num; ++i) {
-            sum[((i / amount) * MAPSIZE) + id] +=
-                data[(i * MAPSIZE) + id + ((i + 1u) * FRAMEOFFSET)];
+            sum[i / amount].imagedata[id] += data[i].imagedata[id];
         }
     }
 };

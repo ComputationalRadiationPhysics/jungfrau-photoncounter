@@ -1,4 +1,5 @@
 #include "../Config.hpp"
+#include <stdio.h>
 
 
 struct CorrectionKernel {
@@ -29,12 +30,12 @@ struct CorrectionKernel {
         auto id = linearizedGlobalThreadIdx[0u];
 
 
-        TPhoton pedestal[3];
-        TGain gain[3];
+        uint16_t pedestal[3];
+        uint16_t gain[3];
 
         for (std::size_t i = 0; i < 3; i++) {
-            pedestal[i] = pede[(i * MAPSIZE) + id].mean;
-            gain[i] = gainmap[(i * MAPSIZE) + id];
+            pedestal[i] = pede[i][id].mean;
+            gain[i] = gainmap[i][id];
         }
 
         uint16_t dataword;
@@ -44,9 +45,9 @@ struct CorrectionKernel {
         bool m2;
 
         for (std::size_t i = 0; i < num; ++i) {
-            dataword = data[(MAPSIZE * i) + id + (FRAMEOFFSET * (i + 1u))];
-            m1 = mask[(MAPSIZE * i) + id];
-            m2 = manualMask[(MAPSIZE * i) + id];
+            dataword = data[i].imagedata[id];
+            m1 = mask[i][id];
+            m2 = manualMask[id];
 
             if(m1 && m2) {
                 adc = dataword & 0x3fff;
@@ -71,13 +72,13 @@ struct CorrectionKernel {
                     energy = 0;
                     break;
                 }
-                photon[(MAPSIZE * i) + id + (FRAMEOFFSET * (i + 1u))] =
+                photon[i].imagedata[id] =
                     int((energy + BEAMCONST) * PHOTONCONST);
 
                 // copy the header
                 if (globalThreadIdx[0u] < 8) {
-                    photon[(MAPSIZE * i) + (globalThreadIdx[0u] * (i + 1u))] =
-                        data[(MAPSIZE * i) + (globalThreadIdx[0u] * (i + 1u))];
+                    photon[i].framenumber = data[i].framenumber;
+                    photon[i].bunchid = data[i].bunchid;
                 }
             }
         }

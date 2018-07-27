@@ -33,44 +33,44 @@ struct StatisticsKernel {
         std::size_t counter;
 
         for (std::size_t i = 0; i < num; ++i) { 
-            dataword = data[(MAPSIZE * i) + id + (FRAMEOFFSET * (i + 1u))];
+            dataword = data[i].imagedata[id];
             charge = dataword & 0x3fff;
             uint8_t stage = (dataword >> 14);
             if(stage == 3) stage = 2;
             
-            if(pedestal[(stage * MAPSIZE) + id].counter < 1000) {
-                pedestal[(stage * MAPSIZE) + id].counter += 1;
-                counter = pedestal[(stage * MAPSIZE) + id].counter;
+            if(pedestal[stage][id].counter < 1000) {
+                pedestal[stage][id].counter += 1;
+                counter = pedestal[stage][id].counter;
                 
                 //mean algorithm by Welford
-                delta = charge - pedestal[(stage * MAPSIZE) +id].mean;
-                pedestal[(stage * MAPSIZE) +id].mean += (delta/counter);
-                delta2 = charge - pedestal[(stage * MAPSIZE) +id].mean;
+                delta = charge - pedestal[stage][id].mean;
+                pedestal[stage][id].mean += (delta/counter);
+                delta2 = charge - pedestal[stage][id].mean;
 
-                pedestal[(stage * MAPSIZE) +id].M2 += delta * delta2;
+                pedestal[stage][id].M2 += delta * delta2;
 
-                pedestal[(stage * MAPSIZE) +id].stddev = 
-                    sqrt(pedestal[(stage * MAPSIZE) +id].M2 / counter);
-            } else if (dataword < (pedestal[(stage * MAPSIZE) +id].mean +
-                (pedestal[(stage * MAPSIZE) +id].stddev * 5)) ) { 
-                pedestal[(stage * MAPSIZE) + id].counter += 1;
-                counter = pedestal[(stage * MAPSIZE) + id].counter;
+                pedestal[stage][id].stddev = 
+                    sqrt(pedestal[stage][id].M2 / counter);
+            } else if (dataword < (pedestal[stage][id].mean +
+                (pedestal[stage][id].stddev * 5)) ) { 
+                pedestal[stage][id].counter += 1;
+                counter = pedestal[stage][id].counter;
                 
                 //mean algorithm by Welford
-                delta = charge - pedestal[(stage * MAPSIZE) +id].mean;
-                pedestal[(stage * MAPSIZE) +id].mean += (delta/counter);
-                delta2 = charge - pedestal[(stage * MAPSIZE) +id].mean;
+                delta = charge - pedestal[stage][id].mean;
+                pedestal[stage][id].mean += (delta/counter);
+                delta2 = charge - pedestal[stage][id].mean;
 
-                pedestal[(stage * MAPSIZE) +id].M2 += delta * delta2;
+                pedestal[stage][id].M2 += delta * delta2;
 
-                pedestal[(stage * MAPSIZE) +id].stddev = 
-                    sqrt(pedestal[(stage * MAPSIZE) +id].M2 / counter);
+                pedestal[stage][id].stddev = 
+                    sqrt(pedestal[stage][id].M2 / counter);
 
                 //set masking pixel
-                mask[(MAPSIZE * i) + id] = false;
+                mask[i][id] = false;
             } else {
                 //set masking pixel
-                mask[(MAPSIZE * i) + id] = true;
+                mask[i][id] = true;
             }
         }
     }

@@ -230,39 +230,39 @@ auto Dispenser<TAlpaka>::initDevices(std::vector<typename TAlpaka::DevAcc> devs)
         devices[num].data =
             alpaka::mem::buf::alloc<Data, typename TAlpaka::Size>(
                 devs[num / workdiv.STREAMS_PER_DEV],
-                DEV_FRAMES * (MAPSIZE + FRAMEOFFSET));
+                DEV_FRAMES);
         devices[num].gain =
             alpaka::mem::buf::alloc<Gain, typename TAlpaka::Size>(
-                devs[num / workdiv.STREAMS_PER_DEV], GAINMAPS * MAPSIZE);
+                devs[num / workdiv.STREAMS_PER_DEV], GAINMAPS);
         alpaka::mem::view::copy(devices[num].stream,
                                 devices[num].gain,
                                 gain.data,
-                                MAPSIZE * GAINMAPS);
+                                GAINMAPS);
         devices[num].pedestal =
             alpaka::mem::buf::alloc<Pedestal, typename TAlpaka::Size>(
-                devs[num / workdiv.STREAMS_PER_DEV], PEDEMAPS * MAPSIZE);
+                devs[num / workdiv.STREAMS_PER_DEV], PEDEMAPS);
         devices[num].mask =
             alpaka::mem::buf::alloc<Mask, typename TAlpaka::Size>(
                 devs[num / workdiv.STREAMS_PER_DEV],
-                DEV_FRAMES * (MAPSIZE));
+                DEV_FRAMES);
         devices[num].manualMask =
             alpaka::mem::buf::alloc<Mask, typename TAlpaka::Size>(
                 devs[num / workdiv.STREAMS_PER_DEV],
-                DEV_FRAMES * (MAPSIZE));
+                DEV_FRAMES);
         devices[num].photon =
             alpaka::mem::buf::alloc<Photon, typename TAlpaka::Size>(
                 devs[num / workdiv.STREAMS_PER_DEV],
-                DEV_FRAMES * (MAPSIZE + FRAMEOFFSET));
+                DEV_FRAMES);
         devices[num].sum =
             alpaka::mem::buf::alloc<PhotonSum, typename TAlpaka::Size>(
                 devs[num / workdiv.STREAMS_PER_DEV],
-                (DEV_FRAMES / SUM_FRAMES) * MAPSIZE);
+                DEV_FRAMES / SUM_FRAMES);
         devices[num].photonHost =
             alpaka::mem::buf::alloc<Photon, typename TAlpaka::Size>(
-                host, DEV_FRAMES * (MAPSIZE + FRAMEOFFSET));
+                host, DEV_FRAMES);
         devices[num].sumHost =
             alpaka::mem::buf::alloc<PhotonSum, typename TAlpaka::Size>(
-                host, (DEV_FRAMES / SUM_FRAMES) * MAPSIZE);
+                host, (DEV_FRAMES / SUM_FRAMES));
 #ifdef ALPAKA_ACC_GPU_CUDA_ENABLED
 #if (SHOW_DEBUG == false)
         //pin all buffer
@@ -300,14 +300,14 @@ auto Dispenser<TAlpaka>::uploadPedestaldata(Maps<Data, TAlpaka> data) -> void
     //upload all frames cut into smaller packages
     while (offset <= data.numMaps - DEV_FRAMES) {
         offset += calcPedestaldata(alpaka::mem::view::getPtrNative(data.data) +
-                                       (offset * (MAPSIZE + FRAMEOFFSET)),
+                                       offset,
                                    DEV_FRAMES);
         DEBUG(offset << "/" << data.numMaps << " pedestalframes uploaded");
     }
     //upload remaining frames
     if (offset != data.numMaps) {
         offset += calcPedestaldata(alpaka::mem::view::getPtrNative(data.data) +
-                                       (offset * (MAPSIZE + FRAMEOFFSET)),
+                                       offset,
                                    data.numMaps % DEV_FRAMES);
         DEBUG(offset << "/" << data.numMaps << " pedestalframes uploaded");
     }
@@ -331,8 +331,8 @@ auto Dispenser<TAlpaka>::calcPedestaldata(Data* data, std::size_t numMaps)
                                         Data,
                                         typename TAlpaka::Dim,
                                         typename TAlpaka::Size>(
-            data, host, (numMaps * (MAPSIZE + FRAMEOFFSET))),
-        numMaps * (MAPSIZE + FRAMEOFFSET));
+            data, host, numMaps),
+        numMaps);
 
     //copy offset data from last initialized device
     std::lock_guard<std::mutex> lock(mutex);
@@ -341,7 +341,7 @@ auto Dispenser<TAlpaka>::calcPedestaldata(Data* data, std::size_t numMaps)
         alpaka::mem::view::copy(dev->stream,
                                 dev->pedestal,
                                 devices[nextFree.back()].pedestal,
-                                PEDEMAPS * MAPSIZE);
+                                PEDEMAPS);
         nextFree.pop_front();
     }
     nextFree.push_back(dev->id);
@@ -392,8 +392,8 @@ auto Dispenser<TAlpaka>::calcPedestaldata(Data* data, std::size_t numMaps)
     //
     //
     // Maps<Pedestal, Accelerator>
-    auto ipedestalMaps = downloadPedestaldata();
-    Photon* iped = new Photon[MAPSIZE * PEDEMAPS];
+    /*auto ipedestalMaps = downloadPedestaldata();
+    uint16_t* iped = new uint16_t[MAPSIZE * PEDEMAPS];
     if (!iped)
         exit(EXIT_FAILURE);
 
@@ -425,7 +425,7 @@ auto Dispenser<TAlpaka>::calcPedestaldata(Data* data, std::size_t numMaps)
             (std::chrono::duration_cast<ms>((Clock::now() - t))).count()) +
             ":initial_pedestal2:dev" + std::to_string(nextFree.back()),
         iped,
-        2);
+        2);*/
 
     //
     //
@@ -455,7 +455,7 @@ auto Dispenser<TAlpaka>::downloadPedestaldata() -> Maps<Pedestal, TAlpaka>
     alpaka::mem::view::copy(current_device.stream,
                             pedestal.data,
                             current_device.pedestal,
-                            PEDEMAPS * MAPSIZE);
+                            PEDEMAPS);
 
     // wait for copy to finish
     alpaka::wait::wait(current_device.stream, current_device.event);
@@ -471,14 +471,14 @@ auto Dispenser<TAlpaka>::uploadData(Maps<Data, TAlpaka> data,
         //try uploading one data package
         if (offset <= data.numMaps - DEV_FRAMES) {
             offset += calcData(alpaka::mem::view::getPtrNative(data.data) +
-                                   (offset * (MAPSIZE + FRAMEOFFSET)),
+                                   offset,
                                DEV_FRAMES);
             DEBUG(offset << "/" << data.numMaps << " frames uploaded");
         }
         //upload remaining frames
         else if (offset != data.numMaps) {
             offset += calcData(alpaka::mem::view::getPtrNative(data.data) +
-                                   (offset * (MAPSIZE + FRAMEOFFSET)),
+                                   offset,
                                data.numMaps % DEV_FRAMES);
             DEBUG(offset << "/" << data.numMaps << " frames uploaded");
         }
@@ -512,8 +512,8 @@ auto Dispenser<TAlpaka>::calcData(Data* data, std::size_t numMaps)
                                         Data,
                                         typename TAlpaka::Dim,
                                         typename TAlpaka::Size>(
-            data, host, (numMaps * (MAPSIZE + FRAMEOFFSET))),
-        numMaps * (MAPSIZE + FRAMEOFFSET));
+            data, host, numMaps),
+        numMaps);
 
     //copy offset data from last device uploaded to
     std::lock_guard<std::mutex> lock(mutex);
@@ -524,7 +524,7 @@ auto Dispenser<TAlpaka>::calcData(Data* data, std::size_t numMaps)
     alpaka::mem::view::copy(dev->stream,
                             dev->pedestal,
                             devices[nextFree.back()].pedestal,
-                            PEDEMAPS * MAPSIZE);
+                            PEDEMAPS);
     nextFree.push_back(dev->id);
 
     StatisticsKernel statisticsKernel;
@@ -593,7 +593,7 @@ auto Dispenser<TAlpaka>::downloadData(Maps<Photon, TAlpaka>* photon,
     alpaka::mem::view::copy(dev->stream,
                             dev->photonHost,
                             dev->photon,
-                            dev->numMaps * (MAPSIZE + FRAMEOFFSET));
+                            dev->numMaps);
     photon->data = dev->photonHost;
     photon->header = true;
 
@@ -601,7 +601,7 @@ auto Dispenser<TAlpaka>::downloadData(Maps<Photon, TAlpaka>* photon,
     alpaka::mem::view::copy(dev->stream,
                             dev->sumHost,
                             dev->sum,
-                            (dev->numMaps / SUM_FRAMES) * MAPSIZE);
+                            (dev->numMaps / SUM_FRAMES));
     sum->data = dev->sumHost;
     sum->header = true;
 

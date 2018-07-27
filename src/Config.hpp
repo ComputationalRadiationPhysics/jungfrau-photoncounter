@@ -22,7 +22,7 @@ const std::size_t MAXINT = std::numeric_limits<uint32_t>::max();
 
 // data types
 template <typename TData, typename TAlpaka> struct Maps {
-    long unsigned int numMaps;
+    std::size_t numMaps;
     alpaka::mem::buf::Buf<typename TAlpaka::DevHost,
                           TData,
                           typename TAlpaka::Dim,
@@ -37,19 +37,27 @@ template <typename TData, typename TAlpaka> struct Maps {
           header(false){};
 };
 
-using Data = std::uint16_t;
-using Charge = double;
-using Mask = bool; 
-using Gain = double;
-using Photon = std::uint16_t;
-using PhotonSum = std::uint64_t;
+template <typename TData> struct Frame {
+    uint64_t framenumber;
+    uint64_t bunchid;
+    TData imagedata[DIMX * DIMY];
+}; 
 
-struct Pedestal {
+using Data = Frame<std::uint16_t>;
+using Charge = Frame<double>;
+using Mask = bool[DIMX * DIMY]; 
+using Gain = double[DIMX * DIMY];
+using Photon = Frame<std::uint16_t>;
+using PhotonSum = Frame<std::uint64_t>;
+
+struct PedestalStruct {
     std::size_t counter;
     double mean;
     double M2;
     double stddev;
 };
+
+using Pedestal = PedestalStruct[DIMX * DIMY];
 
 // debug statements
 typedef std::chrono::high_resolution_clock Clock;
@@ -77,8 +85,7 @@ void save_image(std::string path, TBuffer* data, std::size_t frame_number)
     img.open (path + ".txt");
     for (std::size_t j = 0; j < 512; j++) {
         for (std::size_t k = 0; k < 1024; k++) {
-            int h = int(data[(frame_number * (MAPSIZE + FRAMEOFFSET)) +
-                             (j * 1024) + k + FRAMEOFFSET]) *10;
+            int h = int(data[frame_number].imagedata[(j * 1024) + k] *10);
             img << h << " ";
         }
     img << "\n";
