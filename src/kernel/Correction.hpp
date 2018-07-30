@@ -7,13 +7,16 @@ struct CorrectionKernel {
               typename TPedestal,
               typename TGain,
               typename TNum,
-              typename TPhoton>
+              typename TPhoton,
+              typename TMask>
     ALPAKA_FN_ACC auto operator()(TAcc const& acc,
                                   TData const* const data,
                                   TPedestal* const pede,
                                   TGain const* const gainmap,
                                   TNum const num,
-                                  TPhoton* const photon) const -> void
+                                  TPhoton* const photon,
+                                  TMask* const manualMask,
+                                  TMask* const mask) const -> void
     {
         auto const globalThreadIdx =
             alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc);
@@ -26,67 +29,57 @@ struct CorrectionKernel {
         auto id = linearizedGlobalThreadIdx[0u];
 
 
-        TPhoton pedestal[3];
-        uint32_t pCounter;
-        uint32_t pMovAvg;
-
-        TGain gain[3];
+        uint16_t pedestal[3];
+        uint16_t gain[3];
 
         for (std::size_t i = 0; i < 3; i++) {
-            pedestal[i] = pede[(i * MAPSIZE) + id].value;
-            gain[i] = gainmap[(i * MAPSIZE) + id];
+            pedestal[i] = pede[i][id].mean;
+            gain[i] = gainmap[i][id];
         }
-        pCounter = pede[id].counter;
-        pMovAvg = pede[id].movAvg;
 
         uint16_t dataword;
         uint16_t adc;
         float energy;
+        bool m1;
+        bool m2;
 
         for (std::size_t i = 0; i < num; ++i) {
-            dataword = data[(MAPSIZE * i) + id + (FRAMEOFFSET * (i + 1u))];
-            adc = dataword & 0x3fff;
+            dataword = data[i].imagedata[id];
+            m1 = mask[i][id];
+            m2 = manualMask[id];
 
-            switch ((dataword & 0xc000) >> 14) {
-            case 0:
-                if (adc < 100) {
-                    // calibration for dark pixels
-                    pMovAvg = pMovAvg + adc - (pMovAvg / pCounter);
-                    if (pCounter < MAXINT)
-                        pCounter++;
+            if(m1 && m2) {
+                adc = dataword & 0x3fff;
 
-                    pedestal[0] = pMovAvg / pCounter;
+                switch ((dataword & 0xc000) >> 14) {
+                case 0:
+                    energy = (adc - pedestal[0]) / gain[0];
+                    if (energy < 0)
+                        energy = 0;
+                    break;
+                case 1:
+                    energy = (-1) * (pedestal[1] - adc) / gain[1];
+                    if (energy < 0)
+                        energy = 0;
+                    break;
+                case 3:
+                    energy = (-1) * (pedestal[2] - adc) / gain[2];
+                    if (energy < 0)
+                        energy = 0;
+                    break;
+                default:
+                    energy = 0;
+                    break;
                 }
-                energy = (adc - pedestal[0]) / gain[0];
-                if (energy < 0)
-                    energy = 0;
-                break;
-            case 1:
-                energy = (-1) * (pedestal[1] - adc) / gain[1];
-                if (energy < 0)
-                    energy = 0;
-                break;
-            case 3:
-                energy = (-1) * (pedestal[2] - adc) / gain[2];
-                if (energy < 0)
-                    energy = 0;
-                break;
-            default:
-                energy = 0;
-                break;
-            }
-            photon[(MAPSIZE * i) + id + (FRAMEOFFSET * (i + 1u))] =
-                int((energy + BEAMCONST) * PHOTONCONST);
+                photon[i].imagedata[id] =
+                    int((energy + BEAMCONST) * PHOTONCONST);
 
-            // copy the header
-            if (globalThreadIdx[0u] < 8) {
-                photon[(MAPSIZE * i) + (globalThreadIdx[0u] * (i + 1u))] =
-                    data[(MAPSIZE * i) + (globalThreadIdx[0u] * (i + 1u))];
+                // copy the header
+                if (globalThreadIdx[0u] < 8) {
+                    photon[i].framenumber = data[i].framenumber;
+                    photon[i].bunchid = data[i].bunchid;
+                }
             }
         }
-        // save new pedestal value
-        pede[id].value = pedestal[0];
-        pede[id].counter = pCounter;
-        pede[id].movAvg = pMovAvg;
     }
 };
