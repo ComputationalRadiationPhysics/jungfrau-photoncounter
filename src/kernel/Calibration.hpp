@@ -22,28 +22,25 @@ struct CalibrationKernel {
 
         uint16_t stage = 0;
 
-        while (pede[(stage * MAPSIZE) + id].counter >= FRAMESPERSTAGE[stage])
-            if (stage < 2)
-                ++stage;
+        for (std::size_t i = 0; i < 3; ++i) {
+            if (pede[i][id].counter == FRAMESPERSTAGE)
+                stage = i;
+        }
 
-        for (std::size_t counter = 0; counter < numframes; ++counter) {
+        while (counter < numframes) {
+           stage++; 
 
-            pede[(stage * MAPSIZE) + id].movAvg +=
-                data[(MAPSIZE * (counter)) + id +
-                     (FRAMEOFFSET * (counter + 1u))] &
-                0x3fff;
-            pede[(stage * MAPSIZE) + id].counter++;
-
-            if (pede[(stage * MAPSIZE) + id].counter >= FRAMESPERSTAGE[stage]) {
-                if (!pede[(stage * MAPSIZE) + id].value) {
-                    pede[(stage * MAPSIZE) + id].movAvg /=
-                        pede[(stage * MAPSIZE) + id].counter;
-                    pede[(stage * MAPSIZE) + id].value =
-                        pede[(stage * MAPSIZE) + id].movAvg;
-                }
-
-                if (stage < 2)
-                    ++stage;
+            while (counter < ((stage + 1u) * FRAMESPERSTAGE) &&
+                   counter < ((stage * FRAMESPERSTAGE) + numframes)) {
+                pede[stage][id].movAvg +=
+                    data[counter].imagedata[id] &0x3fff;
+                pede[stage][id].counter++;
+                counter++;
+            }
+            if (pede[stage][id].counter == FRAMESPERSTAGE) {
+                pede[stage][id].movAvg /= FRAMESPERSTAGE;
+                pede[stage][id].value =
+                    pede[stage][id].movAvg;
             }
         }
     }

@@ -33,7 +33,11 @@ auto main() -> int
     Maps<Gain, Accelerator> gain(fc->loadMaps<Gain, Accelerator>(
         "../../jungfrau-photoncounter/data_pool/px_101016/gainMaps_M022.bin"));
     DEBUG(gain.numMaps << " gain maps loaded");
-    delete (fc);
+
+    Maps<Mask, Accelerator> mask(fc->loadMaps<Mask, Accelerator>(
+        "../data_pool/px_101016/mask.bin"));
+    DEBUG(mask.numMaps << " masking maps loaded");
+    delete(fc);
 
     // print info
 #ifdef ALPAKA_ACC_GPU_CUDA_ENABLED
@@ -45,7 +49,7 @@ auto main() -> int
     DEBUG("cpu count: " << (alpaka::pltf::getDevCount<
                             alpaka::pltf::Pltf<typename Accelerator::Acc>>()));
 
-    Dispenser<Accelerator>* dispenser = new Dispenser<Accelerator>(gain);
+    Dispenser<Accelerator>* dispenser = new Dispenser<Accelerator>(gain, mask);
 
 
     // upload and calculate pedestal data

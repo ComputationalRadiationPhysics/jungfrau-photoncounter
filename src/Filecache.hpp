@@ -26,8 +26,8 @@ auto Filecache::loadMaps(const std::string& path, bool header)
 {
 	//allocate space
     auto fileSize = getFileSize(path);
-    auto mapSize = sizeof(TData) * MAPSIZE + (header ? FRAME_HEADER_SIZE : 0);
-    auto numMaps = fileSize / static_cast<unsigned>(mapSize);
+    auto mapSize = header ? (MAPSIZE * 2 + 32) : (MAPSIZE * 2);
+    std::size_t numMaps = fileSize / static_cast<unsigned>(mapSize);
 
 	if(fileSize + bufferPointer >= buffer.get() + sizeBytes)
 	{
@@ -54,7 +54,8 @@ auto Filecache::loadMaps(const std::string& path, bool header)
 	//allocate alpaka memory
     maps.data = alpaka::mem::buf::alloc<TData, typename TAlpaka::Size>(
         alpaka::pltf::getDevByIdx<typename TAlpaka::PltfHost>(0u),
-        numMaps * (MAPSIZE + (header ? FRAMEOFFSET : 0)));
+        (numMaps * 2));
+
 #ifdef ALPAKA_ACC_GPU_CUDA_ENABLED 
 #if (SHOW_DEBUG == false)
     alpaka::mem::buf::pin(maps.data);
@@ -76,8 +77,8 @@ auto Filecache::loadMaps(const std::string& path, bool header)
                                         typename TAlpaka::Size>(
             dataBuf,
             alpaka::pltf::getDevByIdx<typename TAlpaka::PltfHost>(0u),
-            (numMaps * (MAPSIZE + (header ? FRAMEOFFSET : 0)))),
-        numMaps * (MAPSIZE + (header ? FRAMEOFFSET : 0)));
+            numMaps),
+        numMaps);
 
     bufferPointer += fileSize;
 

@@ -47,7 +47,7 @@ public:
 		
 		memcpy(other.data, data, size * sizeof(T));
 
-		return this;
+        return *this;
 	}
 
     /**
