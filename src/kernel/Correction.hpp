@@ -1,22 +1,23 @@
 #include "../Config.hpp"
 
-
 struct CorrectionKernel {
     template <typename TAcc,
               typename TData,
               typename TPedestal,
               typename TGain,
               typename TNum,
-              typename TPhoton,
-              typename TMask>
+              typename TEnergy,
+              typename TMask,
+              >
     ALPAKA_FN_ACC auto operator()(TAcc const& acc,
                                   TData const* const data,
                                   TPedestal* const pede,
                                   TGain const* const gainmap,
                                   TNum const num,
-                                  TPhoton* const photon,
+                                  Tenergy* const energyMap,
                                   TMask* const manualMask,
-                                  TMask* const mask) const -> void
+                                  TMask* const mask
+                                  ) const -> void
     {
         auto const globalThreadIdx =
             alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc);
@@ -71,13 +72,11 @@ struct CorrectionKernel {
                     energy = 0;
                     break;
                 }
-                photon[i].imagedata[id] =
-                    int((energy + BEAMCONST) * PHOTONCONST);
-
+                energyMap[i].imagedata[id] = energy;
                 // copy the header
                 if (globalThreadIdx[0u] < 8) {
-                    photon[i].framenumber = data[i].framenumber;
-                    photon[i].bunchid = data[i].bunchid;
+                    energyMap[i].framenumber = data[i].framenumber;
+                    energyMap[i].bunchid = data[i].bunchid;
                 }
             }
         }
