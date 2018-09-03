@@ -1,20 +1,20 @@
 #include "../Config.hpp"
 
-struct CorrectionKernel {
+struct EnergyConversionKernel {
     template <typename TAcc,
               typename TData,
-              typename TPedestal,
-              typename TGain,
-              typename TNum,
-              typename TEnergy,
+              typename TGainMap,
+              typename TStatistics,
+              typename TNumFrames,
+              typename TEnergyMap,
               typename TMask,
               >
     ALPAKA_FN_ACC auto operator()(TAcc const& acc,
                                   TData const* const data,
-                                  TPedestal* const pede,
-                                  TGain const* const gainmap,
-                                  TNum const num,
-                                  Tenergy* const energyMap,
+                                  TGain const* const gainMaps,
+                                  TStatistics const* const statMaps,
+                                  TNumFrames const numFrames,
+                                  TEnergyMap* const energyMaps,
                                   TMask* const manualMask,
                                   TMask* const mask
                                   ) const -> void
@@ -29,13 +29,12 @@ struct CorrectionKernel {
 
         auto id = linearizedGlobalThreadIdx[0u];
 
-
         uint16_t pedestal[3];
         uint16_t gain[3];
 
-        for (std::size_t i = 0; i < 3; i++) {
-            pedestal[i] = pede[i][id].mean;
-            gain[i] = gainmap[i][id];
+        for (std::size_t i = 0; i < 3; ++i) {
+            pedestal[i] = statMaps[i][id].mean;
+            gain[i] = gainMaps[i][id];
         }
 
         uint16_t dataword;
@@ -45,11 +44,17 @@ struct CorrectionKernel {
         bool m2;
 
         for (std::size_t i = 0; i < num; ++i) {
+            // first thread copies frame header
+            if (id == 0) {
+                energyMaps[i].frameNumber = data[i].frameNumber;
+                energyMaps[i].bunchId = data[i].bunchId;
+            }
             dataword = data[i].imagedata[id];
             m1 = mask[i][id];
             m2 = manualMask[id];
 
-            if(m1 && m2) {
+            // calculate energy only for pixels in mask, 0 otherwise
+            if (m1 && m2) {
                 adc = dataword & 0x3fff;
 
                 switch ((dataword & 0xc000) >> 14) {
@@ -72,13 +77,12 @@ struct CorrectionKernel {
                     energy = 0;
                     break;
                 }
-                energyMap[i].imagedata[id] = energy;
-                // copy the header
-                if (globalThreadIdx[0u] < 8) {
-                    energyMap[i].framenumber = data[i].framenumber;
-                    energyMap[i].bunchid = data[i].bunchid;
-                }
             }
+            else {
+                energy = 0;
+            }
+            // set final value
+            energyMaps[i].data[id] = energy;
         }
     }
 };
