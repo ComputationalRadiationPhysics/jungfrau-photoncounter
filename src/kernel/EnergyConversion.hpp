@@ -2,19 +2,21 @@
 
 struct EnergyConversionKernel {
     template <typename TAcc,
-              typename TData,
+              typename TDetectorData,
               typename TGainMap,
               typename TStatistics,
               typename TNumFrames,
+              typename TGainStageMap,
               typename TEnergyMap,
               typename TMask,
               >
     ALPAKA_FN_ACC auto operator()(TAcc const& acc,
-                                  TData const* const data,
-                                  TGain const* const gainMaps,
+                                  TDetectorData const* const detectorData,
+                                  TGainMap const* const gainMaps,
                                   TStatistics const* const statMaps,
                                   TNumFrames const numFrames,
                                   TEnergyMap* const energyMaps,
+                                  TGainStageMap* const gainStageMaps,
                                   TMask* const manualMask,
                                   TMask* const mask
                                   ) const -> void
@@ -28,61 +30,30 @@ struct EnergyConversionKernel {
             alpaka::idx::mapIdx<1u>(globalThreadIdx, globalThreadExtent);
 
         auto id = linearizedGlobalThreadIdx[0u];
-
-        uint16_t pedestal[3];
-        uint16_t gain[3];
-
-        for (std::size_t i = 0; i < 3; ++i) {
-            pedestal[i] = statMaps[i][id].mean;
-            gain[i] = gainMaps[i][id];
-        }
-
-        uint16_t dataword;
-        uint16_t adc;
-        float energy;
-        bool m1;
-        bool m2;
-
+        bool isValid = manualMask[id] && mask[id];
+        // for each frame to be processed
         for (std::size_t i = 0; i < num; ++i) {
+            auto dataword = detectorData[i].data[id];
             // first thread copies frame header
             if (id == 0) {
-                energyMaps[i].frameNumber = data[i].frameNumber;
-                energyMaps[i].bunchId = data[i].bunchId;
+                auto header = detectorData[i].header;
+                energyMaps[i].header = header;
+                gainStageMaps[i].header = header;
             }
-            dataword = data[i].imagedata[id];
-            m1 = mask[i][id];
-            m2 = manualMask[id];
-
-            // calculate energy only for pixels in mask, 0 otherwise
-            if (m1 && m2) {
-                adc = dataword & 0x3fff;
-
-                switch ((dataword & 0xc000) >> 14) {
-                case 0:
-                    energy = (adc - pedestal[0]) / gain[0];
-                    if (energy < 0)
-                        energy = 0;
-                    break;
-                case 1:
-                    energy = (-1) * (pedestal[1] - adc) / gain[1];
-                    if (energy < 0)
-                        energy = 0;
-                    break;
-                case 3:
-                    energy = (-1) * (pedestal[2] - adc) / gain[2];
-                    if (energy < 0)
-                        energy = 0;
-                    break;
-                default:
-                    energy = 0;
-                    break;
-                }
+            std::uint16_t adc = dataword & 0x3fff;
+            char gainStage = (dataword & 0xc000) >> 14;
+            // map gain stages from 0, 1, 3 to 0, 1, 2
+            if (gainStage == 3) {
+                gainStage = 2;
             }
-            else {
-                energy = 0;
+            gainStageMaps[i].data[id] = gainStage;
+            energyMaps[i].data[id] = 
+                (adc - statMaps[gainStage * MAPSIZE + id].mean) 
+                    / gainMaps[gainStage][id];
+            // set energy to zero if pixel is marked false by mask
+            if (!isValid) {
+                energyMaps[i].data[id] = 0;
             }
-            // set final value
-            energyMaps[i].data[id] = energy;
         }
     }
 };
