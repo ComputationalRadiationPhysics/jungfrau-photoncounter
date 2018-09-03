@@ -3,6 +3,7 @@
 struct PhotonCountingKernel {
     template <typename TAcc,
               typename TEnergyMap,
+              typename TGainStageMap,
               typename TStatistics,
               typename TNumFrames,
               typename TPhotonMap,
@@ -12,6 +13,7 @@ struct PhotonCountingKernel {
               >
     ALPAKA_FN_ACC auto operator()(TAcc const& acc,
                                   TEnergyMap const* const energyMaps,
+                                  TGainStageMap const* const gainStageMaps,
                                   TStatistics const* const statMaps,
                                   TNumFrames const numFrames,
                                   TPhotonMap* const photonMaps,
@@ -33,11 +35,16 @@ struct PhotonCountingKernel {
 
         for (std::size_t i = 0; i < num; ++i) {
             // first thread copies frame header
-            if (useCpf) {
-
+            if (id == 0) {
+                photonMaps[i].header = energyMaps[i].header;
             }
+            auto gainStage = gainStageMaps[i].data[id];
+            // cluster finding algorithm
+            if (useCpf) {
+            }
+            // normal photon counting
             else {
-
+                if 
             }
         }
     }
