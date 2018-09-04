@@ -87,6 +87,10 @@ struct ConversionKernel {
                     id / DIMX <= DIMY - (n + 1) / 2) {
                         sum = 0;
                         maxId = 0;
+                        // iterate over all elements of current cluster where
+                        // the current thread is the cluster center
+                        // - sum up energy over cluster
+                        // - find index of maximum in cluster
                         for (int y = -n / 2; y < (n + 1) / 2; ++y) {
                             for (int x = -n / 2; x < (n + 1) / 2; ++x) {
                                 currentIdx = id + y * DIMX + x;
@@ -114,8 +118,10 @@ struct ConversionKernel {
                         clusterVectors[i].x = id % DIMX;
                         clusterVectors[i].y = id / DIMX;
                         // fill cluster buffer with energy data
-                        int l = 0;
+                        int l = 0; // index of current cluster element
                         int currentIdx;
+                        // iterate over all elements of the cluster where
+                        // the current thread is the cluster center
                         for (int y = -n / 2; y < (n + 1) / 2; ++y) {
                             for (int x = -n / 2; x < (n + 1) / 2; ++x) {
                                 currentIdx = id + y * DIMX + x;
