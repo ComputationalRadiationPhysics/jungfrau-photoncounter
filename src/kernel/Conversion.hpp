@@ -59,24 +59,26 @@ struct ConversionKernel {
             if (gainStage == 3) {
                 gainStage = 2;
             }
+            // calculate energy
+            auto energy = (adc - statMaps[gainStage][id].mean) 
+                        / gainMaps[gainStage][id];
+            // set energy to zero if marked invalid / false by mask
+            if (!isValid)
+                energy = 0;
+            // set values in optional maps
             if (gainStageMaps)
                 gainStageMaps[i].data[id] = gainStage;
             if (energyMaps)
-                energyMaps[i].data[id] = 
-                    (adc - statMaps[gainStage * MAPSIZE + id].mean) 
-                        / gainMaps[gainStage][id];
-            // set energy to zero if pixel is marked false by mask
-            if (!isValid) {
-                energyMaps[i].data[id] = 0;
-            }
+                energyMaps[i].data[id] = energy;
             // detect photons
             float sum;
             int maxId;
             int currentIdx;
             bool photonCondition;
+            auto& mean = statMaps[gainStage][id].mean;
+            auto& stddev = statMaps[gainStage][id].stddev;
             // check for single photon hit
-            photonCondition = (energyMaps[i].data[id] > 
-                        c * statMaps[gainStage * MAPSIZE + id].stddev);
+            photonCondition = (energy > c * stddev);
             if (useCpf) {
                 // check if pixel is valid cluster center
                 if (id % DIMX >= n / 2 &&
@@ -95,22 +97,29 @@ struct ConversionKernel {
                             }
                         }
                         // check if sum of charges is high enough
-                        photonCondition |= sum > n * c * 
-                                statMaps[gainStage * MAPSIZE + id].stddev;
+                        photonCondition |= sum > n * c * stddev;
                         // check if center is maximum in cluster
                         photonCondition &= id == maxId;
                     }
                     if (photonCondition) {
                         // photon detected in cluster
-                        // copy cluster to cluster vector
-                        // TODO: atomic increment
-                        auto clusterIdx = clusterVector.used++;
+                        // obtain free buffer for cluster (atomically)
+                        auto clusterIdx =
+                        alpaka::atomic::atomicOp<alpaka::atomic::op::Add>(
+                                acc,
+                                &clusterVectors[i].used,
+                                1);
+                        // copy cluster information
+                        clusterVectors[i].frameNumber = header.frameNumber;
+                        clusterVectors[i].x = id % DIMX;
+                        clusterVectors[i].y = id / DIMX;
+                        // fill cluster buffer with energy data
                         int l = 0;
                         int currentIdx;
                         for (int y = -n / 2; y < (n + 1) / 2; ++y) {
                             for (int x = -n / 2; x < (n + 1) / 2; ++x) {
                                 currentIdx = id + y * DIMX + x;
-                                clusterVector.data[clusterIdx].data[l++] = 
+                                clusterVectors[i].data[clusterIdx].data[l++] = 
                                     energyMaps[i].data[currentIdx];
                             }
                         }
@@ -118,15 +127,30 @@ struct ConversionKernel {
                 }
             }
             else {
-                // no clustering used
-                if (photonCondition) {
-                    //TODO: calculate photon count, write to photonmap
+                // no clustering used, optionally count photons
+                if (photonMaps && photonCondition) {
+                        photonsMaps[i].data[id] = energy / BEAMCONST;
                 }
             }
-            // no single photon on single pixel or cluster
-            // check if dark pixel and update pedestal
             if (!photonCondition) {
-                //TODO: check dark pixel condition, update pedestal
+                // no photons detected
+                // check if dark pixel
+                if (pedestal - c * stddev <= adc &&
+                        adc <= pedestal + c * stddev) {
+                    // dark pixel found, update statistics for pixel
+                    // algorithm by Welford
+                    float delta, delta2;
+                    auto& count = statMaps[gainStage][id].count;
+                    auto& variance = statMaps[gainStage][id].variance;
+                    auto& m2 = statMaps[gainStage][id].m2;
+                    ++count;
+                    delta = adc - mean;
+                    mean += delta / count;
+                    delta2 = adc - mean;
+                    m2 += delta * delta2;
+                    variance = m2 / count;
+                    stddev = sqrt(variance);
+                }
             }
         }
     }
