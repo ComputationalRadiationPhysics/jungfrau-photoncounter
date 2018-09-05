@@ -1,25 +1,26 @@
 #include "../Config.hpp"
 
-struct ConversionKernel {
+struct PhotonFinderKernel {
     template <typename TAcc,
               typename TDetectorData,
-              typename TGainMap,
               typename TPedestalMap,
               typename TGainStageMap,
               typename TEnergyMap,
+              typename TPhotonMap,
               typename TNumFrames,
-              typename TMask,
-              typename TNumMasks
+              typename TBeamEnergy,
+              typename TNumStdDevs,
               >
     ALPAKA_FN_ACC auto operator()(TAcc const& acc,
                                   TDetectorData const* const detectorData,
                                   TGainMap const* const gainMaps,
                                   TPedestalMap* const pedestalMaps,
-                                  TGainStageMap* const gainStageMaps,
-                                  TEnergyMap* const energyMaps,
+                                  TGainStageMap const* const gainStageMaps,
+                                  TEnergyMap const* const energyMaps,
+                                  TPhotonMap* const photonMaps,
                                   TNumFrames const numFrames,
-                                  TMask const* const masks = nullptr,
-                                  TNumMasks const numMasks = 0
+                                  TBeamEnergy const beamEnergy,
+                                  TNumStdDevs const c = 5,
                                   ) const -> void
     {
         auto const globalThreadIdx =
@@ -32,32 +33,30 @@ struct ConversionKernel {
 
         auto id = linearizedGlobalThreadIdx[0u];
 
-        // use masks to check whether the channel is valid or masked out
-        bool isValid = applyMasks(masks, numMasks);
-
         for (TNumFrames i = 0; i < numFrames; ++i) {
             auto dataword = detectorData[i].data[id];
             auto adc = getAdc(dataword);
 
-            auto& gainStage = gainStageMaps[i].data[id];
-            gainStage = getGainStage(dataword);
-
-            // first thread copies frame header to output maps
+            const auto& gainStage = gainStageMaps[i].data[id];
+            // first thread copies frame header to output
             if (id == 0) {
-                copyFrameHeader(detectorData[i], energyMaps[i]);
-                copyFrameHeader(detectorData[i], gainStageMaps[i]);
+                copyFrameHeader(detectorData[i], photonMaps[i]);
             }
 
+            const auto& energy = energyMaps[i].data[id];
+            auto& photonCount = photonMaps[i].data[id];
+
+            // calculate photon count from calibrated energy
+            photonCount = energy / beamEnergy;
+
             const auto& pedestal = pedestalMaps[gainStage][id].mean;
-            const auto& gain = gainMaps[gainStage][id];
+            const auto& stddev = pedestalMaps[gainStage][id].stddev;
 
-            // calculate energy of current channel
-            auto& energy = energyMaps[i].data[id];
-            energy = (adc - pedestal) / gain;
-
-            // set energy to zero if masked out
-            if (!isValid)
-                energy = 0;
+            // check "dark pixel" condition
+            if (pedestal - c * stddev <= adc &&
+                pedestal + c * stddev >= adc) {
+                updatePedestal(adc, pedestalMaps[gainStage][id]);
+            }
         }
     }
 };
