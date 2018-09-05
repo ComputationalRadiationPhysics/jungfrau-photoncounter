@@ -1,4 +1,6 @@
+#pragma once
 #include "../Config.hpp"
+#include "helpers.hpp"
 
 struct ConversionKernel {
     template <typename TAcc,

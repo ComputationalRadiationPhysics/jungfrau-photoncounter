@@ -1,4 +1,6 @@
+#pragma once
 #include "../Config.hpp"
+#include "helpers.hpp"
 
 struct PhotonFinderKernel {
     template <typename TAcc,

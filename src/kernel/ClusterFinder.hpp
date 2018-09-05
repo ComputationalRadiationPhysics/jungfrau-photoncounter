@@ -1,4 +1,6 @@
+#pragma once
 #include "../Config.hpp"
+#include "helpers.hpp"
 
 struct ClusterFinderKernel {
     template <typename TAcc,
@@ -43,7 +45,7 @@ struct ClusterFinderKernel {
             const auto& energy = energyMaps[i].data[id];
             const auto& pedestal = pedestalMaps[gainStage][id].mean;
             const auto& stddev = pedestalMaps[gainStage][id].stddev;
-            if (indexQualifiesAsClusterCenter(id)) {
+            if (indexQualifiesAsClusterCenter(n, id)) {
                 findClusterSumAndMax(energyMaps[i], id, n, sum, max);
                 // check cluster conditions
                 if ((energy > c * stddev || sum > n * c * stddev) && id == max) {
