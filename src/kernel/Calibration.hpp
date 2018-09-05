@@ -22,6 +22,13 @@ struct CalibrationKernel {
             alpaka::idx::mapIdx<1u>(globalThreadIdx, globalThreadExtent);
 
         auto id = linearizedGlobalThreadIdx[0u];
+
+        // initially zero data for pedestal initialization
+        for (int i = 0; i < 3; ++i) {
+            pedestalMap[i][id] = {}; // TODO: check if this zeros values
+        }
+
+        // initialize pedestal maps
         for (TNumFrames i = 0; i < numFrames; ++i) {
             auto dataword = detectorData[i].data[id];
             auto adc = getAdc(dataword);
