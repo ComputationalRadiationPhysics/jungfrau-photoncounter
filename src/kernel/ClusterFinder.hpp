@@ -34,6 +34,7 @@ struct ClusterFinderKernel {
 
         auto id = linearizedGlobalThreadIdx[0u];
 
+        constexpr auto n = CLUSTER_SIZE;
         for (TNumFrames i = 0; i < numFrames; ++i) {
             auto adc = getAdc(detectorData[i].data[id]);
             const auto& gainStage = gainStageMaps[i].data[id];
@@ -43,7 +44,6 @@ struct ClusterFinderKernel {
             const auto& energy = energyMaps[i].data[id];
             const auto& pedestal = pedestalMaps[gainStage][id].mean;
             const auto& stddev = pedestalMaps[gainStage][id].stddev;
-            constexpr auto n = CLUSTER_SIZE;
             if (indexQualifiesAsClusterCenter(id)) {
                 findClusterSumAndMax(energyMaps[i], id, sum, max);
                 // check cluster conditions
