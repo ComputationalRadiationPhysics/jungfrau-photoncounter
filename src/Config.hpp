@@ -73,6 +73,9 @@ struct ClusterArray {
 };
 
 using DetectorData = Frame<std::uint16_t>;
+using PhotonMap = DetectorData;
+using PhotonSumMap = Frame<std::uint64_t>;
+using DriftMap = Frame<std::uint32_t>;
 using GainStageMap = Frame<char>;
 using EnergyMap = Frame<float>;
 using GainMap = float[DIMX * DIMY];

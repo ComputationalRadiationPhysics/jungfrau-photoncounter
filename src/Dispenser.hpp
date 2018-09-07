@@ -19,8 +19,8 @@ public:
      * Dispenser constructor
      * @param Maps-Struct with initial gain
      */
-    Dispenser(Maps<Gain, TAlpaka> gainmap, Maps<Mask, TAlpaka> mask)
-        : gain(gainmap),
+    Dispenser(Maps<GainMap, TAlpaka> gainMap, Maps<Mask, TAlpaka> mask)
+        : gain(gainMap),
           mask(mask),
           workdiv(TAlpaka()),
           init(false),
@@ -92,7 +92,7 @@ public:
      * Only stops after all data packages are uploaded.
      * @param Maps-Struct with datamaps
      */
-    auto uploadPedestaldata(Maps<Data, TAlpaka> data) -> void
+    auto uploadPedestaldata(Maps<DetectorData, TAlpaka> data) -> void
     {
         std::size_t offset = 0;
         DEBUG("uploading pedestaldata...");
@@ -118,7 +118,7 @@ public:
      * Downloads the pedestal data.
      * @return pedestal pedestal data
      */
-    auto downloadPedestaldata() -> Maps<Pedestal, TAlpaka>
+    auto downloadPedestaldata() -> Maps<PedestalMap, TAlpaka>
     {
         DEBUG("downloading pedestaldata...");
 
@@ -164,7 +164,7 @@ public:
      * Downloads the current gain stage map.
      * @return gain stage map
      */
-    auto downloadGainStages() -> Maps<GainStage, TAlpaka>;
+    auto downloadGainStages() -> Maps<GainStageMap, TAlpaka>;
     {
         DEBUG("downloading gain stage map...");
 
@@ -209,7 +209,9 @@ public:
      * @param Maps-struct with raw data, offset within the package
      * @return number of frames uploaded from the package
      */
-    auto uploadData(Maps<Data, TAlpaka> data, std::size_t offset) -> std::size_t
+    auto uploadData(Maps<DetectorData, 
+                    TAlpaka> data, 
+                    std::size_t offset) -> std::size_t
     {
         if (!ringbuffer.isEmpty()) {
             // try uploading one data package
@@ -242,7 +244,7 @@ public:
      * @param pointer to empty struct for photon and sum maps
      * @return boolean indicating whether maps were downloaded or not
      */
-    auto downloadData(Maps<Photon, TAlpaka>* photon,
+    auto downloadData(Maps<PhotonMaps, TAlpaka>* photon,
                       Maps<PhotonSum, TAlpaka>* sum) -> bool
     {
         std::lock_guard<std::mutex> lock(mutex);
