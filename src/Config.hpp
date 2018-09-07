@@ -15,6 +15,7 @@ const std::size_t FRAMEOFFSET = FRAME_HEADER_SIZE / 2;
 const std::size_t DIMX = 1024;
 const std::size_t DIMY = 512;
 const std::size_t MAPSIZE = DIMX * DIMY;
+const std::size_t SINGLEMAP = 1;
 const std::size_t SUM_FRAMES = 100;
 const std::size_t DEV_FRAMES = 1000;
 const std::size_t PEDEMAPS = 3;
@@ -40,7 +41,6 @@ template <typename TData, typename TAlpaka> struct Maps {
           header(false){};
 };
 
-<<<<<<< Updated upstream
 template <typename TData> struct Frame {
     uint64_t framenumber;
     uint64_t bunchid;
@@ -54,6 +54,7 @@ using Mask = bool[DIMX * DIMY];
 using Gain = double[DIMX * DIMY];
 using Photon = Frame<std::uint16_t>;
 using PhotonSum = Frame<std::uint64_t>;
+using Value = std::uint16_t;
 
 struct PedestalStruct {
     std::size_t counter;

@@ -62,7 +62,7 @@ auto Filecache::loadMaps(const std::string& path, bool header)
 #endif
 #endif
 
-    alpaka::stream::StreamCpuSync streamBuf = 
+    alpaka::queue::QueueCpuSync streamBuf = 
         alpaka::pltf::getDevByIdx<typename TAlpaka::PltfHost>(0u);
 
     TData* dataBuf = reinterpret_cast<TData*>(bufferPointer);
