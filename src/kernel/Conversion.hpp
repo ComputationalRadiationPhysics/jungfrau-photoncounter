@@ -10,9 +10,7 @@ struct ConversionKernel {
               typename TGainStageMap,
               typename TEnergyMap,
               typename TNumFrames,
-              typename TMask,
-              typename TNumMasks
-              >
+              typename TMask>
     ALPAKA_FN_ACC auto operator()(TAcc const& acc,
                                   TDetectorData const* const detectorData,
                                   TGainMap const* const gainMaps,
@@ -20,8 +18,7 @@ struct ConversionKernel {
                                   TGainStageMap* const gainStageMaps,
                                   TEnergyMap* const energyMaps,
                                   TNumFrames const numFrames,
-                                  TMask const* const masks = nullptr,
-                                  TNumMasks const numMasks = 0
+                                  TMask const* const mask
                                   ) const -> void
     {
         auto const globalThreadIdx =
@@ -35,7 +32,7 @@ struct ConversionKernel {
         auto id = linearizedGlobalThreadIdx[0u];
 
         // use masks to check whether the channel is valid or masked out
-        bool isValid = applyMasks(masks, numMasks);
+        bool isValid = mask[id];
 
         for (TNumFrames i = 0; i < numFrames; ++i) {
             auto dataword = detectorData[i].data[id];
