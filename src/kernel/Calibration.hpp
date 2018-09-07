@@ -1,12 +1,17 @@
+#pragma once
 #include "../Config.hpp"
-
+#include "helpers.hpp"
 
 struct CalibrationKernel {
-    template <typename TAcc, typename TData, typename TPedestal, typename TNum>
+    template <typename TAcc, 
+              typename TDetectorData, 
+              typename TPedestalMap, 
+              typename TNumFrames
+             >
     ALPAKA_FN_ACC auto operator()(TAcc const& acc,
-                                  TData const* const data,
-                                  TPedestal* const pede,
-                                  TNum const numframes) const -> void
+                                  TData const* const detectorData,
+                                  TPedestal* const pedestalMap,
+                                  TNumFrames const numFrames) const -> void
     {
         auto const globalThreadIdx =
             alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc);
@@ -20,28 +25,17 @@ struct CalibrationKernel {
         const std::size_t FRAMESPERSTAGE[] = {
             FRAMESPERSTAGE_G0, FRAMESPERSTAGE_G1, FRAMESPERSTAGE_G2};
 
-        uint16_t stage = 0;
-
-        for (std::size_t i = 0; i < 3; ++i) {
-            if (pede[i][id].counter == FRAMESPERSTAGE)
-                stage = i;
+        // initially zero data for pedestal initialization
+        for (int i = 0; i < 3; ++i) {
+            pedestalMap[i][id] = {}; // TODO: check if this zeros values
         }
 
-        while (counter < numframes) {
-           stage++; 
-
-            while (counter < ((stage + 1u) * FRAMESPERSTAGE) &&
-                   counter < ((stage * FRAMESPERSTAGE) + numframes)) {
-                pede[stage][id].movAvg +=
-                    data[counter].imagedata[id] &0x3fff;
-                pede[stage][id].counter++;
-                counter++;
-            }
-            if (pede[stage][id].counter == FRAMESPERSTAGE) {
-                pede[stage][id].movAvg /= FRAMESPERSTAGE;
-                pede[stage][id].value =
-                    pede[stage][id].movAvg;
-            }
+        // initialize pedestal maps
+        for (TNumFrames i = 0; i < numFrames; ++i) {
+            auto dataword = detectorData[i].data[id];
+            auto adc = getAdc(dataword);
+            auto gainStage = getGainStage(dataword);
+            updatePedestal(acc, adc, pedestalMap[gainStage][id]);
         }
     }
 };
