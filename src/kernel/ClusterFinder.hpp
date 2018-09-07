@@ -11,7 +11,6 @@ struct ClusterFinderKernel {
               typename TEnergyMap,
               typename TClusterArray,
               typename TNumFrames,
-              typename TClusterSize,
               typename TNumStdDevs
               >
     ALPAKA_FN_ACC auto operator()(TAcc const& acc,
@@ -44,10 +43,11 @@ struct ClusterFinderKernel {
             const auto& energy = energyMaps[i].data[id];
             const auto& pedestal = pedestalMaps[gainStage][id].mean;
             const auto& stddev = pedestalMaps[gainStage][id].stddev;
+            constexpr auto n = CLUSTER_SIZE;
             if (indexQualifiesAsClusterCenter(id)) {
                 findClusterSumAndMax(energyMaps[i], id, sum, max);
                 // check cluster conditions
-                if ((energy > c * stddev || sum > CLUSTER_SIZE * c * stddev) 
+                if ((energy > c * stddev || sum > n * c * stddev) 
                         && id == max) {
                     auto& cluster = getClusterBuffer(acc, clusterArray);
                     copyCluster(energyMaps[i], id, cluster);
