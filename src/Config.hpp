@@ -6,23 +6,25 @@
 #include <fstream>
 
 // general settings
-const std::size_t FRAMESPERSTAGE_G0 = 1000;
-const std::size_t FRAMESPERSTAGE_G1 = 1000;
-const std::size_t FRAMESPERSTAGE_G2 = 999;
+constexpr std::size_t FRAMESPERSTAGE_G0 = 1000;
+constexpr std::size_t FRAMESPERSTAGE_G1 = 1000;
+constexpr std::size_t FRAMESPERSTAGE_G2 = 999;
 
-const std::size_t FRAME_HEADER_SIZE = 16;
-const std::size_t FRAMEOFFSET = FRAME_HEADER_SIZE / 2;
-const std::size_t DIMX = 1024;
-const std::size_t DIMY = 512;
-const std::size_t MAPSIZE = DIMX * DIMY;
-const std::size_t SINGLEMAP = 1;
-const std::size_t SUM_FRAMES = 100;
-const std::size_t DEV_FRAMES = 1000;
-const std::size_t PEDEMAPS = 3;
-const std::size_t GAINMAPS = 3;
-const float BEAMCONST = 6.2;
-const float PHOTONCONST = (1. / 12.4);
-const std::size_t MAXINT = std::numeric_limits<uint32_t>::max();
+constexpr std::size_t FRAME_HEADER_SIZE = 16;
+constexpr std::size_t FRAMEOFFSET = FRAME_HEADER_SIZE / 2;
+constexpr std::size_t DIMX = 1024;
+constexpr std::size_t DIMY = 512;
+constexpr std::size_t MAPSIZE = DIMX * DIMY;
+constexpr std::size_t SINGLEMAP = 1;
+constexpr std::size_t SUM_FRAMES = 100;
+constexpr std::size_t DEV_FRAMES = 1000;
+constexpr std::size_t PEDEMAPS = 3;
+constexpr std::size_t GAINMAPS = 3;
+constexpr float BEAMCONST = 6.2;
+constexpr float PHOTONCONST = (1. / 12.4);
+constexpr std::size_t MAXINT = std::numeric_limits<uint32_t>::max();
+
+constexpr int CLUSTER_SIZE = 3;
 
 // data types
 template <typename TData, typename TAlpaka> struct Maps {
@@ -41,29 +43,40 @@ template <typename TData, typename TAlpaka> struct Maps {
           header(false){};
 };
 
-template <typename TData> struct Frame {
-    uint64_t framenumber;
-    uint64_t bunchid;
-    TData imagedata[DIMX * DIMY];
-}; 
-using GainStage = Frame<std::uint8_t>;
-using Drift = Frame<std::uint32_t>;
-using Data = Frame<std::uint16_t>;
-using Charge = Frame<double>;
-using Mask = bool[DIMX * DIMY]; 
-using Gain = double[DIMX * DIMY];
-using Photon = Frame<std::uint16_t>;
-using PhotonSum = Frame<std::uint64_t>;
-using Value = std::uint16_t;
+struct FrameHeader {
+    std::uint64_t frameNumber;
+    std::uint64_t bunchId;
+};
 
-struct PedestalStruct {
+template <typename TData> struct Frame {
+    FrameHeader header;
+    TData data[DIMX * DIMY];
+}; 
+
+struct Pedestal {
     std::size_t counter;
     double mean;
     double M2;
     double stddev;
 };
 
-using Pedestal = PedestalStruct[DIMX * DIMY];
+struct Cluster {
+    std::uint64_t frameNumber;
+    std::int16_t x;
+    std::int16_t y;
+    std::int32_t data[CLUSTER_SIZE * CLUSTER_SIZE];
+};
+
+struct ClusterArray {
+    std::size_t used;
+    Cluster* data;
+};
+
+using DetectorData = Frame<std::uint16_t>;
+using GainStageMap = Frame<char>;
+using EnergyMap = Frame<float>;
+using GainMap = float[DIMX * DIMY];
+using PedestalMap = Pedestal[DIMX * DIMY];
 
 // debug statements
 typedef std::chrono::high_resolution_clock Clock;
