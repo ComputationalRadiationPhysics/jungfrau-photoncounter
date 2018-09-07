@@ -6,12 +6,16 @@
 #include <fstream>
 
 // general settings
-const std::size_t FRAMESPERSTAGE = 1000;
+const std::size_t FRAMESPERSTAGE_G0 = 1000;
+const std::size_t FRAMESPERSTAGE_G1 = 1000;
+const std::size_t FRAMESPERSTAGE_G2 = 999;
+
 const std::size_t FRAME_HEADER_SIZE = 16;
 const std::size_t FRAMEOFFSET = FRAME_HEADER_SIZE / 2;
 const std::size_t DIMX = 1024;
 const std::size_t DIMY = 512;
 const std::size_t MAPSIZE = DIMX * DIMY;
+const std::size_t SINGLEMAP = 1;
 const std::size_t SUM_FRAMES = 100;
 const std::size_t DEV_FRAMES = 1000;
 const std::size_t PEDEMAPS = 3;
@@ -42,13 +46,15 @@ template <typename TData> struct Frame {
     uint64_t bunchid;
     TData imagedata[DIMX * DIMY];
 }; 
-
+using GainStage = Frame<std::uint8_t>;
+using Drift = Frame<std::uint32_t>;
 using Data = Frame<std::uint16_t>;
 using Charge = Frame<double>;
 using Mask = bool[DIMX * DIMY]; 
 using Gain = double[DIMX * DIMY];
 using Photon = Frame<std::uint16_t>;
 using PhotonSum = Frame<std::uint64_t>;
+using Value = std::uint16_t;
 
 struct PedestalStruct {
     std::size_t counter;
@@ -69,9 +75,11 @@ static Clock::time_point t;
 #if (SHOW_DEBUG)
 #include <iostream>
 #define DEBUG(msg)                                                             \
-    (std::cout << __FILE__ << "[" << __LINE__ << "]:\n\t" << (std::chrono::duration_cast<ms>((Clock::now() - t))).count() << " ms\n\t" << msg << std::endl)
+    (std::cout << __FILE__ << "[" << __LINE__ << "]:\n\t"                      \
+               << (std::chrono::duration_cast<ms>((Clock::now() - t))).count() \
+               << " ms\n\t" << msg << std::endl)
 #else
-#define DEBUG(msg) 
+#define DEBUG(msg)
 #endif
 
 #if (SHOW_DEBUG)

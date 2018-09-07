@@ -18,8 +18,8 @@ struct CpuOmp2Blocks {
     using PltfHost = alpaka::pltf::Pltf<DevHost>;
     using PltfAcc = alpaka::pltf::Pltf<DevAcc>;
     using WorkDiv = alpaka::workdiv::WorkDivMembers<Dim, Size>;
-    using Stream = alpaka::stream::StreamCpuSync;
-    using Event = alpaka::event::Event<Stream>;
+    using Queue = alpaka::queue::QueueCpuSync;
+    using Event = alpaka::event::Event<Queue>;
 
     const std::size_t STREAMS_PER_DEV = 4;
 
@@ -49,8 +49,8 @@ struct CpuOmp4 {
     using PltfHost = alpaka::pltf::Pltf<DevHost>;
     using PltfAcc = alpaka::pltf::Pltf<DevAcc>;
     using WorkDiv = alpaka::workdiv::WorkDivMembers<Dim, Size>;
-    using Stream = alpaka::stream::StreamCpuSync;
-    using Event = alpaka::event::Event<Stream>;
+    using Queue = alpaka::queue::QueueCpuSync;
+    using Event = alpaka::event::Event<Queue>;
 
     const std::size_t STREAMS_PER_DEV = 4;
 
@@ -76,8 +76,8 @@ struct CpuSerial {
     using PltfHost = alpaka::pltf::Pltf<DevHost>;
     using PltfAcc = alpaka::pltf::Pltf<DevAcc>;
     using WorkDiv = alpaka::workdiv::WorkDivMembers<Dim, Size>;
-    using Stream = alpaka::stream::StreamCpuSync;
-    using Event = alpaka::event::Event<Stream>;
+    using Queue = alpaka::queue::QueueCpuSync;
+    using Event = alpaka::event::Event<Queue>;
 
     const std::size_t STREAMS_PER_DEV = 4;
 
@@ -107,8 +107,8 @@ struct CpuThreads {
     using PltfHost = alpaka::pltf::Pltf<DevHost>;
     using PltfAcc = alpaka::pltf::Pltf<DevAcc>;
     using WorkDiv = alpaka::workdiv::WorkDivMembers<Dim, Size>;
-    using Stream = alpaka::stream::StreamCpuSync;
-    using Event = alpaka::event::Event<Stream>;
+    using Queue = alpaka::queue::QueueCpuSync;
+    using Event = alpaka::event::Event<Queue>;
 
     const std::size_t STREAMS_PER_DEV = 4;
 
@@ -134,8 +134,8 @@ struct GpuCudaRt {
     using PltfHost = alpaka::pltf::Pltf<DevHost>;
     using PltfAcc = alpaka::pltf::Pltf<DevAcc>;
     using WorkDiv = alpaka::workdiv::WorkDivMembers<Dim, Size>;
-    using Stream = alpaka::stream::StreamCudaRtAsync;
-    using Event = alpaka::event::Event<Stream>;
+    using Queue = alpaka::queue::QueueCudaRtAsync;
+    using Event = alpaka::event::Event<Queue>;
     
     const std::size_t STREAMS_PER_DEV = 1;
 

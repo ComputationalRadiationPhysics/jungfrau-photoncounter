@@ -22,6 +22,8 @@ struct CalibrationKernel {
             alpaka::idx::mapIdx<1u>(globalThreadIdx, globalThreadExtent);
 
         auto id = linearizedGlobalThreadIdx[0u];
+        const std::size_t FRAMESPERSTAGE[] = {
+            FRAMESPERSTAGE_G0, FRAMESPERSTAGE_G1, FRAMESPERSTAGE_G2};
 
         // initially zero data for pedestal initialization
         for (int i = 0; i < 3; ++i) {
