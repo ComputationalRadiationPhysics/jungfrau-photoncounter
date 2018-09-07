@@ -44,11 +44,10 @@ ALPAKA_FN_ACC void updatePedestal(
     stddev = alpaka::math::sqrt(acc, var);
 }
 
-template <typename TClusterSize, typename TThreadIndex>
-ALPAKA_FN_ACC bool indexQualifiesAsClusterCenter(
-        TClusterSize n, 
-        TThreadIndex id)
+template <typename TThreadIndex>
+ALPAKA_FN_ACC bool indexQualifiesAsClusterCenter(TThreadIndex id)
 {
+    constexpr auto n = CLUSTER_SIZE;
     return (
         id % DIMX >= n / 2 &&
         id % DIMX <= DIMX - (n + 1) / 2 &&
@@ -59,19 +58,18 @@ ALPAKA_FN_ACC bool indexQualifiesAsClusterCenter(
 template <
     typename TMap, 
     typename TThreadIndex, 
-    typename TClusterSize, 
     typename TSum
     >
 ALPAKA_FN_ACC void findClusterSumAndMax(
         TMap const& map, 
         TThreadIndex const id, 
-        TClusterSize const n, 
         TSum& sum, 
         TThreadIndex& max
         )
 {
     TThreadIndex it = 0;
     max = 0;
+    constexpr auto n = CLUSTER_SIZE;
     for (int y = -n / 2; y < (n + 1) / 2; ++y) {
         for (int x = -n / 2; x < (n + 1) / 2; ++x) {
             it = id + y * DIMX + x;
@@ -97,21 +95,20 @@ auto& getClusterBuffer(TAcc const& acc, TClusterArray* const clusterArray)
 template <
     typename TMap, 
     typename TThreadIndex, 
-    typename TClusterSize, 
     typename TCluster
     >
 ALPAKA_FN_ACC void copyCluster(
         TMap const& map, 
         TThreadIndex const id, 
-        TClusterSize const n, 
         TCluster& cluster
         )
 {
+    constexpr auto n = CLUSTER_SIZE;
     TThreadIndex it;
     TThreadIndex i = 0;
     cluster.x = id % DIMX;
     cluster.y = id / DIMX;
-    cluster.header = map.header;
+    cluster.frameNumber = map.header.frameNumber;
     for (int y = -n / 2; y < (n + 1) / 2; ++y) {
         for (int x = -n / 2; x < (n + 1) / 2; ++x) {
             it = id + y * DIMX + x;

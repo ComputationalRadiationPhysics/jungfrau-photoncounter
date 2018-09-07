@@ -22,7 +22,6 @@ struct ClusterFinderKernel {
                                   TEnergyMap const* const energyMaps,
                                   TClusterArray* const clusterArray,
                                   TNumFrames const numFrames,
-                                  TClusterSize const n,
                                   TNumStdDevs const c = 5,
                                   ) const -> void
     {
@@ -45,12 +44,13 @@ struct ClusterFinderKernel {
             const auto& energy = energyMaps[i].data[id];
             const auto& pedestal = pedestalMaps[gainStage][id].mean;
             const auto& stddev = pedestalMaps[gainStage][id].stddev;
-            if (indexQualifiesAsClusterCenter(n, id)) {
-                findClusterSumAndMax(energyMaps[i], id, n, sum, max);
+            if (indexQualifiesAsClusterCenter(id)) {
+                findClusterSumAndMax(energyMaps[i], id, sum, max);
                 // check cluster conditions
-                if ((energy > c * stddev || sum > n * c * stddev) && id == max) {
+                if ((energy > c * stddev || sum > CLUSTER_SIZE * c * stddev) 
+                        && id == max) {
                     auto& cluster = getClusterBuffer(acc, clusterArray);
-                    copyCluster(energyMaps[i], id, n, cluster);
+                    copyCluster(energyMaps[i], id, cluster);
                 }
                 // check dark pixel condition
                 else if (-c * stddev <= energy && c * stddev >= energy) {
