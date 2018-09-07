@@ -12,7 +12,8 @@ struct CalibrationKernel {
     ALPAKA_FN_ACC auto operator()(TAcc const& acc,
                                   TData const* const detectorData,
                                   TPedestal* const pedestalMap,
-                                  TMask* const mask) {
+                                  TMask* const mask,
+                                  TNumFrames const numFrames) {
         auto const globalThreadIdx =
             alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc);
         auto const globalThreadExtent =
@@ -26,7 +27,7 @@ struct CalibrationKernel {
             FRAMESPERSTAGE_G0, FRAMESPERSTAGE_G1, FRAMESPERSTAGE_G2};
 
         // determine expected gain stage
-        for (TNumFrames i = 0; i < nFrames; ++i) {
+        for (TNumFrames i = 0; i < numFrames; ++i) {
             // find expected gain stage
             char expectedGainStage;
             for (int i = 0; i < 3; ++i) {
