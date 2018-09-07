@@ -34,6 +34,8 @@ public:
      **/
     Ringbuffer& operator=(const Ringbuffer& other)
 	{
+		if(&other == this)
+			return this;
 		size = other.size;
 		full = other.full;
 		head = other.head;
