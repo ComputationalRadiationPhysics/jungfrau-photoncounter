@@ -186,7 +186,7 @@ public:
      * Downloads the current drift map.
      * @return drift map
      */
-    auto downloadDriftMaps() -> Maps<Drift, TAlpaka>
+    auto downloadDriftMaps() -> Maps<DriftMap, TAlpaka>
     {
         DEBUG("downloading drift map...");
 
@@ -324,11 +324,11 @@ public:
     }
 
 private:
-    Maps<Gain, TAlpaka> gain;
+    Maps<GainMap, TAlpaka> gain;
     Maps<Mask, TAlpaka> mask;
-    Maps<Drift, TAlpaka> drift;
-    Maps<GainStage, TAlpaka> gainStage;
-    Maps<Pedestal, TAlpaka> pedestal;
+    Maps<DriftMap, TAlpaka> drift;
+    Maps<GainStageMap, TAlpaka> gainStage;
+    Maps<PedestalMap, TAlpaka> pedestal;
   
     TAlpaka workdiv;
     bool init;
@@ -376,23 +376,23 @@ private:
                 alpaka::mem::buf::alloc<GainStage, typename TAlpaka::Size>(
                     devs[num / workdiv.STREAMS_PER_DEV], SINGLEMAP);
             devices[num].maxValue =
-                alpaka::mem::buf::alloc<Value, typename TAlpaka::Size>(
+                alpaka::mem::buf::alloc<PhotonMap, typename TAlpaka::Size>(
                     devs[num / workdiv.STREAMS_PER_DEV], SINGLEMAP);
             devices[num].photon =
-                alpaka::mem::buf::alloc<Photon, typename TAlpaka::Size>(
+                alpaka::mem::buf::alloc<PhotonMap, typename TAlpaka::Size>(
                     devs[num / workdiv.STREAMS_PER_DEV], DEV_FRAMES);
             devices[num].sum =
-                alpaka::mem::buf::alloc<PhotonSum, typename TAlpaka::Size>(
+                alpaka::mem::buf::alloc<PhotonSumMap, typename TAlpaka::Size>(
                     devs[num / workdiv.STREAMS_PER_DEV],
                     DEV_FRAMES / SUM_FRAMES);
             devices[num].photonHost =
-                alpaka::mem::buf::alloc<Photon, typename TAlpaka::Size>(
+                alpaka::mem::buf::alloc<PhotonMap, typename TAlpaka::Size>(
                     host, DEV_FRAMES);
             devices[num].sumHost =
-                alpaka::mem::buf::alloc<PhotonSum, typename TAlpaka::Size>(
+                alpaka::mem::buf::alloc<PhotonSumMap, typename TAlpaka::Size>(
                     host, (DEV_FRAMES / SUM_FRAMES));
             devices[num].maxValueHost =
-                alpaka::mem::buf::alloc<Value, typename TAlpaka::Size>(
+                alpaka::mem::buf::alloc<PhotonMap, typename TAlpaka::Size>(
                     host, SINGLEMAP);
 
 #ifdef ALPAKA_ACC_GPU_CUDA_ENABLED
@@ -426,7 +426,8 @@ private:
      * @param pointer to raw data and number of frames
      * @return number of frames calculated
      */
-    auto calcPedestaldata(Data* data, std::size_t numMaps) -> std::size_t
+    template<typename TDetectorData>
+    auto calcPedestaldata(TDetectorData* data, std::size_t numMaps) -> std::size_t
     {
         DeviceData<TAlpaka>* dev;
         if (!ringbuffer.pop(dev))
@@ -439,7 +440,7 @@ private:
             dev->queue,
             dev->data,
             alpaka::mem::view::ViewPlainPtr<typename TAlpaka::DevHost,
-                                            Data,
+                                            TDetectorData,
                                             typename TAlpaka::Dim,
                                             typename TAlpaka::Size>(
                 data, host, numMaps),
@@ -472,17 +473,17 @@ private:
 
 
         //! @todo: use new kernels
-        StatisticsKernel StatisticsKernel;
-        auto const statistics(
+        CalibrationKernel calibrationKernel;
+        auto const calibration(
             alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
                 workdiv.workdiv,
-                StatisticsKernel,
+                calibrationKernel,
                 alpaka::mem::view::getPtrNative(dev->data),
-                dev->numMaps,
                 alpaka::mem::view::getPtrNative(dev->pedestal),
-                alpaka::mem::view::getPtrNative(dev->mask)));
+                alpaka::mem::view::getPtrNative(dev->mask),
+                dev->numMaps));
 
-        alpaka::queue::enqueue(dev->queue, statistics);
+        alpaka::queue::enqueue(dev->queue, calibration);
 
         alpaka::wait::wait(dev->queue);
         DEBUG("device " << dev->id << " finished");
@@ -502,7 +503,8 @@ private:
      * @param pointer to raw data and number of frames
      * @return number of frames calculated
      */
-    auto calcData(Data* data, std::size_t numMaps) -> std::size_t
+    template<typename TDetectorData>
+    auto calcData(TDetectorData* data, std::size_t numMaps) -> std::size_t
     {
         DeviceData<TAlpaka>* dev;
         if (!ringbuffer.pop(dev))
@@ -533,37 +535,23 @@ private:
                                 PEDEMAPS);
         nextFree.push_back(dev->id);
 
-
-        //! @todo: use new kernels
-        StatisticsKernel statisticsKernel;
-        auto const statistics(
+        PhotonFinderKernel photonFinderKernel;
+        auto const photonFinder(
             alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
                 workdiv.workdiv,
-                statisticsKernel,
+                photonFinderKernel,
                 alpaka::mem::view::getPtrNative(dev->data),
-                dev->numMaps,
-                alpaka::mem::view::getPtrNative(dev->pedestal),
-                alpaka::mem::view::getPtrNative(dev->mask)));
-
-        alpaka::queue::enqueue(dev->queue, statistics);
-        alpaka::wait::wait(dev->queue);
-
-        CorrectionKernel correctionKernel;
-        auto const correction(
-            alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
-                workdiv.workdiv,
-                correctionKernel,
-                alpaka::mem::view::getPtrNative(dev->data),
-                alpaka::mem::view::getPtrNative(dev->pedestal),
                 alpaka::mem::view::getPtrNative(dev->gain),
-                dev->numMaps,
+                alpaka::mem::view::getPtrNative(dev->pedestal),
+                alpaka::mem::view::getPtrNative(dev->gainStage),
+                alpaka::mem::view::getPtrNative(dev->energy),
                 alpaka::mem::view::getPtrNative(dev->photon),
-                alpaka::mem::view::getPtrNative(dev->manualMask),
-                alpaka::mem::view::getPtrNative(dev->mask)));
+                dev->numMaps));
 
-        alpaka::queue::enqueue(dev->queue, correction);
+        alpaka::queue::enqueue(dev->queue, photonFinder);
         alpaka::wait::wait(dev->queue);
 
+        /* TODO: uncomment summation
         SummationKernel summationKernel;
         auto const summation(
             alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
@@ -575,6 +563,7 @@ private:
                 alpaka::mem::view::getPtrNative(dev->sum)));
 
         alpaka::queue::enqueue(dev->queue, summation);
+        */
 
         save_image<Data>(
             static_cast<std::string>(std::to_string(dev->id) + "data" +

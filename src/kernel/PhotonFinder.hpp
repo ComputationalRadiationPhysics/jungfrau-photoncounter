@@ -21,9 +21,8 @@ struct PhotonFinderKernel {
                                   TEnergyMap const* const energyMaps,
                                   TPhotonMap* const photonMaps,
                                   TNumFrames const numFrames,
-                                  TBeamEnergy const beamEnergy,
-                                  TNumStdDevs const c = 5,
-                                  ) const -> void
+                                  TNumStdDevs const c = 5)
+        const -> void
     {
         auto const globalThreadIdx =
             alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc);
@@ -49,7 +48,7 @@ struct PhotonFinderKernel {
             auto& photonCount = photonMaps[i].data[id];
 
             // calculate photon count from calibrated energy
-            photonCount = energy / beamEnergy;
+            photonCount = (energy + BEAMCONST) * PHOTONCONST;
 
             const auto& pedestal = pedestalMaps[gainStage][id].mean;
             const auto& stddev = pedestalMaps[gainStage][id].stddev;

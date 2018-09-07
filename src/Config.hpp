@@ -34,13 +34,11 @@ template <typename TData, typename TAlpaka> struct Maps {
                           typename TAlpaka::Dim,
                           typename TAlpaka::Size>
         data;
-    bool header;
     Maps()
         : numMaps(0),
           data(alpaka::mem::buf::alloc<TData, typename TAlpaka::Size>(
               alpaka::pltf::getDevByIdx<typename TAlpaka::PltfHost>(0u),
-              0lu)),
-          header(false){};
+              0lu)){};
 };
 
 struct FrameHeader {
