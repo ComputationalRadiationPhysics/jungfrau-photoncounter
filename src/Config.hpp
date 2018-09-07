@@ -69,7 +69,7 @@ struct Cluster {
 
 struct ClusterArray {
     std::size_t used;
-    Cluster* data;
+    Cluster* clusters;
 };
 
 using DetectorData = Frame<std::uint16_t>;
@@ -106,7 +106,7 @@ void save_image(std::string path, TBuffer* data, std::size_t frame_number)
     img.open (path + ".txt");
     for (std::size_t j = 0; j < 512; j++) {
         for (std::size_t k = 0; k < 1024; k++) {
-            int h = int(data[frame_number].imagedata[(j * 1024) + k] *10);
+            int h = int(data[frame_number].data[(j * 1024) + k] *10);
             img << h << " ";
         }
     img << "\n";
