@@ -9,7 +9,7 @@ enum State { FREE, PROCESSING, READY };
  * devices. It's fully templated to use one of the structs provided
  * by Alpakaconfig.hpp.
  */
-template <typename TAlpaka> struct DeviceData {
+template <typename TAlpaka, typename TDim, typename TSize> struct DeviceData {
     std::size_t id;
   std::size_t numMaps; //! @todo: is this ever used?
     typename TAlpaka::DevHost host;
@@ -20,76 +20,76 @@ template <typename TAlpaka> struct DeviceData {
 
     // device maps
     alpaka::mem::buf::Buf<typename TAlpaka::DevAcc,
-                          Data,
-                          typename TAlpaka::Dim,
-                          typename TAlpaka::Size>
+                          DetectorData,
+                          TDim,
+                          TSize>
         data;
 
     alpaka::mem::buf::Buf<typename TAlpaka::DevAcc,
-                          Gain,
-                          typename TAlpaka::Dim,
-                          typename TAlpaka::Size>
+                          GainMap,
+                          TDim,
+                          TSize>
         gain;
 
     alpaka::mem::buf::Buf<typename TAlpaka::DevAcc,
-                          Pedestal,
-                          typename TAlpaka::Dim,
-                          typename TAlpaka::Size>
+                          PedestalMap,
+                          TDim,
+                          TSize>
         pedestal;
 
     alpaka::mem::buf::Buf<typename TAlpaka::DevAcc,
-                          Mask,
-                          typename TAlpaka::Dim,
-                          typename TAlpaka::Size>
+                          MaskMap,
+                          TDim,
+                          TSize>
         mask;
 
     alpaka::mem::buf::Buf<typename TAlpaka::DevAcc,
-                          Drift,
-                          typename TAlpaka::Dim,
-                          typename TAlpaka::Size>
+                          DriftMap,
+                          TDim,
+                          TSize>
         drift;
 
     alpaka::mem::buf::Buf<typename TAlpaka::DevAcc,
-                          GainStage,
-                          typename TAlpaka::Dim,
-                          typename TAlpaka::Size>
+                          GainStageMap,
+                          TDim,
+                          TSize>
         gainStage;
 
     alpaka::mem::buf::Buf<typename TAlpaka::DevAcc,
-                          Value,
-                          typename TAlpaka::Dim,
-                          typename TAlpaka::Size>
+                          EnergyMap,
+                          TDim,
+                          TSize>
         maxValue;
 
     alpaka::mem::buf::Buf<typename TAlpaka::DevAcc,
-                          Photon,
-                          typename TAlpaka::Dim,
-                          typename TAlpaka::Size>
+                          PhotonMap,
+                          TDim,
+                          TSize>
         photon;
 
     alpaka::mem::buf::Buf<typename TAlpaka::DevAcc,
-                          PhotonSum,
-                          typename TAlpaka::Dim,
-                          typename TAlpaka::Size>
+                          PhotonSumMap,
+                          TDim,
+                          TSize>
         sum;
 
     // host maps
     alpaka::mem::buf::Buf<typename TAlpaka::DevHost,
-                          Photon,
-                          typename TAlpaka::Dim,
-                          typename TAlpaka::Size>
+                          PhotonMap,
+                          TDim,
+                          TSize>
         photonHost;
 
     alpaka::mem::buf::Buf<typename TAlpaka::DevHost,
-                          PhotonSum,
-                          typename TAlpaka::Dim,
-                          typename TAlpaka::Size>
+                          PhotonSumMap,
+                          TDim,
+                          TSize>
         sumHost;
 
     alpaka::mem::buf::Buf<typename TAlpaka::DevHost,
-                          Value,
-                          typename TAlpaka::Dim,
-                          typename TAlpaka::Size>
+                          EnergyMap,
+                          TDim,
+                          TSize>
         maxValueHost;
 
     DeviceData()
@@ -100,44 +100,35 @@ template <typename TAlpaka> struct DeviceData {
           queue(device),
           event(device),
           state(FREE),
-          data(alpaka::mem::buf::alloc<Data, typename TAlpaka::Size>(device,
+          data(alpaka::mem::buf::alloc<DetectorData, TSize>(device,
                                                                      0lu)),
-          gain(alpaka::mem::buf::alloc<Gain, typename TAlpaka::Size>(device,
+          gain(alpaka::mem::buf::alloc<GainMap, TSize>(device,
                                                                      0lu)),
           pedestal(
-              alpaka::mem::buf::alloc<Pedestal, typename TAlpaka::Size>(device,
+              alpaka::mem::buf::alloc<PedestalMap, TSize>(device,
                                                                         0lu)),
-          drift(alpaka::mem::buf::alloc<Drift, typename TAlpaka::Size>(device,
+          drift(alpaka::mem::buf::alloc<DriftMap, TSize>(device,
                                                                        0lu)),
           gainStage(
-              alpaka::mem::buf::alloc<GainStage, typename TAlpaka::Size>(device,
+              alpaka::mem::buf::alloc<GainStageMap, TSize>(device,
                                                                          0lu)),
           maxValue(
-              alpaka::mem::buf::alloc<Value, typename TAlpaka::Size>(device,
+              alpaka::mem::buf::alloc<EnergyMap, TSize>(device,
                                                                      0lu)),
-          mask(alpaka::mem::buf::alloc<Mask, typename TAlpaka::Size>(device,
+          mask(alpaka::mem::buf::alloc<MaskMap, TSize>(device,
                                                                      0lu)),
-          manualMask(
-              alpaka::mem::buf::alloc<Mask, typename TAlpaka::Size>(device,
-                                                                    0lu)),
-          photon(alpaka::mem::buf::alloc<Photon, typename TAlpaka::Size>(device,
+          photon(alpaka::mem::buf::alloc<PhotonMap, TSize>(device,
                                                                          0lu)),
-          sum(alpaka::mem::buf::alloc<PhotonSum, typename TAlpaka::Size>(device,
-                                                                         0lu)),
-          driftHost(
-              alpaka::mem::buf::alloc<Drift, typename TAlpaka::Size>(host,
-                                                                     0lu)),
-          gainStageHost(
-              alpaka::mem::buf::alloc<GainStage, typename TAlpaka::Size>(host,
+          sum(alpaka::mem::buf::alloc<PhotonSumMap, TSize>(device,
                                                                          0lu)),
           maxValueHost(
-              alpaka::mem::buf::alloc<Value, typename TAlpaka::Size>(host,
+              alpaka::mem::buf::alloc<EnergyMap, TSize>(host,
                                                                      0lu)),
           photonHost(
-              alpaka::mem::buf::alloc<Photon, typename TAlpaka::Size>(host,
+              alpaka::mem::buf::alloc<PhotonMap, TSize>(host,
                                                                       0lu)),
           sumHost(
-              alpaka::mem::buf::alloc<PhotonSum, typename TAlpaka::Size>(host,
+              alpaka::mem::buf::alloc<PhotonSumMap, TSize>(host,
                                                                          0lu))
     {
     }

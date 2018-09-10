@@ -22,7 +22,7 @@
 
 #pragma once
 
-#include "iterator.hpp"
+#include "Config.hpp"
 #include <alpaka/alpaka.hpp>
 
 // Defines for dimensions and types.
@@ -30,20 +30,6 @@ using Dim = alpaka::dim::DimInt<1u>;
 using Size = uint64_t;
 using Extent = uint64_t;
 using WorkDiv = alpaka::workdiv::WorkDivMembers<Dim, Extent>;
-
-//#############################################################################
-//! Get Trait via struct.
-//!
-//! \tparam T The data type.
-//! \tparam TBuf The buffer type.
-//! \tparam TAcc The accelerator type.
-//!
-//! Defines the appropriate iterator for an accelerator.
-template <typename T, typename TBuf, typename TAcc>
-struct GetIterator
-{
-    using Iterator = IteratorCpu<TAcc, T, TBuf>;
-};
 
 // Note: Boost Fibers, OpenMP 2 Threads and TBB Blocks accelerators aren't implented
 

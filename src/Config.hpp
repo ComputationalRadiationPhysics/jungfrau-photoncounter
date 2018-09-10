@@ -2,8 +2,8 @@
 
 #include <alpaka/alpaka.hpp>
 #include <chrono>
-#include <iostream>
 #include <fstream>
+#include <iostream>
 
 // general settings
 constexpr std::size_t FRAMESPERSTAGE_G0 = 1000;
@@ -27,20 +27,17 @@ constexpr std::size_t MAXINT = std::numeric_limits<uint32_t>::max();
 constexpr int CLUSTER_SIZE = 3;
 
 // data types
-template <typename TData, typename TAlpaka> struct Maps {
+/*template <typename TData, typename TAlpaka, typename TDim, typename TSize>
+struct Maps {
     std::size_t numMaps;
-    alpaka::mem::buf::Buf<typename TAlpaka::DevHost,
-                          TData,
-                          typename TAlpaka::Dim,
-                          typename TAlpaka::Size>
-        data;
+    alpaka::mem::buf::Buf<typename TAlpaka::DevHost, TData, TDim, TSize> data;
     Maps()
         : numMaps(0),
-          data(alpaka::mem::buf::alloc<TData, typename TAlpaka::Size>(
+          data(alpaka::mem::buf::alloc<TData, typename TSize>(
               alpaka::pltf::getDevByIdx<typename TAlpaka::PltfHost>(0u),
               0lu)){};
 };
-
+*/
 struct FrameHeader {
     std::uint64_t frameNumber;
     std::uint64_t bunchId;
@@ -49,7 +46,7 @@ struct FrameHeader {
 template <typename TData> struct Frame {
     FrameHeader header;
     TData data[DIMX * DIMY];
-}; 
+};
 
 struct Pedestal {
     std::size_t counter;
@@ -70,11 +67,27 @@ struct ClusterArray {
     Cluster* clusters;
 };
 
+template <typename T, typename TAlpaka, typename TDim, typename TSize> struct FramePakage {
+    std::size_t numFrames;
+    alpaka::mem::buf::
+        Buf<typename TAlpaka::DevHost, T, TDim, TSize>
+            data;
+
+    FramePakage()
+        : numFrames(0),
+          data(alpaka::mem::buf::alloc<T, TSize>(
+              alpaka::pltf::getDevByIdx<typename TAlpaka::PltfHost>(0u),
+              static_cast<TSize>(1u)))
+    {
+    }
+};
+
 using DetectorData = Frame<std::uint16_t>;
 using PhotonMap = DetectorData;
 using PhotonSumMap = Frame<std::uint64_t>;
 using DriftMap = Frame<std::uint32_t>;
 using GainStageMap = Frame<char>;
+using MaskMap = Frame<bool>;
 using EnergyMap = Frame<float>;
 using GainMap = float[DIMX * DIMY];
 using PedestalMap = Pedestal[DIMX * DIMY];
@@ -104,13 +117,13 @@ void save_image(std::string path, TBuffer* data, std::size_t frame_number)
 {
 #if (SHOW_DEBUG)
     std::ofstream img;
-    img.open (path + ".txt");
+    img.open(path + ".txt");
     for (std::size_t j = 0; j < 512; j++) {
         for (std::size_t k = 0; k < 1024; k++) {
-            int h = int(data[frame_number].data[(j * 1024) + k] *10);
+            int h = int(data[frame_number].data[(j * 1024) + k] * 10);
             img << h << " ";
         }
-    img << "\n";
+        img << "\n";
     }
     img.close();
 #endif

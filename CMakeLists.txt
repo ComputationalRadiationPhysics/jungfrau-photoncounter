@@ -37,15 +37,9 @@ endif()
 
 alpaka_add_executable(  
     ${_TARGET_NAME}
-    src/main.cpp            src/Config.hpp
-    src/Filecache.cpp       src/Filecache.hpp
-    src/Bitmap.cpp          src/Bitmap.hpp
-    src/Dispenser.hpp
-    src/Ringbuffer.hpp
-    src/Alpakaconfig.hpp
-    src/kernel/Calibration.hpp
-    src/kernel/Correction.hpp
-    src/kernel/Summation.hpp)
+    src/main.cpp
+    src/Filecache.cpp
+    src/Bitmap.cpp)
 
 target_compile_options(
     ${_TARGET_NAME}

@@ -21,7 +21,7 @@ struct ClusterFinderKernel {
                                   TEnergyMap const* const energyMaps,
                                   TClusterArray* const clusterArray,
                                   TNumFrames const numFrames,
-                                  TNumStdDevs const c = 5,
+                                  TNumStdDevs const c = 5
                                   ) const -> void
     {
         auto const globalThreadIdx =

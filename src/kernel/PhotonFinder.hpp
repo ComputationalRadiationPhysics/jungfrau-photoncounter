@@ -5,14 +5,13 @@
 struct PhotonFinderKernel {
     template <typename TAcc,
               typename TDetectorData,
+              typename TGainMap,
               typename TPedestalMap,
               typename TGainStageMap,
               typename TEnergyMap,
               typename TPhotonMap,
               typename TNumFrames,
-              typename TBeamEnergy,
-              typename TNumStdDevs,
-              >
+              typename TNumStdDevs>
     ALPAKA_FN_ACC auto operator()(TAcc const& acc,
                                   TDetectorData const* const detectorData,
                                   TGainMap const* const gainMaps,
@@ -21,8 +20,7 @@ struct PhotonFinderKernel {
                                   TEnergyMap const* const energyMaps,
                                   TPhotonMap* const photonMaps,
                                   TNumFrames const numFrames,
-                                  TNumStdDevs const c = 5)
-        const -> void
+                                  TNumStdDevs const c = 5) const -> void
     {
         auto const globalThreadIdx =
             alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc);
@@ -54,8 +52,7 @@ struct PhotonFinderKernel {
             const auto& stddev = pedestalMaps[gainStage][id].stddev;
 
             // check "dark pixel" condition
-            if (pedestal - c * stddev <= adc &&
-                pedestal + c * stddev >= adc) {
+            if (pedestal - c * stddev <= adc && pedestal + c * stddev >= adc) {
                 updatePedestal(adc, pedestalMaps[gainStage][id]);
             }
         }

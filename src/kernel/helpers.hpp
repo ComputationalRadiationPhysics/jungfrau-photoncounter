@@ -1,12 +1,15 @@
 #pragma once
-#include <alpaka/alpaka.hpp>
 #include "../Config.hpp"
+#include <alpaka/alpaka.hpp>
 
-template<typename TDataword>
-ALPAKA_FN_ACC auto getAdc(TDataword dataword) { return dataword & 0x3fff; }
+template <typename TDataword>
+ALPAKA_FN_ACC auto getAdc(TDataword dataword) -> uint16_t
+{
+    return dataword & 0x3fff;
+}
 
-template<typename TDataword>
-ALPAKA_FN_ACC auto getGainStage(TDataword dataword)
+template <typename TDataword>
+ALPAKA_FN_ACC auto getGainStage(TDataword dataword) -> uint8_t
 {
     auto g = (dataword & 0xc000) >> 14;
     // map gain stages 0, 1, 3 to 0, 1, 2
@@ -15,18 +18,15 @@ ALPAKA_FN_ACC auto getGainStage(TDataword dataword)
     return g;
 }
 
-template<typename TInputMap, typename TOutputMap>
-ALPAKA_FN_ACC void copyFrameHeader(TInputMap const& src, TOutputMap& dst)
+template <typename TInputMap, typename TOutputMap>
+ALPAKA_FN_ACC auto copyFrameHeader(TInputMap const& src, TOutputMap& dst) -> void
 {
     dst.header = src.header;
 }
 
 template <typename TAcc, typename TAdcValue, typename TPedestal>
-ALPAKA_FN_ACC void updatePedestal(
-        const TAcc& acc, 
-        TAdcValue const adc, 
-        TPedestal& pedestal
-        )
+ALPAKA_FN_ACC auto
+updatePedestal(const TAcc& acc, TAdcValue const adc, TPedestal& pedestal) -> void
 {
     // online algorithm for variance by Welford
     auto& count = pedestal.count;
@@ -45,27 +45,18 @@ ALPAKA_FN_ACC void updatePedestal(
 }
 
 template <typename TThreadIndex>
-ALPAKA_FN_ACC bool indexQualifiesAsClusterCenter(TThreadIndex id)
+ALPAKA_FN_ACC auto indexQualifiesAsClusterCenter(TThreadIndex id) -> bool
 {
     constexpr auto n = CLUSTER_SIZE;
-    return (
-        id % DIMX >= n / 2 &&
-        id % DIMX <= DIMX - (n + 1) / 2 &&
-        id / DIMX >= n / 2 &&
-        id / DIMX <= DIMY - (n + 1) / 2);
+    return (id % DIMX >= n / 2 && id % DIMX <= DIMX - (n + 1) / 2 &&
+            id / DIMX >= n / 2 && id / DIMX <= DIMY - (n + 1) / 2);
 }
 
-template <
-    typename TMap, 
-    typename TThreadIndex, 
-    typename TSum
-    >
-ALPAKA_FN_ACC void findClusterSumAndMax(
-        TMap const& map, 
-        TThreadIndex const id, 
-        TSum& sum, 
-        TThreadIndex& max
-        )
+template <typename TMap, typename TThreadIndex, typename TSum>
+ALPAKA_FN_ACC auto findClusterSumAndMax(TMap const& map,
+                                        TThreadIndex const id,
+                                        TSum& sum,
+                                        TThreadIndex& max) -> void
 {
     TThreadIndex it = 0;
     max = 0;
@@ -80,28 +71,19 @@ ALPAKA_FN_ACC void findClusterSumAndMax(
     }
 }
 
-template<typename TAcc, typename TClusterArray>
-ALPAKA_FN_ACC
-auto& getClusterBuffer(TAcc const& acc, TClusterArray* const clusterArray)
+template <typename TAcc, typename TClusterArray>
+ALPAKA_FN_ACC auto getClusterBuffer(TAcc const& acc,
+                                     TClusterArray* const clusterArray) -> TClusterArray&
 {
     // get next free index of buffer atomically
     auto i = alpaka::atomic::atomicOp<alpaka::atomic::op::Add>(
-            acc,
-            &clusterArray->size,
-            1);
+        acc, &clusterArray->size, 1);
     return clusterArray->clusters[i];
 }
 
-template <
-    typename TMap, 
-    typename TThreadIndex, 
-    typename TCluster
-    >
-ALPAKA_FN_ACC void copyCluster(
-        TMap const& map, 
-        TThreadIndex const id, 
-        TCluster& cluster
-        )
+template <typename TMap, typename TThreadIndex, typename TCluster>
+ALPAKA_FN_ACC auto
+copyCluster(TMap const& map, TThreadIndex const id, TCluster& cluster) -> void
 {
     constexpr auto n = CLUSTER_SIZE;
     TThreadIndex it;
@@ -116,4 +98,3 @@ ALPAKA_FN_ACC void copyCluster(
         }
     }
 }
-

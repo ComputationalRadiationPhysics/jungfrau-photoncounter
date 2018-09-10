@@ -15,19 +15,19 @@ private:
 
 public:
     Filecache(std::size_t size);
-    template <typename TData, typename TAlpaka>
+  template <typename TData, typename TAlpaka, typename TDim, typename TSize>
     auto loadMaps(const std::string& path, bool header = false)
-        -> Maps<TData, TAlpaka>;
+    -> FramePakage<TData, TAlpaka, TDim, TSize>;
 };
 
-template <typename TData, typename TAlpaka>
+template <typename TData, typename TAlpaka, typename TDim, typename TSize>
 auto Filecache::loadMaps(const std::string& path, bool header)
-    -> Maps<TData, TAlpaka>
+    -> FramePakage<TData, TAlpaka, TDim, TSize>
 {
 	//allocate space
     auto fileSize = getFileSize(path);
     auto mapSize = header ? (MAPSIZE * 2 + 32) : (MAPSIZE * 2);
-    std::size_t numMaps = fileSize / static_cast<unsigned>(mapSize);
+    std::size_t numFrames = fileSize / static_cast<unsigned>(mapSize);
 
 	if(fileSize + bufferPointer >= buffer.get() + sizeBytes)
 	{
@@ -47,14 +47,13 @@ auto Filecache::loadMaps(const std::string& path, bool header)
     file.read(bufferPointer, fileSize);
     file.close();
 
-    Maps<TData, TAlpaka> maps{};
-    maps.numMaps = static_cast<unsigned>(numMaps); 
-    maps.header = header;
+    FramePakage<TData, TAlpaka, TDim, TSize> maps{};
+    maps.numFrames = static_cast<unsigned>(numFrames); 
 
 	//allocate alpaka memory
-    maps.data = alpaka::mem::buf::alloc<TData, typename TAlpaka::Size>(
+    maps.data = alpaka::mem::buf::alloc<TData, TSize>(
         alpaka::pltf::getDevByIdx<typename TAlpaka::PltfHost>(0u),
-        (numMaps * 2));
+        (numFrames * 2));
 
 #ifdef ALPAKA_ACC_GPU_CUDA_ENABLED 
 #if (SHOW_DEBUG == false)
@@ -73,12 +72,12 @@ auto Filecache::loadMaps(const std::string& path, bool header)
         maps.data,
         alpaka::mem::view::ViewPlainPtr<typename TAlpaka::DevHost,
                                         TData,
-                                        typename TAlpaka::Dim,
-                                        typename TAlpaka::Size>(
+                                        TDim,
+                                        TSize>(
             dataBuf,
             alpaka::pltf::getDevByIdx<typename TAlpaka::PltfHost>(0u),
-            numMaps),
-        numMaps);
+            numFrames),
+        numFrames);
 
     bufferPointer += fileSize;
 
