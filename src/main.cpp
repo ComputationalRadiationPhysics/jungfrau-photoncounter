@@ -18,28 +18,28 @@ auto main() -> int
     DEBUG("filecache created");
 
     // load maps
-    FramePakage<DetectorData, Accelerator, Dim, Size> pedestaldata(
+    FramePackage<DetectorData, Accelerator, Dim, Size> pedestaldata(
         fc->loadMaps<DetectorData, Accelerator, Dim, Size>(
             "../../jungfrau-photoncounter/data_pool/px_101016/"
             "allpede_250us_1243__B_000000.dat",
             true));
     DEBUG(pedestaldata.numFrames << " pedestaldata maps loaded");
 
-    FramePakage<DetectorData, Accelerator, Dim, Size> data(
+    FramePackage<DetectorData, Accelerator, Dim, Size> data(
         fc->loadMaps<DetectorData, Accelerator, Dim, Size>(
             "../../jungfrau-photoncounter/data_pool/px_101016/"
             "Insu_6_tr_1_45d_250us__B_000000.dat",
             true));
     DEBUG(data.numFrames << " data maps loaded");
 
-    FramePakage<GainMap, Accelerator, Dim, Size> gain(fc->loadMaps<GainMap,
+    FramePackage<GainMap, Accelerator, Dim, Size> gain(fc->loadMaps<GainMap,
                                                                    Accelerator,
                                                                    Dim,
                                                                    Size>(
         "../../jungfrau-photoncounter/data_pool/px_101016/gainMaps_M022.bin"));
     DEBUG(gain.numFrames << " gain maps loaded");
 
-    FramePakage<MaskMap, Accelerator, Dim, Size> mask(
+    FramePackage<MaskMap, Accelerator, Dim, Size> mask(
         fc->loadMaps<MaskMap, Accelerator, Dim, Size>(
             "../data_pool/px_101016/mask.bin"));
     DEBUG(mask.numFrames << " masking maps loaded");
@@ -70,8 +70,8 @@ auto main() -> int
     // upload and calculate pedestal data
     dispenser->uploadPedestaldata(pedestaldata);
 
-    FramePakage<PhotonMap, Accelerator, Dim, Size> photon{};
-    FramePakage<PhotonSumMap, Accelerator, Dim, Size> sum{};
+    FramePackage<PhotonMap, Accelerator, Dim, Size> photon{};
+    FramePackage<PhotonSumMap, Accelerator, Dim, Size> sum{};
     std::size_t offset = 0;
     std::size_t downloaded = 0;
 

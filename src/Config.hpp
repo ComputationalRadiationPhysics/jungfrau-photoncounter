@@ -67,13 +67,13 @@ struct ClusterArray {
     Cluster* clusters;
 };
 
-template <typename T, typename TAlpaka, typename TDim, typename TSize> struct FramePakage {
+template <typename T, typename TAlpaka, typename TDim, typename TSize> struct FramePackage {
     std::size_t numFrames;
     alpaka::mem::buf::
         Buf<typename TAlpaka::DevHost, T, TDim, TSize>
             data;
 
-    FramePakage()
+    FramePackage()
         : numFrames(0),
           data(alpaka::mem::buf::alloc<T, TSize>(
               alpaka::pltf::getDevByIdx<typename TAlpaka::PltfHost>(0u),

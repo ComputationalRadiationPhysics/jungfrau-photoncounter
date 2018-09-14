@@ -21,7 +21,7 @@ public:
      * @param Maps-Struct with initial gain
      */
     Dispenser(
-        FramePakage<GainMap, TAlpaka, TDim, TSize> gainMap,
+        FramePackage<GainMap, TAlpaka, TDim, TSize> gainMap,
         alpaka::mem::buf::Buf<typename TAlpaka::DevHost, MaskMap, TDim, TSize>
             mask)
         : gain(gainMap),
@@ -98,7 +98,7 @@ public:
      * @param Maps-Struct with datamaps
      */
     auto
-    uploadPedestaldata(FramePakage<DetectorData, TAlpaka, TDim, TSize> data)
+    uploadPedestaldata(FramePackage<DetectorData, TAlpaka, TDim, TSize> data)
         -> void
     {
         std::size_t offset = 0;
@@ -116,7 +116,7 @@ public:
         if (offset != data.numFrames) {
             offset += calcPedestaldata(
                 alpaka::mem::view::getPtrNative(data.data) + offset,
-                data.numMaps % DEV_FRAMES);
+                data.numFrames % DEV_FRAMES);
             DEBUG(offset << "/" << data.numFrames << " pedestalframes uploaded");
         }
     }
@@ -126,7 +126,7 @@ public:
      * @return pedestal pedestal data
      */
     auto downloadPedestaldata()
-        -> FramePakage<PedestalMap, TAlpaka, TDim, TSize>
+        -> FramePackage<PedestalMap, TAlpaka, TDim, TSize>
     {
         DEBUG("downloading pedestaldata...");
 
@@ -219,7 +219,7 @@ public:
      * @param Maps-struct with raw data, offset within the package
      * @return number of frames uploaded from the package
      */
-    auto uploadData(FramePakage<DetectorData, TAlpaka, TDim, TSize> data,
+    auto uploadData(FramePackage<DetectorData, TAlpaka, TDim, TSize> data,
                     std::size_t offset) -> std::size_t
     {
         if (!ringbuffer.isEmpty()) {
@@ -253,26 +253,26 @@ public:
      * @param pointer to empty struct for photon and sum maps
      * @return boolean indicating whether maps were downloaded or not
      */
-    auto downloadData(FramePakage<PhotonMap, TAlpaka, TDim, TSize>* photon,
-                      FramePakage<PhotonSumMap, TAlpaka, TDim, TSize>* sum)
+    auto downloadData(FramePackage<PhotonMap, TAlpaka, TDim, TSize>* photon,
+                      FramePackage<PhotonSumMap, TAlpaka, TDim, TSize>* sum)
         -> bool
     {
         std::lock_guard<std::mutex> lock(mutex);
-        struct DeviceData<TAlpaka>* dev = &Dispenser::devices[nextFree.front()];
+        struct DeviceData<TAlpaka, TDim, TSize>* dev = &Dispenser::devices[nextFree.front()];
 
         // to keep frames in order only download if the longest running device
         // has finished
         if (dev->state != READY)
             return false;
 
-        photon->numFrames = dev->numFrames;
+        photon->numFrames = dev->numMaps;
         alpaka::mem::view::copy(
-            dev->queue, dev->photonHost, dev->photon, dev->numFrames);
+            dev->queue, dev->photonHost, dev->photon, dev->numMaps);
         photon->data = dev->photonHost;
 
-        sum->numMaps = dev->numMaps / SUM_FRAMES;
+        sum->numFrames = dev->numMaps / SUM_FRAMES;
         alpaka::mem::view::copy(
-            dev->queue, dev->sumHost, dev->sum, (dev->numFrames / SUM_FRAMES));
+            dev->queue, dev->sumHost, dev->sum, (dev->numMaps / SUM_FRAMES));
         sum->data = dev->sumHost;
 
         alpaka::wait::wait(dev->queue, dev->event);
@@ -333,13 +333,13 @@ public:
     }
 
 private:
-    FramePakage<GainMap, TAlpaka, TDim, TSize> gain;
+    FramePackage<GainMap, TAlpaka, TDim, TSize> gain;
     alpaka::mem::buf::Buf<typename TAlpaka::DevHost, MaskMap, TDim, TSize> mask;
     alpaka::mem::buf::Buf<typename TAlpaka::DevHost, DriftMap, TDim, TSize>
         drift;
     alpaka::mem::buf::Buf<typename TAlpaka::DevHost, GainStageMap, TDim, TSize>
         gainStage;
-    FramePakage<PedestalMap, TAlpaka, TDim, TSize> pedestal;
+    FramePackage<PedestalMap, TAlpaka, TDim, TSize> pedestal;
 
     TAlpaka workdiv;
     bool init;
@@ -474,7 +474,7 @@ private:
         //! @todo: use new kernels
         CalibrationKernel calibrationKernel;
         auto const calibration(
-            alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
+                               alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
                 workdiv.workdiv,
                 calibrationKernel,
                 alpaka::mem::view::getPtrNative(dev->data),
@@ -505,7 +505,7 @@ private:
     template <typename TDetectorData>
     auto calcData(TDetectorData* data, std::size_t numMaps) -> std::size_t
     {
-        DeviceData<TAlpaka>* dev;
+      DeviceData<TAlpaka, TDim, TSize>* dev;
         if (!ringbuffer.pop(dev))
             return 0;
 

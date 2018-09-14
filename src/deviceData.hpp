@@ -11,7 +11,7 @@ enum State { FREE, PROCESSING, READY };
  */
 template <typename TAlpaka, typename TDim, typename TSize> struct DeviceData {
     std::size_t id;
-  std::size_t numMaps; //! @todo: is this ever used?
+    std::size_t numMaps; //! @todo: is this ever used?
     typename TAlpaka::DevHost host;
     typename TAlpaka::DevAcc device;
     typename TAlpaka::Queue queue;
@@ -19,78 +19,46 @@ template <typename TAlpaka, typename TDim, typename TSize> struct DeviceData {
     State state;
 
     // device maps
-    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc,
-                          DetectorData,
-                          TDim,
-                          TSize>
+    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, DetectorData, TDim, TSize>
         data;
 
-    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc,
-                          GainMap,
-                          TDim,
-                          TSize>
-        gain;
+    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, GainMap, TDim, TSize> gain;
 
-    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc,
-                          PedestalMap,
-                          TDim,
-                          TSize>
+    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, PedestalMap, TDim, TSize>
         pedestal;
 
-    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc,
-                          MaskMap,
-                          TDim,
-                          TSize>
-        mask;
+    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, MaskMap, TDim, TSize> mask;
 
-    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc,
-                          DriftMap,
-                          TDim,
-                          TSize>
+    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, DriftMap, TDim, TSize>
         drift;
 
-    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc,
-                          GainStageMap,
-                          TDim,
-                          TSize>
+    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, GainStageMap, TDim, TSize>
         gainStage;
 
-    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc,
-                          EnergyMap,
-                          TDim,
-                          TSize>
+    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, EnergyMap, TDim, TSize>
+        energy;
+
+    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, EnergyMap, TDim, TSize>
         maxValue;
 
-    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc,
-                          PhotonMap,
-                          TDim,
-                          TSize>
+    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, PhotonMap, TDim, TSize>
         photon;
 
-    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc,
-                          PhotonSumMap,
-                          TDim,
-                          TSize>
+    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, PhotonSumMap, TDim, TSize>
         sum;
 
     // host maps
-    alpaka::mem::buf::Buf<typename TAlpaka::DevHost,
-                          PhotonMap,
-                          TDim,
-                          TSize>
+    alpaka::mem::buf::Buf<typename TAlpaka::DevHost, PhotonMap, TDim, TSize>
         photonHost;
 
-    alpaka::mem::buf::Buf<typename TAlpaka::DevHost,
-                          PhotonSumMap,
-                          TDim,
-                          TSize>
+    alpaka::mem::buf::Buf<typename TAlpaka::DevHost, PhotonSumMap, TDim, TSize>
         sumHost;
 
-    alpaka::mem::buf::Buf<typename TAlpaka::DevHost,
-                          EnergyMap,
-                          TDim,
-                          TSize>
+    alpaka::mem::buf::Buf<typename TAlpaka::DevHost, EnergyMap, TDim, TSize>
         maxValueHost;
+
+    alpaka::mem::buf::Buf<typename TAlpaka::DevHost, EnergyMap, TDim, TSize>
+        energyHost;
 
     DeviceData()
         : id(0),
@@ -100,36 +68,20 @@ template <typename TAlpaka, typename TDim, typename TSize> struct DeviceData {
           queue(device),
           event(device),
           state(FREE),
-          data(alpaka::mem::buf::alloc<DetectorData, TSize>(device,
-                                                                     0lu)),
-          gain(alpaka::mem::buf::alloc<GainMap, TSize>(device,
-                                                                     0lu)),
-          pedestal(
-              alpaka::mem::buf::alloc<PedestalMap, TSize>(device,
-                                                                        0lu)),
-          drift(alpaka::mem::buf::alloc<DriftMap, TSize>(device,
-                                                                       0lu)),
-          gainStage(
-              alpaka::mem::buf::alloc<GainStageMap, TSize>(device,
-                                                                         0lu)),
-          maxValue(
-              alpaka::mem::buf::alloc<EnergyMap, TSize>(device,
-                                                                     0lu)),
-          mask(alpaka::mem::buf::alloc<MaskMap, TSize>(device,
-                                                                     0lu)),
-          photon(alpaka::mem::buf::alloc<PhotonMap, TSize>(device,
-                                                                         0lu)),
-          sum(alpaka::mem::buf::alloc<PhotonSumMap, TSize>(device,
-                                                                         0lu)),
-          maxValueHost(
-              alpaka::mem::buf::alloc<EnergyMap, TSize>(host,
-                                                                     0lu)),
-          photonHost(
-              alpaka::mem::buf::alloc<PhotonMap, TSize>(host,
-                                                                      0lu)),
-          sumHost(
-              alpaka::mem::buf::alloc<PhotonSumMap, TSize>(host,
-                                                                         0lu))
+          data(alpaka::mem::buf::alloc<DetectorData, TSize>(device, 0lu)),
+          gain(alpaka::mem::buf::alloc<GainMap, TSize>(device, 0lu)),
+          pedestal(alpaka::mem::buf::alloc<PedestalMap, TSize>(device, 0lu)),
+          drift(alpaka::mem::buf::alloc<DriftMap, TSize>(device, 0lu)),
+          gainStage(alpaka::mem::buf::alloc<GainStageMap, TSize>(device, 0lu)),
+          maxValue(alpaka::mem::buf::alloc<EnergyMap, TSize>(device, 0lu)),
+          energy(alpaka::mem::buf::alloc<EnergyMap, TSize>(device, 0lu)),
+          mask(alpaka::mem::buf::alloc<MaskMap, TSize>(device, 0lu)),
+          photon(alpaka::mem::buf::alloc<PhotonMap, TSize>(device, 0lu)),
+          sum(alpaka::mem::buf::alloc<PhotonSumMap, TSize>(device, 0lu)),
+          maxValueHost(alpaka::mem::buf::alloc<EnergyMap, TSize>(host, 0lu)),
+          photonHost(alpaka::mem::buf::alloc<PhotonMap, TSize>(host, 0lu)),
+          sumHost(alpaka::mem::buf::alloc<PhotonSumMap, TSize>(host, 0lu)),
+          energyHost(alpaka::mem::buf::alloc<EnergyMap, TSize>(host, 0lu))
     {
     }
 };

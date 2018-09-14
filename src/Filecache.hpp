@@ -17,12 +17,12 @@ public:
     Filecache(std::size_t size);
   template <typename TData, typename TAlpaka, typename TDim, typename TSize>
     auto loadMaps(const std::string& path, bool header = false)
-    -> FramePakage<TData, TAlpaka, TDim, TSize>;
+    -> FramePackage<TData, TAlpaka, TDim, TSize>;
 };
 
 template <typename TData, typename TAlpaka, typename TDim, typename TSize>
 auto Filecache::loadMaps(const std::string& path, bool header)
-    -> FramePakage<TData, TAlpaka, TDim, TSize>
+    -> FramePackage<TData, TAlpaka, TDim, TSize>
 {
 	//allocate space
     auto fileSize = getFileSize(path);
@@ -47,7 +47,7 @@ auto Filecache::loadMaps(const std::string& path, bool header)
     file.read(bufferPointer, fileSize);
     file.close();
 
-    FramePakage<TData, TAlpaka, TDim, TSize> maps{};
+    FramePackage<TData, TAlpaka, TDim, TSize> maps{};
     maps.numFrames = static_cast<unsigned>(numFrames); 
 
 	//allocate alpaka memory
