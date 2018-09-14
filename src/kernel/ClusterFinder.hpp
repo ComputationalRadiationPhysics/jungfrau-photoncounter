@@ -40,7 +40,6 @@ struct ClusterFinderKernel {
             const auto& gainStage = gainStageMaps[i].data[id];
             float sum;
             decltype(id) max;
-            const auto gainStage = gainStageMaps[i][id];
             const auto& energy = energyMaps[i].data[id];
             const auto& pedestal = pedestalMaps[gainStage][id].mean;
             const auto& stddev = pedestalMaps[gainStage][id].stddev;

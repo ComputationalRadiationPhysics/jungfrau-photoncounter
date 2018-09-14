@@ -49,10 +49,11 @@ template <typename TData> struct Frame {
 };
 
 struct Pedestal {
-    std::size_t counter;
-    double mean;
-    double M2;
-    double stddev;
+    std::size_t count;
+  float mean;
+    float m2;
+    float stddev;
+  float variance;
 };
 
 struct Cluster {

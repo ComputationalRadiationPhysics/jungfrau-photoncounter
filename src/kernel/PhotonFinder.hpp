@@ -11,7 +11,7 @@ struct PhotonFinderKernel {
               typename TEnergyMap,
               typename TPhotonMap,
               typename TNumFrames,
-              typename TNumStdDevs>
+              typename TNumStdDevs = int>
     ALPAKA_FN_ACC auto operator()(TAcc const& acc,
                                   TDetectorData const* const detectorData,
                                   TGainMap const* const gainMaps,
@@ -53,7 +53,7 @@ struct PhotonFinderKernel {
 
             // check "dark pixel" condition
             if (pedestal - c * stddev <= adc && pedestal + c * stddev >= adc) {
-                updatePedestal(adc, pedestalMaps[gainStage][id]);
+              updatePedestal(acc, adc, pedestalMaps[gainStage][id]);
             }
         }
     }
