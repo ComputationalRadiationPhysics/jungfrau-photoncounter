@@ -88,7 +88,7 @@ public:
      */
     auto synchronize() -> void
     {
-      for (struct DeviceData<TAlpaka, TDim, TSize> dev : devices)
+        for (struct DeviceData<TAlpaka, TDim, TSize> dev : devices)
             alpaka::wait::wait(dev.queue);
     }
 
@@ -109,7 +109,8 @@ public:
             offset += calcPedestaldata(
                 alpaka::mem::view::getPtrNative(data.data) + offset,
                 DEV_FRAMES);
-            DEBUG(offset << "/" << data.numFrames << " pedestalframes uploaded");
+            DEBUG(offset << "/" << data.numFrames
+                         << " pedestalframes uploaded");
         }
 
         // upload remaining frames
@@ -117,7 +118,8 @@ public:
             offset += calcPedestaldata(
                 alpaka::mem::view::getPtrNative(data.data) + offset,
                 data.numFrames % DEV_FRAMES);
-            DEBUG(offset << "/" << data.numFrames << " pedestalframes uploaded");
+            DEBUG(offset << "/" << data.numFrames
+                         << " pedestalframes uploaded");
         }
     }
 
@@ -151,7 +153,7 @@ public:
     /**
      * Downloads the current mask map.
      * @return mask map
-     * /
+     */
     auto downloadMask() -> MaskMap
     {
         DEBUG("downloading mask...");
@@ -168,7 +170,7 @@ public:
         alpaka::wait::wait(current_device.queue, current_device.event);
 
         return mask;
-        }*/
+    }
 
     /**
      * Downloads the current gain stage map.
@@ -258,7 +260,8 @@ public:
         -> bool
     {
         std::lock_guard<std::mutex> lock(mutex);
-        struct DeviceData<TAlpaka, TDim, TSize>* dev = &Dispenser::devices[nextFree.front()];
+        struct DeviceData<TAlpaka, TDim, TSize>* dev =
+            &Dispenser::devices[nextFree.front()];
 
         // to keep frames in order only download if the longest running device
         // has finished
@@ -377,12 +380,12 @@ private:
             devices[num].mask = alpaka::mem::buf::alloc<MaskMap, TSize>(
                 devs[num / workdiv.STREAMS_PER_DEV], SINGLEMAP);
             devices[num].drift = alpaka::mem::buf::alloc<DriftMap, TSize>(
-                devs[num / workdiv.STREAMS_PER_DEV], SINGLEMAP);
+                devs[num / workdiv.STREAMS_PER_DEV], DEV_FRAMES);
             devices[num].gainStage =
                 alpaka::mem::buf::alloc<GainStageMap, TSize>(
-                    devs[num / workdiv.STREAMS_PER_DEV], SINGLEMAP);
+                    devs[num / workdiv.STREAMS_PER_DEV], DEV_FRAMES);
             devices[num].maxValue = alpaka::mem::buf::alloc<EnergyMap, TSize>(
-                devs[num / workdiv.STREAMS_PER_DEV], SINGLEMAP);
+                devs[num / workdiv.STREAMS_PER_DEV], DEV_FRAMES);
             devices[num].photon = alpaka::mem::buf::alloc<PhotonMap, TSize>(
                 devs[num / workdiv.STREAMS_PER_DEV], DEV_FRAMES);
             devices[num].sum = alpaka::mem::buf::alloc<PhotonSumMap, TSize>(
@@ -459,11 +462,7 @@ private:
 
         if (init == false) {
             //! @todo: test this memset
-            alpaka::mem::view::set(
-                                   dev->queue,
-                dev->pedestal,
-                0,
-                SINGLEMAP);
+            alpaka::mem::view::set(dev->queue, dev->pedestal, 0, SINGLEMAP);
 
             alpaka::wait::wait(dev->queue);
 
@@ -474,7 +473,7 @@ private:
         //! @todo: use new kernels
         CalibrationKernel calibrationKernel;
         auto const calibration(
-                               alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
+            alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
                 workdiv.workdiv,
                 calibrationKernel,
                 alpaka::mem::view::getPtrNative(dev->data),
@@ -505,7 +504,7 @@ private:
     template <typename TDetectorData>
     auto calcData(TDetectorData* data, std::size_t numMaps) -> std::size_t
     {
-      DeviceData<TAlpaka, TDim, TSize>* dev;
+        DeviceData<TAlpaka, TDim, TSize>* dev;
         if (!ringbuffer.pop(dev))
             return 0;
 
@@ -532,7 +531,20 @@ private:
                                 devices[nextFree.back()].pedestal,
                                 PEDEMAPS);
         nextFree.push_back(dev->id);
-        /*
+        
+        ConversionKernel conversionKernel;
+        auto const conversion(
+            alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
+                workdiv.workdiv,
+                conversionKernel,
+                alpaka::mem::view::getPtrNative(dev->data),
+                alpaka::mem::view::getPtrNative(dev->gain),
+                alpaka::mem::view::getPtrNative(dev->pedestal),
+                alpaka::mem::view::getPtrNative(dev->gainStage),
+                alpaka::mem::view::getPtrNative(dev->energy),
+                dev->numMaps,
+                alpaka::mem::view::getPtrNative(dev->mask)));
+                
         PhotonFinderKernel photonFinderKernel;
         auto const photonFinder(
             alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
@@ -545,11 +557,8 @@ private:
                 alpaka::mem::view::getPtrNative(dev->energy),
                 alpaka::mem::view::getPtrNative(dev->photon),
                 dev->numMaps));
-
-        alpaka::queue::enqueue(dev->queue, photonFinder);
-        alpaka::wait::wait(dev->queue);
-
-        / * TODO: uncomment summation
+        /*        
+        // TODO: uncomment summation
         SummationKernel summationKernel;
         auto const summation(
             alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
@@ -559,16 +568,18 @@ private:
                 SUM_FRAMES,
                 dev->numMaps,
                 alpaka::mem::view::getPtrNative(dev->sum)));
-
-        alpaka::queue::enqueue(dev->queue, summation);
-        * /
+        */
+        alpaka::queue::enqueue(dev->queue, conversion);
+        //alpaka::queue::enqueue(dev->queue, photonFinder);
+        //alpaka::queue::enqueue(dev->queue, summation);
+        alpaka::wait::wait(dev->queue); //! @todo: do we really have to wait????
 
         save_image<DetectorData>(
             static_cast<std::string>(std::to_string(dev->id) + "data" +
                                      std::to_string(std::rand() % 1000)),
             data,
-                    DEV_FRAMES - 1);
-*/
+            DEV_FRAMES - 1);
+
         // the event is used to wait for pedestal data
         alpaka::queue::enqueue(dev->queue, dev->event);
 
