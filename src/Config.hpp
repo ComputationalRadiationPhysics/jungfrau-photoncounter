@@ -90,7 +90,7 @@ using DriftMap = Frame<std::uint32_t>;
 using GainStageMap = Frame<char>;
 using MaskMap = Frame<bool>;
 using EnergyMap = Frame<float>;
-using GainMap = float[DIMX * DIMY];
+using GainMap = double[DIMX * DIMY];
 using PedestalMap = Pedestal[DIMX * DIMY];
 
 // debug statements
