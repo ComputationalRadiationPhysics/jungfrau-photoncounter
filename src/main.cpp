@@ -84,6 +84,7 @@ auto main() -> int
             DEBUG(downloaded << "/" << data.numFrames << " downloaded");
         }
     }
+    
     /*
     save_image<PedestalMap>(
         static_cast<std::string>(std::to_string(dev->id) + "pedestal" +
