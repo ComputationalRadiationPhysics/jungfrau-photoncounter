@@ -33,16 +33,16 @@ auto main() -> int
     DEBUG(data.numFrames << " data maps loaded");
 
     FramePackage<GainMap, Accelerator, Dim, Size> gain(fc->loadMaps<GainMap,
-                                                                   Accelerator,
-                                                                   Dim,
-                                                                   Size>(
+                                                                    Accelerator,
+                                                                    Dim,
+                                                                    Size>(
         "../../jungfrau-photoncounter/data_pool/px_101016/gainMaps_M022.bin"));
     DEBUG(gain.numFrames << " gain maps loaded");
 
-    FramePackage<MaskMap, Accelerator, Dim, Size> mask(
+    FramePackage<MaskMap, Accelerator, Dim, Size> mask;/*(
         fc->loadMaps<MaskMap, Accelerator, Dim, Size>(
             "../data_pool/px_101016/mask.bin"));
-    DEBUG(mask.numFrames << " masking maps loaded");
+            DEBUG(mask.numFrames << " masking maps loaded");*/
     delete (fc);
 
     // print info
@@ -60,11 +60,12 @@ auto main() -> int
             mask.numFrames == 1
                 ? mask.data
                 : alpaka::mem::buf::alloc<MaskMap, Size>(
-                      alpaka::pltf::getDevByIdx<typename Accelerator::PltfHost>(0u),
+                      alpaka::pltf::getDevByIdx<typename Accelerator::PltfHost>(
+                          0u),
                       0lu));
 
     Dispenser<Accelerator, Dim, Size>* dispenser =
-        new Dispenser<Accelerator, Dim, Size>(gain, maskPtr);
+      new Dispenser<Accelerator, Dim, Size>(gain, maskPtr);
 
 
     // upload and calculate pedestal data
@@ -83,6 +84,13 @@ auto main() -> int
             DEBUG(downloaded << "/" << data.numFrames << " downloaded");
         }
     }
+    /*
+    save_image<PedestalMap>(
+        static_cast<std::string>(std::to_string(dev->id) + "pedestal" +
+                                 std::to_string(std::rand() % 1000)),
+        alpaka::mem::view::getPtrNative(dev->energyHost),
+        DEV_FRAMES - 1);
+    */
 
     auto sizes = dispenser->getMemSize();
     auto free_mem = dispenser->getFreeMem();

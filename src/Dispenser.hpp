@@ -381,6 +381,8 @@ private:
                 devs[num / workdiv.STREAMS_PER_DEV], SINGLEMAP);
             devices[num].drift = alpaka::mem::buf::alloc<DriftMap, TSize>(
                 devs[num / workdiv.STREAMS_PER_DEV], DEV_FRAMES);
+            devices[num].energy = alpaka::mem::buf::alloc<EnergyMap, TSize>(
+                devs[num / workdiv.STREAMS_PER_DEV], DEV_FRAMES);
             devices[num].gainStage =
                 alpaka::mem::buf::alloc<GainStageMap, TSize>(
                     devs[num / workdiv.STREAMS_PER_DEV], DEV_FRAMES);
@@ -394,6 +396,8 @@ private:
                 alpaka::mem::buf::alloc<PhotonMap, TSize>(host, DEV_FRAMES);
             devices[num].sumHost = alpaka::mem::buf::alloc<PhotonSumMap, TSize>(
                 host, (DEV_FRAMES / SUM_FRAMES));
+            devices[num].energyHost = alpaka::mem::buf::alloc<EnergyMap, TSize>(
+                host, DEV_FRAMES);
             devices[num].maxValueHost =
                 alpaka::mem::buf::alloc<EnergyMap, TSize>(host, SINGLEMAP);
 
@@ -406,15 +410,19 @@ private:
             alpaka::mem::buf::pin(devices[num].mask);
             alpaka::mem::buf::pin(devices[num].drift);
             alpaka::mem::buf::pin(devices[num].gainStage);
+            alpaka::mem::buf::pin(devices[num].energy);
             alpaka::mem::buf::pin(devices[num].maxValue);
             alpaka::mem::buf::pin(devices[num].photon);
             alpaka::mem::buf::pin(devices[num].sum);
             alpaka::mem::buf::pin(devices[num].photonHost);
             alpaka::mem::buf::pin(devices[num].sumHost);
             alpaka::mem::buf::pin(devices[num].maxValueHost);
+            alpaka::mem::buf::pin(devices[num].energyHost);
 #endif
 #endif
-
+            
+            alpaka::mem::view::set(devices[num].queue, devices[num].mask, 1, SINGLEMAP);
+            
             if (!ringbuffer.push(&devices[num])) {
                 fputs("FATAL ERROR (RingBuffer): Unexpected size!\n", stderr);
                 exit(EXIT_FAILURE);
@@ -461,11 +469,8 @@ private:
         nextFree.push_back(dev->id);
 
         if (init == false) {
-            //! @todo: test this memset
             alpaka::mem::view::set(dev->queue, dev->pedestal, 0, SINGLEMAP);
-
             alpaka::wait::wait(dev->queue);
-
             init = true;
         }
 
@@ -570,8 +575,20 @@ private:
                 alpaka::mem::view::getPtrNative(dev->sum)));
         */
         alpaka::queue::enqueue(dev->queue, conversion);
-        //alpaka::queue::enqueue(dev->queue, photonFinder);
+        alpaka::queue::enqueue(dev->queue, photonFinder);
         //alpaka::queue::enqueue(dev->queue, summation);
+
+
+
+
+
+
+        
+        alpaka::mem::view::copy(dev->queue,
+                                dev->energyHost,
+                                dev->energy,
+                                PEDEMAPS);
+        
         alpaka::wait::wait(dev->queue); //! @todo: do we really have to wait????
 
         save_image<DetectorData>(
@@ -580,6 +597,12 @@ private:
             data,
             DEV_FRAMES - 1);
 
+        save_image<EnergyMap>(
+            static_cast<std::string>(std::to_string(dev->id) + "energy" +
+                                     std::to_string(std::rand() % 1000)),
+            alpaka::mem::view::getPtrNative(dev->energyHost),
+            DEV_FRAMES - 1);
+        
         // the event is used to wait for pedestal data
         alpaka::queue::enqueue(dev->queue, dev->event);
 
