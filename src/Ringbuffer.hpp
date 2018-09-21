@@ -11,7 +11,7 @@ public:
      * Ringbuffer constructor
      * @param number of elements
      **/
-    Ringbuffer(std::size_t maxElements)
+    explicit Ringbuffer(std::size_t maxElements)
         : data(new T[maxElements]), size(maxElements), head(0), tail(0), full(false)
     {
     }
@@ -35,7 +35,7 @@ public:
     Ringbuffer& operator=(const Ringbuffer& other)
 	{
 		if(&other == this)
-			return this;
+			return *this;
 		size = other.size;
 		full = other.full;
 		head = other.head;

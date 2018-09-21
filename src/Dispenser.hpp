@@ -52,9 +52,11 @@ public:
             alpaka::mem::buf::alloc<PedestalMap, TSize>(host, PEDEMAPS);
 
         // make room for live mask information
-        if (!alpaka::mem::view::getPtrNative(this->mask))
+        if (!alpaka::mem::view::getPtrNative(this->mask)) {
             this->mask =
                 alpaka::mem::buf::alloc<MaskMap, TSize>(host, SINGLEMAP);
+            alpaka::mem::view::set(devices[0].queue, devices[0].mask, 1, SINGLEMAP);
+        }
 
         // make room for live drift information
         drift = alpaka::mem::buf::alloc<DriftMap, TSize>(host, SINGLEMAP);
@@ -71,6 +73,7 @@ public:
         alpaka::mem::buf::pin(gainStage);
 #endif
 #endif
+        synchronize();
     }
 
     /**
@@ -121,6 +124,8 @@ public:
             DEBUG(offset << "/" << data.numFrames
                          << " pedestalframes uploaded");
         }
+
+        distributeMaskMaps();
     }
 
     /**
@@ -396,8 +401,8 @@ private:
                 alpaka::mem::buf::alloc<PhotonMap, TSize>(host, DEV_FRAMES);
             devices[num].sumHost = alpaka::mem::buf::alloc<PhotonSumMap, TSize>(
                 host, (DEV_FRAMES / SUM_FRAMES));
-            devices[num].energyHost = alpaka::mem::buf::alloc<EnergyMap, TSize>(
-                host, DEV_FRAMES);
+            devices[num].energyHost =
+                alpaka::mem::buf::alloc<EnergyMap, TSize>(host, DEV_FRAMES);
             devices[num].maxValueHost =
                 alpaka::mem::buf::alloc<EnergyMap, TSize>(host, SINGLEMAP);
 
@@ -420,9 +425,11 @@ private:
             alpaka::mem::buf::pin(devices[num].energyHost);
 #endif
 #endif
-            
-            alpaka::mem::view::set(devices[num].queue, devices[num].mask, 1, SINGLEMAP);
-            
+            // copy mask input data on to GPUs
+            alpaka::mem::view::copy(
+                devices[num].queue, devices[num].mask, mask, PEDEMAPS);
+
+
             if (!ringbuffer.push(&devices[num])) {
                 fputs("FATAL ERROR (RingBuffer): Unexpected size!\n", stderr);
                 exit(EXIT_FAILURE);
@@ -464,6 +471,10 @@ private:
                                     dev->pedestal,
                                     devices[nextFree.back()].pedestal,
                                     PEDEMAPS);
+
+            alpaka::mem::view::copy(
+                dev->queue, dev->mask, devices[nextFree.back()].mask, PEDEMAPS);
+
             nextFree.pop_front();
         }
         nextFree.push_back(dev->id);
@@ -474,8 +485,6 @@ private:
             init = true;
         }
 
-
-        //! @todo: use new kernels
         CalibrationKernel calibrationKernel;
         auto const calibration(
             alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
@@ -499,6 +508,25 @@ private:
         }
 
         return numMaps;
+    }
+
+
+    /**
+     * Distributes copies the mask map of the current accelerator to all others.
+     */
+    auto distributeMaskMaps() -> void
+    {
+      //! @todo: check if this works. 
+      uint64_t source = nextFree.front();
+        for (uint64_t i = 1; i < devices.size(); ++i) {
+            uint64_t destination =
+              (i + source + (i >= source ? 1 : 0)) % devices.size();
+            alpaka::mem::view::copy(devices[source].queue,
+                                    devices[destination].mask,
+                                    devices[source].mask,
+                                    SINGLEMAP);
+        }
+        synchronize();
     }
 
     /**
@@ -536,7 +564,7 @@ private:
                                 devices[nextFree.back()].pedestal,
                                 PEDEMAPS);
         nextFree.push_back(dev->id);
-        
+
         ConversionKernel conversionKernel;
         auto const conversion(
             alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
@@ -549,7 +577,7 @@ private:
                 alpaka::mem::view::getPtrNative(dev->energy),
                 dev->numMaps,
                 alpaka::mem::view::getPtrNative(dev->mask)));
-                
+
         PhotonFinderKernel photonFinderKernel;
         auto const photonFinder(
             alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
@@ -562,7 +590,7 @@ private:
                 alpaka::mem::view::getPtrNative(dev->energy),
                 alpaka::mem::view::getPtrNative(dev->photon),
                 dev->numMaps));
-        /*        
+        /*
         // TODO: uncomment summation
         SummationKernel summationKernel;
         auto const summation(
@@ -576,19 +604,12 @@ private:
         */
         alpaka::queue::enqueue(dev->queue, conversion);
         alpaka::queue::enqueue(dev->queue, photonFinder);
-        //alpaka::queue::enqueue(dev->queue, summation);
+        // alpaka::queue::enqueue(dev->queue, summation);
 
 
+        alpaka::mem::view::copy(
+            dev->queue, dev->energyHost, dev->energy, PEDEMAPS);
 
-
-
-
-        
-        alpaka::mem::view::copy(dev->queue,
-                                dev->energyHost,
-                                dev->energy,
-                                PEDEMAPS);
-        
         alpaka::wait::wait(dev->queue); //! @todo: do we really have to wait????
 
         save_image<DetectorData>(
@@ -602,7 +623,7 @@ private:
                                      std::to_string(std::rand() % 1000)),
             alpaka::mem::view::getPtrNative(dev->energyHost),
             DEV_FRAMES - 1);
-        
+
         // the event is used to wait for pedestal data
         alpaka::queue::enqueue(dev->queue, dev->event);
 
