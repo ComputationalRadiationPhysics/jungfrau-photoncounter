@@ -36,7 +36,7 @@ struct ConversionKernel {
         for (TNumFrames i = 0; i < numFrames; ++i) {
             auto dataword = detectorData[i].data[id];
             auto adc = getAdc(dataword);
-
+            
             auto& gainStage = gainStageMaps[i].data[id];
             gainStage = getGainStage(dataword);
 

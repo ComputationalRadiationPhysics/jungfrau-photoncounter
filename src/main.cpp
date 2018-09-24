@@ -39,8 +39,8 @@ auto main() -> int
         "../../jungfrau-photoncounter/data_pool/px_101016/gainMaps_M022.bin"));
     DEBUG(gain.numFrames << " gain maps loaded");
 
-    FramePackage<MaskMap, Accelerator, Dim, Size> mask;/*(
-        fc->loadMaps<MaskMap, Accelerator, Dim, Size>(
+    FramePackage<MaskMap, Accelerator, Dim, Size> mask;
+    /*(fc->loadMaps<MaskMap, Accelerator, Dim, Size>(
             "../data_pool/px_101016/mask.bin"));
             DEBUG(mask.numFrames << " masking maps loaded");*/
     delete (fc);
@@ -55,14 +55,9 @@ auto main() -> int
     DEBUG("cpu count: " << (alpaka::pltf::getDevCount<
                             alpaka::pltf::Pltf<typename Accelerator::Acc>>()));
 
-    alpaka::mem::buf::Buf<typename Accelerator::DevHost, MaskMap, Dim, Size>
-        maskPtr(
-            mask.numFrames == 1
-                ? mask.data
-                : alpaka::mem::buf::alloc<MaskMap, Size>(
-                      alpaka::pltf::getDevByIdx<typename Accelerator::PltfHost>(
-                          0u),
-                      0lu));
+    boost::optional<alpaka::mem::buf::Buf<typename Accelerator::DevHost, MaskMap, Dim, Size>> maskPtr;
+    if(mask.numFrames == 1)
+      maskPtr = mask.data;
 
     Dispenser<Accelerator, Dim, Size>* dispenser =
       new Dispenser<Accelerator, Dim, Size>(gain, maskPtr);

@@ -10,6 +10,8 @@
 #include "kernel/PhotonFinder.hpp"
 #include "kernel/Summation.hpp"
 
+#include <boost/optional.hpp>
+
 #include <iostream>
 #include <limits>
 #include <mutex>
@@ -22,10 +24,12 @@ public:
      */
     Dispenser(
         FramePackage<GainMap, TAlpaka, TDim, TSize> gainMap,
-        alpaka::mem::buf::Buf<typename TAlpaka::DevHost, MaskMap, TDim, TSize>
+        boost::optional<alpaka::mem::buf::Buf<typename TAlpaka::DevHost, MaskMap, TDim, TSize>>
             mask)
         : gain(gainMap),
-          mask(mask),
+          mask((
+              mask ? *mask
+                   : alpaka::mem::buf::alloc<MaskMap, TSize>(host, SINGLEMAP))),
           drift(alpaka::mem::buf::alloc<DriftMap, TSize>(
               alpaka::pltf::getDevByIdx<typename TAlpaka::PltfHost>(0u),
               static_cast<TSize>(0u))),
@@ -41,7 +45,6 @@ public:
         std::vector<typename TAlpaka::DevAcc> devs(
             alpaka::pltf::getDevs<typename TAlpaka::PltfAcc>());
 
-        devices.resize(devs.size() * workdiv.STREAMS_PER_DEV);
         initDevices(devs);
 
         auto host = alpaka::pltf::getDevByIdx<typename TAlpaka::PltfHost>(0u);
@@ -52,10 +55,9 @@ public:
             alpaka::mem::buf::alloc<PedestalMap, TSize>(host, PEDEMAPS);
 
         // make room for live mask information
-        if (!alpaka::mem::view::getPtrNative(this->mask)) {
-            this->mask =
-                alpaka::mem::buf::alloc<MaskMap, TSize>(host, SINGLEMAP);
-            alpaka::mem::view::set(devices[0].queue, devices[0].mask, 1, SINGLEMAP);
+        if (!mask) {
+            alpaka::mem::view::set(
+                devices[0].queue, devices[0].mask, 1, SINGLEMAP);
         }
 
         // make room for live drift information
@@ -290,25 +292,6 @@ public:
         ringbuffer.push(dev);
         DEBUG("device " << dev->id << " freed");
 
-        /*
-        //
-        //
-        //! @TODO: debugging
-        save_image<Photon>(
-            static_cast<std::string>(std::to_string(dev->id) + "First" +
-                                     std::to_string(std::rand() % 1000)),
-            alpaka::mem::view::getPtrNative(photon->data),
-            0);
-        save_image<Photon>(
-            static_cast<std::string>(std::to_string(dev->id) + "Last" +
-                                     std::to_string(std::rand() % 1000)),
-            alpaka::mem::view::getPtrNative(photon->data),
-            DEV_FRAMES - 1);
-        //
-        //
-        //
-        */
-
         return true;
     }
 
@@ -364,72 +347,14 @@ private:
      */
     auto initDevices(std::vector<typename TAlpaka::DevAcc> devs) -> void
     {
+        devices.reserve(devs.size() * workdiv.STREAMS_PER_DEV);
         for (std::size_t num = 0; num < devs.size() * workdiv.STREAMS_PER_DEV;
              ++num) {
             // initialize variables
-            devices[num].id = num;
-            devices[num].device = devs[num / workdiv.STREAMS_PER_DEV];
-            devices[num].queue = devs[num / workdiv.STREAMS_PER_DEV];
-            devices[num].event = devs[num / workdiv.STREAMS_PER_DEV];
-            devices[num].state = FREE;
-
-            // create all buffer on the device
-            devices[num].data = alpaka::mem::buf::alloc<DetectorData, TSize>(
-                devs[num / workdiv.STREAMS_PER_DEV], DEV_FRAMES);
-            devices[num].gain = alpaka::mem::buf::alloc<GainMap, TSize>(
-                devs[num / workdiv.STREAMS_PER_DEV], GAINMAPS);
+            devices.emplace_back(num, devs[num / workdiv.STREAMS_PER_DEV]);
             alpaka::mem::view::copy(
                 devices[num].queue, devices[num].gain, gain.data, GAINMAPS);
-            devices[num].pedestal = alpaka::mem::buf::alloc<PedestalMap, TSize>(
-                devs[num / workdiv.STREAMS_PER_DEV], PEDEMAPS);
-            devices[num].mask = alpaka::mem::buf::alloc<MaskMap, TSize>(
-                devs[num / workdiv.STREAMS_PER_DEV], SINGLEMAP);
-            devices[num].drift = alpaka::mem::buf::alloc<DriftMap, TSize>(
-                devs[num / workdiv.STREAMS_PER_DEV], DEV_FRAMES);
-            devices[num].energy = alpaka::mem::buf::alloc<EnergyMap, TSize>(
-                devs[num / workdiv.STREAMS_PER_DEV], DEV_FRAMES);
-            devices[num].gainStage =
-                alpaka::mem::buf::alloc<GainStageMap, TSize>(
-                    devs[num / workdiv.STREAMS_PER_DEV], DEV_FRAMES);
-            devices[num].maxValue = alpaka::mem::buf::alloc<EnergyMap, TSize>(
-                devs[num / workdiv.STREAMS_PER_DEV], DEV_FRAMES);
-            devices[num].photon = alpaka::mem::buf::alloc<PhotonMap, TSize>(
-                devs[num / workdiv.STREAMS_PER_DEV], DEV_FRAMES);
-            devices[num].sum = alpaka::mem::buf::alloc<PhotonSumMap, TSize>(
-                devs[num / workdiv.STREAMS_PER_DEV], DEV_FRAMES / SUM_FRAMES);
-            devices[num].photonHost =
-                alpaka::mem::buf::alloc<PhotonMap, TSize>(host, DEV_FRAMES);
-            devices[num].sumHost = alpaka::mem::buf::alloc<PhotonSumMap, TSize>(
-                host, (DEV_FRAMES / SUM_FRAMES));
-            devices[num].energyHost =
-                alpaka::mem::buf::alloc<EnergyMap, TSize>(host, DEV_FRAMES);
-            devices[num].maxValueHost =
-                alpaka::mem::buf::alloc<EnergyMap, TSize>(host, SINGLEMAP);
-
-#ifdef ALPAKA_ACC_GPU_CUDA_ENABLED
-#if (SHOW_DEBUG == false)
-            // pin all buffer
-            alpaka::mem::buf::pin(devices[num].data);
-            alpaka::mem::buf::pin(devices[num].gain);
-            alpaka::mem::buf::pin(devices[num].pedestal);
-            alpaka::mem::buf::pin(devices[num].mask);
-            alpaka::mem::buf::pin(devices[num].drift);
-            alpaka::mem::buf::pin(devices[num].gainStage);
-            alpaka::mem::buf::pin(devices[num].energy);
-            alpaka::mem::buf::pin(devices[num].maxValue);
-            alpaka::mem::buf::pin(devices[num].photon);
-            alpaka::mem::buf::pin(devices[num].sum);
-            alpaka::mem::buf::pin(devices[num].photonHost);
-            alpaka::mem::buf::pin(devices[num].sumHost);
-            alpaka::mem::buf::pin(devices[num].maxValueHost);
-            alpaka::mem::buf::pin(devices[num].energyHost);
-#endif
-#endif
-            // copy mask input data on to GPUs
-            alpaka::mem::view::copy(
-                devices[num].queue, devices[num].mask, mask, PEDEMAPS);
-
-
+            
             if (!ringbuffer.push(&devices[num])) {
                 fputs("FATAL ERROR (RingBuffer): Unexpected size!\n", stderr);
                 exit(EXIT_FAILURE);
@@ -472,8 +397,10 @@ private:
                                     devices[nextFree.back()].pedestal,
                                     PEDEMAPS);
 
-            alpaka::mem::view::copy(
-                dev->queue, dev->mask, devices[nextFree.back()].mask, PEDEMAPS);
+            alpaka::mem::view::copy(dev->queue,
+                                    dev->mask,
+                                    devices[nextFree.back()].mask,
+                                    SINGLEMAP);
 
             nextFree.pop_front();
         }
@@ -516,11 +443,11 @@ private:
      */
     auto distributeMaskMaps() -> void
     {
-      //! @todo: check if this works. 
-      uint64_t source = nextFree.front();
+        //! @todo: check if this works.
+        uint64_t source = nextFree.front();
         for (uint64_t i = 1; i < devices.size(); ++i) {
             uint64_t destination =
-              (i + source + (i >= source ? 1 : 0)) % devices.size();
+                (i + source + (i >= source ? 1 : 0)) % devices.size();
             alpaka::mem::view::copy(devices[source].queue,
                                     devices[destination].mask,
                                     devices[source].mask,

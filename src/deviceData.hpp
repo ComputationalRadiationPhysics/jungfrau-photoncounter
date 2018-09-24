@@ -2,6 +2,8 @@
 
 #include <alpaka/alpaka.hpp>
 
+#include "Config.hpp"
+
 enum State { FREE, PROCESSING, READY };
 
 /**
@@ -60,28 +62,56 @@ template <typename TAlpaka, typename TDim, typename TSize> struct DeviceData {
     alpaka::mem::buf::Buf<typename TAlpaka::DevHost, EnergyMap, TDim, TSize>
         energyHost;
 
-    DeviceData()
-        : id(0),
-          numMaps(0),
+    DeviceData(std::size_t id,
+               typename TAlpaka::DevAcc device,
+               std::size_t numMaps = DEV_FRAMES)
+        : id(id),
+          numMaps(numMaps),
           host(alpaka::pltf::getDevByIdx<typename TAlpaka::PltfHost>(0u)),
-          device(alpaka::pltf::getDevByIdx<typename TAlpaka::PltfAcc>(0u)),
+          device(device),
           queue(device),
           event(device),
           state(FREE),
-          data(alpaka::mem::buf::alloc<DetectorData, TSize>(device, 0lu)),
-          gain(alpaka::mem::buf::alloc<GainMap, TSize>(device, 0lu)),
-          pedestal(alpaka::mem::buf::alloc<PedestalMap, TSize>(device, 0lu)),
-          drift(alpaka::mem::buf::alloc<DriftMap, TSize>(device, 0lu)),
-          gainStage(alpaka::mem::buf::alloc<GainStageMap, TSize>(device, 0lu)),
-          maxValue(alpaka::mem::buf::alloc<EnergyMap, TSize>(device, 0lu)),
-          energy(alpaka::mem::buf::alloc<EnergyMap, TSize>(device, 0lu)),
-          mask(alpaka::mem::buf::alloc<MaskMap, TSize>(device, 0lu)),
-          photon(alpaka::mem::buf::alloc<PhotonMap, TSize>(device, 0lu)),
-          sum(alpaka::mem::buf::alloc<PhotonSumMap, TSize>(device, 0lu)),
-          maxValueHost(alpaka::mem::buf::alloc<EnergyMap, TSize>(host, 0lu)),
-          photonHost(alpaka::mem::buf::alloc<PhotonMap, TSize>(host, 0lu)),
-          sumHost(alpaka::mem::buf::alloc<PhotonSumMap, TSize>(host, 0lu)),
-          energyHost(alpaka::mem::buf::alloc<EnergyMap, TSize>(host, 0lu))
+          data(alpaka::mem::buf::alloc<DetectorData, TSize>(device, numMaps)),
+          gain(alpaka::mem::buf::alloc<GainMap, TSize>(device, GAINMAPS)),
+          pedestal(
+              alpaka::mem::buf::alloc<PedestalMap, TSize>(device, PEDEMAPS)),
+          drift(alpaka::mem::buf::alloc<DriftMap, TSize>(device, numMaps)),
+          gainStage(
+              alpaka::mem::buf::alloc<GainStageMap, TSize>(device, numMaps)),
+          maxValue(alpaka::mem::buf::alloc<EnergyMap, TSize>(device, numMaps)),
+          energy(alpaka::mem::buf::alloc<EnergyMap, TSize>(device, numMaps)),
+          mask(alpaka::mem::buf::alloc<MaskMap, TSize>(device, SINGLEMAP)),
+          photon(alpaka::mem::buf::alloc<PhotonMap, TSize>(device, numMaps)),
+          sum(alpaka::mem::buf::alloc<PhotonSumMap, TSize>(device,
+                                                           numMaps /
+                                                               SUM_FRAMES)),
+          maxValueHost(
+              alpaka::mem::buf::alloc<EnergyMap, TSize>(host, SINGLEMAP)),
+          photonHost(alpaka::mem::buf::alloc<PhotonMap, TSize>(host, numMaps)),
+          sumHost(alpaka::mem::buf::alloc<PhotonSumMap, TSize>(host,
+                                                               numMaps /
+                                                                   SUM_FRAMES)),
+          energyHost(alpaka::mem::buf::alloc<EnergyMap, TSize>(host, numMaps))
     {
+#ifdef ALPAKA_ACC_GPU_CUDA_ENABLED
+#if (SHOW_DEBUG == false)
+        // pin all buffer
+        alpaka::mem::buf::pin(devices[num].data);
+        alpaka::mem::buf::pin(devices[num].gain);
+        alpaka::mem::buf::pin(devices[num].pedestal);
+        alpaka::mem::buf::pin(devices[num].mask);
+        alpaka::mem::buf::pin(devices[num].drift);
+        alpaka::mem::buf::pin(devices[num].gainStage);
+        alpaka::mem::buf::pin(devices[num].energy);
+        alpaka::mem::buf::pin(devices[num].maxValue);
+        alpaka::mem::buf::pin(devices[num].photon);
+        alpaka::mem::buf::pin(devices[num].sum);
+        alpaka::mem::buf::pin(devices[num].photonHost);
+        alpaka::mem::buf::pin(devices[num].sumHost);
+        alpaka::mem::buf::pin(devices[num].maxValueHost);
+        alpaka::mem::buf::pin(devices[num].energyHost);
+#endif
+#endif
     }
 };
