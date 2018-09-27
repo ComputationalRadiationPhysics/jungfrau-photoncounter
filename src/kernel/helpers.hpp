@@ -105,7 +105,6 @@ template <typename TAcc,
           typename TPedestalMap,
           typename TGainStageMap,
           typename TEnergyMap,
-          typename TNumFrames,
           typename TMaskMap,
           typename TIndex
           >
