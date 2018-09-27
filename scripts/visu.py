@@ -1,3 +1,9 @@
+#!/bin/python
+
+# remove X11 dependecy
+import matplotlib as mpl
+mpl.use('Agg')
+
 from matplotlib import pyplot as plt
 from matplotlib import colors
 import sys
@@ -12,23 +18,28 @@ for f in fileNames:
         print(f)
         data = np.loadtxt(f).reshape((512, 1024))
         (name, _) = os.path.splitext(f)
-        
+
         try:
+            plt.figure()
             plt.imshow(data, norm=colors.LogNorm(), origin='lower')
             plt.colorbar()
-            plt.savefig('log/' + name + '.png')
+            plt.savefig('log/' + name + '.bmp')
             plt.close()
         except:
+            print("Generation of log/" + name + ".bmp failed!")
             pass
         
         try:
+            plt.figure()
             plt.imshow(data, origin='lower')
             plt.colorbar()
-            plt.savefig('linear/' + name + '.png')
+            plt.savefig('linear/' + name + '.bmp')
             plt.close()
         except:
+            print("Generation of linear/" + name + ".bmp failed!")
             pass
 
     except:
+        print("Something with the file " + f + " went wrong!")
         pass
         

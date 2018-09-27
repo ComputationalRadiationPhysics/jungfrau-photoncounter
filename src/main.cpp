@@ -75,6 +75,7 @@ auto main() -> int
     while (downloaded < data.numFrames) {
         offset = dispenser->uploadData(data, offset);
         if (dispenser->downloadData(&photon, &sum)) {
+          //! @todo: only correct if DEV_FRAMES were actually uploaded. 
             downloaded += DEV_FRAMES;
             DEBUG(downloaded << "/" << data.numFrames << " downloaded");
         }

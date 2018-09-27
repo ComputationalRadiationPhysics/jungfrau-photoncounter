@@ -11,7 +11,6 @@ constexpr std::size_t FRAMESPERSTAGE_G1 = 1000;
 constexpr std::size_t FRAMESPERSTAGE_G2 = 999;
 
 constexpr std::size_t FRAME_HEADER_SIZE = 16;
-constexpr std::size_t FRAMEOFFSET = FRAME_HEADER_SIZE / 2;
 constexpr std::size_t DIMX = 1024;
 constexpr std::size_t DIMY = 512;
 constexpr std::size_t MAPSIZE = DIMX * DIMY;
@@ -23,21 +22,8 @@ constexpr std::size_t GAINMAPS = 3;
 constexpr float BEAMCONST = 6.2;
 constexpr float PHOTONCONST = (1. / 12.4);
 constexpr std::size_t MAXINT = std::numeric_limits<uint32_t>::max();
-
 constexpr int CLUSTER_SIZE = 3;
 
-// data types
-/*template <typename TData, typename TAlpaka, typename TDim, typename TSize>
-struct Maps {
-    std::size_t numMaps;
-    alpaka::mem::buf::Buf<typename TAlpaka::DevHost, TData, TDim, TSize> data;
-    Maps()
-        : numMaps(0),
-          data(alpaka::mem::buf::alloc<TData, typename TSize>(
-              alpaka::pltf::getDevByIdx<typename TAlpaka::PltfHost>(0u),
-              0lu)){};
-};
-*/
 struct FrameHeader {
     std::uint64_t frameNumber;
     std::uint64_t bunchId;
@@ -121,7 +107,7 @@ void save_image(std::string path, TBuffer* data, std::size_t frame_number)
     img.open(path + ".txt");
     for (std::size_t j = 0; j < 512; j++) {
         for (std::size_t k = 0; k < 1024; k++) {
-            int h = int(data[frame_number].data[(j * 1024) + k] * 10);
+            double h = double(data[frame_number].data[(j * 1024) + k] * 10);
             img << h << " ";
         }
         img << "\n";

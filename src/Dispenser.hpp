@@ -534,23 +534,44 @@ private:
         // alpaka::queue::enqueue(dev->queue, summation);
 
 
-        alpaka::mem::view::copy(
-            dev->queue, dev->energyHost, dev->energy, PEDEMAPS);
 
+
+        
+
+        alpaka::mem::view::copy(
+            dev->queue, dev->energyHost, dev->energy, DEV_FRAMES);
+
+        alpaka::mem::view::copy(
+            dev->queue, dev->photonHost, dev->photon, DEV_FRAMES);
+        
         alpaka::wait::wait(dev->queue); //! @todo: do we really have to wait????
 
+        unsigned long long d_ptr = (unsigned long long)data;
+        uint16_t uid = d_ptr;
+        
         save_image<DetectorData>(
             static_cast<std::string>(std::to_string(dev->id) + "data" +
-                                     std::to_string(std::rand() % 1000)),
+                                     std::to_string(uid)),
             data,
             DEV_FRAMES - 1);
 
         save_image<EnergyMap>(
             static_cast<std::string>(std::to_string(dev->id) + "energy" +
-                                     std::to_string(std::rand() % 1000)),
+                                     std::to_string(uid)),
             alpaka::mem::view::getPtrNative(dev->energyHost),
             DEV_FRAMES - 1);
 
+        save_image<PhotonMap>(
+            static_cast<std::string>(std::to_string(dev->id) + "photon" +
+                                     std::to_string(uid)),
+            alpaka::mem::view::getPtrNative(dev->photonHost),
+            DEV_FRAMES - 1);
+
+        alpaka::wait::wait(dev->queue); //! @todo: do we really have to wait????
+
+
+
+        
         // the event is used to wait for pedestal data
         alpaka::queue::enqueue(dev->queue, dev->event);
 
