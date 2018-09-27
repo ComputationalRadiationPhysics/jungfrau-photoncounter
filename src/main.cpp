@@ -93,6 +93,10 @@ auto main() -> int
 
     GainStageMap* gainStage = dispenser->downloadGainStages();
     save_image<GainStageMap>("gainstage", gainStage, 0);
+
+    DriftMap* drift = dispenser->downloadDriftMaps();
+    save_image<DriftMap>("driftmap", drift, 0);
+
     
     auto sizes = dispenser->getMemSize();
     auto free_mem = dispenser->getFreeMem();

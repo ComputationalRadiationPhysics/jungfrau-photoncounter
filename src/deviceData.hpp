@@ -27,6 +27,9 @@ template <typename TAlpaka, typename TDim, typename TSize> struct DeviceData {
     alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, GainMap, TDim, TSize> gain;
 
     alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, PedestalMap, TDim, TSize>
+        initialPedestal;
+  
+    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, PedestalMap, TDim, TSize>
         pedestal;
 
     alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, MaskMap, TDim, TSize> mask;
@@ -79,6 +82,8 @@ template <typename TAlpaka, typename TDim, typename TSize> struct DeviceData {
           gain(alpaka::mem::buf::alloc<GainMap, TSize>(device, GAINMAPS)),
           pedestal(
               alpaka::mem::buf::alloc<PedestalMap, TSize>(device, PEDEMAPS)),
+          initialPedestal(
+              alpaka::mem::buf::alloc<PedestalMap, TSize>(device, PEDEMAPS)),
           drift(alpaka::mem::buf::alloc<DriftMap, TSize>(device, numMaps)),
           gainStage(
               alpaka::mem::buf::alloc<GainStageMap, TSize>(device, numMaps)),
@@ -104,6 +109,7 @@ template <typename TAlpaka, typename TDim, typename TSize> struct DeviceData {
         // pin all buffer
         alpaka::mem::buf::pin(devices[num].data);
         alpaka::mem::buf::pin(devices[num].gain);
+        alpaka::mem::buf::pin(devices[num].initialPedestal);
         alpaka::mem::buf::pin(devices[num].pedestal);
         alpaka::mem::buf::pin(devices[num].mask);
         alpaka::mem::buf::pin(devices[num].drift);

@@ -7,6 +7,7 @@
 #include "kernel/Calibration.hpp"
 #include "kernel/ClusterFinder.hpp"
 #include "kernel/Conversion.hpp"
+#include "kernel/DriftMap.hpp"
 #include "kernel/GainStageMasking.hpp"
 #include "kernel/PhotonFinder.hpp"
 #include "kernel/Summation.hpp"
@@ -114,6 +115,7 @@ public:
         }
 
         distributeMaskMaps();
+        distributeInitialPedestalMaps();
     }
 
     /**
@@ -169,7 +171,7 @@ public:
      * Downloads the current gain stage map.
      * @return gain stage map
      */
-    auto downloadGainStages() -> GainStageMap*
+    auto downloadGainStages(std::size_t frame = 0) -> GainStageMap*
     {
         DEBUG("downloading gain stage map...");
 
@@ -177,8 +179,7 @@ public:
         // maps
         auto current_device = devices[nextFree.back()];
 
-        //! @todo: take masked pixels into account
-
+        // mask gain stage maps
         GainStageMaskingKernel gainStageMasking;
         auto const gainStageMasker(
             alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
@@ -186,14 +187,16 @@ public:
                 gainStageMasking,
                 alpaka::mem::view::getPtrNative(current_device.gainStage),
                 alpaka::mem::view::getPtrNative(current_device.gainStageOutput),
-                0,
+                frame,
                 alpaka::mem::view::getPtrNative(current_device.mask)));
 
         alpaka::queue::enqueue(current_device.queue, gainStageMasker);
 
         // get the pedestal data from the device
-        alpaka::mem::view::copy(
-            current_device.queue, gainStage, current_device.gainStageOutput, SINGLEMAP);
+        alpaka::mem::view::copy(current_device.queue,
+                                gainStage,
+                                current_device.gainStageOutput,
+                                SINGLEMAP);
 
         // wait for copy to finish
         alpaka::wait::wait(current_device.queue, current_device.event);
@@ -205,7 +208,7 @@ public:
      * Downloads the current drift map.
      * @return drift map
      */
-    auto downloadDriftMaps() -> DriftMap
+    auto downloadDriftMaps() -> DriftMap*
     {
         DEBUG("downloading drift map...");
 
@@ -213,7 +216,17 @@ public:
         // maps
         auto current_device = devices[nextFree.back()];
 
-        //! @todo: calculate them
+        // mask gain stage maps
+        DriftMapKernel driftMapKernel;
+        auto const driftMap(
+            alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
+                workdiv.workdiv,
+                driftMapKernel,
+                alpaka::mem::view::getPtrNative(current_device.initialPedestal),
+                alpaka::mem::view::getPtrNative(current_device.pedestal),
+                alpaka::mem::view::getPtrNative(current_device.drift)));
+
+        alpaka::queue::enqueue(current_device.queue, driftMap);
 
         // get the pedestal data from the device
         alpaka::mem::view::copy(
@@ -222,7 +235,7 @@ public:
         // wait for copy to finish
         alpaka::wait::wait(current_device.queue, current_device.event);
 
-        return *drift;
+        return alpaka::mem::view::getPtrNative(drift);
     }
 
     /**
@@ -445,7 +458,6 @@ private:
      */
     auto distributeMaskMaps() -> void
     {
-        //! @todo: check if this works.
         uint64_t source = nextFree.front();
         for (uint64_t i = 1; i < devices.size(); ++i) {
             uint64_t destination =
@@ -453,6 +465,23 @@ private:
             alpaka::mem::view::copy(devices[source].queue,
                                     devices[destination].mask,
                                     devices[source].mask,
+                                    SINGLEMAP);
+        }
+        synchronize();
+    }
+
+    /**
+     * Distributes copies the initial pedestal map of the current accelerator to
+     * all others.
+     */
+    auto distributeInitialPedestalMaps() -> void
+    {
+        //! @todo: test if this works
+        uint64_t source = nextFree.front();
+        for (uint64_t i = 0; i < devices.size(); ++i) {
+            alpaka::mem::view::copy(devices[source].queue,
+                                    devices[i].initialPedestal,
+                                    devices[source].pedestal,
                                     SINGLEMAP);
         }
         synchronize();
