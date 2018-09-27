@@ -39,7 +39,8 @@ auto main() -> int
         "../../jungfrau-photoncounter/data_pool/px_101016/gainMaps_M022.bin"));
     DEBUG(gain.numFrames << " gain maps loaded");
 
-    FramePackage<MaskMap, Accelerator, Dim, Size> mask;
+    FramePackage<MaskMap, Accelerator, Dim, Size> mask(SINGLEMAP);
+    mask.numFrames = 0;
     /*(fc->loadMaps<MaskMap, Accelerator, Dim, Size>(
             "../data_pool/px_101016/mask.bin"));
             DEBUG(mask.numFrames << " masking maps loaded");*/
@@ -56,7 +57,7 @@ auto main() -> int
                             alpaka::pltf::Pltf<typename Accelerator::Acc>>()));
 
     boost::optional<alpaka::mem::buf::Buf<typename Accelerator::DevHost, MaskMap, Dim, Size>> maskPtr;
-    if(mask.numFrames == 1)
+    if(mask.numFrames == SINGLEMAP)
       maskPtr = mask.data;
 
     Dispenser<Accelerator, Dim, Size>* dispenser =
@@ -66,15 +67,15 @@ auto main() -> int
     // upload and calculate pedestal data
     dispenser->uploadPedestaldata(pedestaldata);
 
-    FramePackage<PhotonMap, Accelerator, Dim, Size> photon{};
-    FramePackage<PhotonSumMap, Accelerator, Dim, Size> sum{};
+    FramePackage<PhotonMap, Accelerator, Dim, Size> photon(DEV_FRAMES);
+    FramePackage<PhotonSumMap, Accelerator, Dim, Size> sum(DEV_FRAMES / SUM_FRAMES);
     std::size_t offset = 0;
     std::size_t downloaded = 0;
 
     // process data maps
     while (downloaded < data.numFrames) {
         offset = dispenser->uploadData(data, offset);
-        if (dispenser->downloadData(&photon, &sum)) {
+        if (dispenser->downloadData(photon, sum)) {
           //! @todo: only correct if DEV_FRAMES were actually uploaded. 
             downloaded += DEV_FRAMES;
             DEBUG(downloaded << "/" << data.numFrames << " downloaded");
@@ -89,6 +90,10 @@ auto main() -> int
         DEV_FRAMES - 1);
     */
 
+
+    GainStageMap* gainStage = dispenser->downloadGainStages();
+    save_image<GainStageMap>("gainstage", gainStage, 0);
+    
     auto sizes = dispenser->getMemSize();
     auto free_mem = dispenser->getFreeMem();
 

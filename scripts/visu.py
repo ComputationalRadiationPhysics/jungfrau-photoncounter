@@ -23,20 +23,20 @@ for f in fileNames:
             plt.figure()
             plt.imshow(data, norm=colors.LogNorm(), origin='lower')
             plt.colorbar()
-            plt.savefig('log/' + name + '.bmp')
+            plt.savefig('log/' + name + '.png')
             plt.close()
         except:
-            print("Generation of log/" + name + ".bmp failed!")
+            print("Generation of log/" + name + ".png failed!")
             pass
         
         try:
             plt.figure()
             plt.imshow(data, origin='lower')
             plt.colorbar()
-            plt.savefig('linear/' + name + '.bmp')
+            plt.savefig('linear/' + name + '.png')
             plt.close()
         except:
-            print("Generation of linear/" + name + ".bmp failed!")
+            print("Generation of linear/" + name + ".png failed!")
             pass
 
     except:

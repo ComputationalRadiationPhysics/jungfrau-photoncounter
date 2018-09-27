@@ -37,6 +37,9 @@ template <typename TAlpaka, typename TDim, typename TSize> struct DeviceData {
     alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, GainStageMap, TDim, TSize>
         gainStage;
 
+    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, GainStageMap, TDim, TSize>
+        gainStageOutput;
+
     alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, EnergyMap, TDim, TSize>
         energy;
 
@@ -79,6 +82,8 @@ template <typename TAlpaka, typename TDim, typename TSize> struct DeviceData {
           drift(alpaka::mem::buf::alloc<DriftMap, TSize>(device, numMaps)),
           gainStage(
               alpaka::mem::buf::alloc<GainStageMap, TSize>(device, numMaps)),
+          gainStageOutput(
+              alpaka::mem::buf::alloc<GainStageMap, TSize>(device, SINGLEMAP)),
           maxValue(alpaka::mem::buf::alloc<EnergyMap, TSize>(device, numMaps)),
           energy(alpaka::mem::buf::alloc<EnergyMap, TSize>(device, numMaps)),
           mask(alpaka::mem::buf::alloc<MaskMap, TSize>(device, SINGLEMAP)),
@@ -111,6 +116,7 @@ template <typename TAlpaka, typename TDim, typename TSize> struct DeviceData {
         alpaka::mem::buf::pin(devices[num].sumHost);
         alpaka::mem::buf::pin(devices[num].maxValueHost);
         alpaka::mem::buf::pin(devices[num].energyHost);
+        alpaka::mem::buf::pin(devices[num].gainStageHost);
 #endif
 #endif
     }

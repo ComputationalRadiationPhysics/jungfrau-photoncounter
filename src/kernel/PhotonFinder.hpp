@@ -50,14 +50,6 @@ struct PhotonFinderKernel {
 
             const auto& pedestal = pedestalMaps[gainStage][id].mean;
             const auto& stddev = pedestalMaps[gainStage][id].stddev;
-
-
-            /*
-            if(id == 0) {
-              printf("[%lu] dw: %hx\tadc: %hu\tped: %f\tstddev: %f\tenergy: %f\tphoton: %hu\tgs: %hu\n", i, dataword, adc, pedestal, stddev, energy, photonCount, gainStage);
-            }
-            */
-
             
             // check "dark pixel" condition
             if (pedestal - c * stddev <= adc && pedestal + c * stddev >= adc) {

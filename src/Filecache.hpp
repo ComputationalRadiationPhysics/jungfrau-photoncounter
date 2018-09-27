@@ -44,13 +44,7 @@ auto Filecache::loadMaps(const std::string& path, bool header)
     file.read(bufferPointer, fileSize);
     file.close();
 
-    FramePackage<TData, TAlpaka, TDim, TSize> maps{};
-    maps.numFrames = static_cast<unsigned>(numFrames);
-
-    // allocate alpaka memory
-    maps.data = alpaka::mem::buf::alloc<TData, TSize>(
-        alpaka::pltf::getDevByIdx<typename TAlpaka::PltfHost>(0u),
-        (numFrames * 2));
+    FramePackage<TData, TAlpaka, TDim, TSize> maps(numFrames);
 
 #ifdef ALPAKA_ACC_GPU_CUDA_ENABLED
 #if (SHOW_DEBUG == false)

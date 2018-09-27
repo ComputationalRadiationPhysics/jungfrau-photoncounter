@@ -23,6 +23,7 @@ constexpr float BEAMCONST = 6.2;
 constexpr float PHOTONCONST = (1. / 12.4);
 constexpr std::size_t MAXINT = std::numeric_limits<uint32_t>::max();
 constexpr int CLUSTER_SIZE = 3;
+constexpr char MASKED_VALUE = 4;
 
 struct FrameHeader {
     std::uint64_t frameNumber;
@@ -36,10 +37,10 @@ template <typename TData> struct Frame {
 
 struct Pedestal {
     std::size_t count;
-  float mean;
+    float mean;
     float m2;
     float stddev;
-  float variance;
+    float variance;
 };
 
 struct Cluster {
@@ -54,17 +55,16 @@ struct ClusterArray {
     Cluster* clusters;
 };
 
-template <typename T, typename TAlpaka, typename TDim, typename TSize> struct FramePackage {
+template <typename T, typename TAlpaka, typename TDim, typename TSize>
+struct FramePackage {
     std::size_t numFrames;
-    alpaka::mem::buf::
-        Buf<typename TAlpaka::DevHost, T, TDim, TSize>
-            data;
+    alpaka::mem::buf::Buf<typename TAlpaka::DevHost, T, TDim, TSize> data;
 
-    FramePackage()
-        : numFrames(0),
-          data(alpaka::mem::buf::alloc<T, TSize>(
-              alpaka::pltf::getDevByIdx<typename TAlpaka::PltfHost>(0u),
-              static_cast<TSize>(1u)))
+    FramePackage(std::size_t numFrames,
+                 typename TAlpaka::DevHost host =
+                     alpaka::pltf::getDevByIdx<typename TAlpaka::PltfHost>(0u))
+        : numFrames(numFrames),
+          data(alpaka::mem::buf::alloc<T, TSize>(host, numFrames))
     {
     }
 };
@@ -107,7 +107,7 @@ void save_image(std::string path, TBuffer* data, std::size_t frame_number)
     img.open(path + ".txt");
     for (std::size_t j = 0; j < 512; j++) {
         for (std::size_t k = 0; k < 1024; k++) {
-            double h = double(data[frame_number].data[(j * 1024) + k] * 10);
+            double h = double(data[frame_number].data[(j * 1024) + k]);
             img << h << " ";
         }
         img << "\n";
