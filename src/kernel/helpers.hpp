@@ -98,3 +98,49 @@ copyCluster(TMap const& map, TThreadIndex const id, TCluster& cluster) -> void
         }
     }
 }
+
+template <typename TAcc,
+          typename TDetectorData,
+          typename TGainMap,
+          typename TPedestalMap,
+          typename TGainStageMap,
+          typename TEnergyMap,
+          typename TMaskMap,
+          typename TIndex
+          >
+ALPAKA_FN_ACC ALPAKA_FN_INLINE auto
+processInput(TAcc const& acc,
+              TDetectorData const& detectorData,
+              TGainMap const* const gainMaps,
+              TPedestalMap* const pedestalMaps,
+              TGainStageMap& gainStageMap,
+              TEnergyMap& energyMap,
+              TMaskMap* const mask,
+              TIndex const id) -> void
+{
+    // use masks to check whether the channel is valid or masked out
+    bool isValid = mask->data[id];
+
+    auto dataword = detectorData.data[id];
+    auto adc = getAdc(dataword);
+    
+    auto& gainStage = gainStageMap.data[id];
+    gainStage = getGainStage(dataword);
+
+    // first thread copies frame header to output maps
+    if (id == 0) {
+        copyFrameHeader(detectorData, energyMap);
+        copyFrameHeader(detectorData, gainStageMap);
+    }
+
+    const auto& pedestal = pedestalMaps[gainStage][id].mean;
+    const auto& gain = gainMaps[gainStage][id];
+
+    // calculate energy of current channel
+    auto& energy = energyMap.data[id];
+    energy = (adc - pedestal) / gain;
+
+    // set energy to zero if masked out
+    if (!isValid)
+        energy = 0;
+}

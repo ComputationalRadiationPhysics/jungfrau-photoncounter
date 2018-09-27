@@ -523,6 +523,7 @@ private:
                                 PEDEMAPS);
         nextFree.push_back(dev->id);
 
+        /*
         ConversionKernel conversionKernel;
         auto const conversion(
             alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
@@ -535,6 +536,7 @@ private:
                 alpaka::mem::view::getPtrNative(dev->energy),
                 dev->numMaps,
                 alpaka::mem::view::getPtrNative(dev->mask)));
+                */
 
         PhotonFinderKernel photonFinderKernel;
         auto const photonFinder(
@@ -547,7 +549,8 @@ private:
                 alpaka::mem::view::getPtrNative(dev->gainStage),
                 alpaka::mem::view::getPtrNative(dev->energy),
                 alpaka::mem::view::getPtrNative(dev->photon),
-                dev->numMaps));
+                dev->numMaps,
+                alpaka::mem::view::getPtrNative(dev->mask)));
         /*
         // TODO: uncomment summation
         SummationKernel summationKernel;
@@ -560,7 +563,7 @@ private:
                 dev->numMaps,
                 alpaka::mem::view::getPtrNative(dev->sum)));
         */
-        alpaka::queue::enqueue(dev->queue, conversion);
+        //alpaka::queue::enqueue(dev->queue, conversion);
         alpaka::queue::enqueue(dev->queue, photonFinder);
         // alpaka::queue::enqueue(dev->queue, summation);
 
