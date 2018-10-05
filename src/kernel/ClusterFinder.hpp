@@ -10,6 +10,7 @@ struct ClusterFinderKernel {
               typename TGainStageMap,
               typename TEnergyMap,
               typename TClusterArray,
+              typename TNumClusters,
               typename TMask,
               typename TNumFrames,
               typename TNumStdDevs
@@ -21,6 +22,7 @@ struct ClusterFinderKernel {
                                   TGainStageMap const* const gainStageMaps,
                                   TEnergyMap const* const energyMaps,
                                   TClusterArray* const clusterArray,
+                                  TNumClusters* const numClusters,
                                   TMask* const mask,
                                   TNumFrames const numFrames,
                                   TNumStdDevs const c = 5
@@ -46,6 +48,7 @@ struct ClusterFinderKernel {
                     energyMaps[i],
                     mask,
                     id);
+            
             auto adc = getAdc(detectorData[i].data[id]);
             const auto& gainStage = gainStageMaps[i].data[id];
             float sum;
@@ -58,7 +61,7 @@ struct ClusterFinderKernel {
                 // check cluster conditions
                 if ((energy > c * stddev || sum > n * c * stddev) 
                         && id == max) {
-                    auto& cluster = getClusterBuffer(acc, clusterArray);
+                  auto& cluster = getClusterBuffer(acc, clusterArray, numClusters);
                     copyCluster(energyMaps[i], id, cluster);
                 }
                 // check dark pixel condition

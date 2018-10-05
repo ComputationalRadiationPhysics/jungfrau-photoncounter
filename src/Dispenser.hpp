@@ -274,11 +274,12 @@ public:
 
     /**
      * Tries to download one data package.
-     * @param pointer to empty struct for photon and sum maps
+     * @param pointer to empty struct for photon and sum maps and cluster data
      * @return boolean indicating whether maps were downloaded or not
      */
     auto downloadData(FramePackage<PhotonMap, TAlpaka, TDim, TSize>& photon,
-                      FramePackage<PhotonSumMap, TAlpaka, TDim, TSize>& sum)
+                      FramePackage<PhotonSumMap, TAlpaka, TDim, TSize>& sum,
+                      ClusterArray<TAlpaka, TDim, TSize> &clusters)
         -> bool
     {
         std::lock_guard<std::mutex> lock(mutex);
@@ -292,13 +293,20 @@ public:
 
         photon.numFrames = dev->numMaps;
         alpaka::mem::view::copy(
-            dev->queue, dev->photonHost, dev->photon, dev->numMaps);
-        photon.data = dev->photonHost;
+            dev->queue, photon.data, dev->photon, dev->numMaps);
 
         sum.numFrames = dev->numMaps / SUM_FRAMES;
         alpaka::mem::view::copy(
-            dev->queue, dev->sumHost, dev->sum, (dev->numMaps / SUM_FRAMES));
-        sum.data = dev->sumHost;
+            dev->queue, sum.data, dev->sum, (dev->numMaps / SUM_FRAMES));
+
+        // download number of clusters
+        alpaka::mem::view::copy(
+            dev->queue, clusters.usedPinned, dev->numClusters, clusters.used);
+
+        // download actual clusters
+        clusters.used = alpaka::mem::view::getPtrNative(clusters.usedPinned)[0];
+        alpaka::mem::view::copy(
+            dev->queue, clusters.clusters, dev->cluster, clusters.used);
 
         alpaka::wait::wait(dev->queue, dev->event);
 
@@ -308,6 +316,51 @@ public:
         DEBUG("device " << dev->id << " freed");
 
         return true;
+    }
+  
+    /**
+     * Tries to download one energy package.
+     * WARNING: currently under construction
+     * @param pointer to empty struct for energy maps
+     * @return boolean indicating whether maps were downloaded or not
+     */
+    auto downloadEnergy(FramePackage<EnergyMap, TAlpaka, TDim, TSize>& energy/*,
+                      FramePackage<PhotonSumMap, TAlpaka, TDim, TSize>& sum,
+                      ClusterArray<TAlpaka, TDim, TSize> &clusters*/)
+        -> bool
+    {
+      //! @todo: implement this
+      /*        std::lock_guard<std::mutex> lock(mutex);
+        struct DeviceData<TAlpaka, TDim, TSize>* dev =
+            &Dispenser::devices[nextFree.front()];
+
+        // to keep frames in order only download if the longest running device
+        // has finished
+        if (dev->state != READY)
+            return false;
+
+        photon.numFrames = dev->numMaps;
+        alpaka::mem::view::copy(
+            dev->queue, photon.data, dev->photon, dev->numMaps);
+
+        sum.numFrames = dev->numMaps / SUM_FRAMES;
+        alpaka::mem::view::copy(
+            dev->queue, sum.data, dev->sum, (dev->numMaps / SUM_FRAMES));
+
+        //! |todo: continue here!!! asdf
+        //! @todo: find out, how much of data needs to be downloaded
+        //clusters.used = ???;
+        alpaka::mem::view::copy(
+            dev->queue, clusters.clusters, dev->cluster, clusters.used);
+
+        alpaka::wait::wait(dev->queue, dev->event);
+
+        dev->state = FREE;
+        nextFree.pop_front();
+        ringbuffer.push(dev);
+        DEBUG("device " << dev->id << " freed");
+*/
+        return false;
     }
 
     /**
@@ -523,7 +576,7 @@ private:
                                 PEDEMAPS);
         nextFree.push_back(dev->id);
 
-        /*
+        
         ConversionKernel conversionKernel;
         auto const conversion(
             alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
@@ -536,7 +589,6 @@ private:
                 alpaka::mem::view::getPtrNative(dev->energy),
                 dev->numMaps,
                 alpaka::mem::view::getPtrNative(dev->mask)));
-                */
 
         PhotonFinderKernel photonFinderKernel;
         auto const photonFinder(
@@ -551,8 +603,7 @@ private:
                 alpaka::mem::view::getPtrNative(dev->photon),
                 dev->numMaps,
                 alpaka::mem::view::getPtrNative(dev->mask)));
-        /*
-        // TODO: uncomment summation
+        
         SummationKernel summationKernel;
         auto const summation(
             alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
@@ -562,43 +613,26 @@ private:
                 SUM_FRAMES,
                 dev->numMaps,
                 alpaka::mem::view::getPtrNative(dev->sum)));
-        */
-        //alpaka::queue::enqueue(dev->queue, conversion);
+
+        ClusterFinderKernel clusterFinderKernel;
+        auto const clusterFinder(
+            alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
+                workdiv.workdiv,
+                clusterFinderKernel,
+                alpaka::mem::view::getPtrNative(dev->data),
+                alpaka::mem::view::getPtrNative(dev->gain),
+                alpaka::mem::view::getPtrNative(dev->pedestal),
+                alpaka::mem::view::getPtrNative(dev->gainStage),
+                alpaka::mem::view::getPtrNative(dev->energy),
+                alpaka::mem::view::getPtrNative(dev->cluster),
+                alpaka::mem::view::getPtrNative(dev->numClusters),
+                alpaka::mem::view::getPtrNative(dev->mask),
+                dev->numMaps));
+        
+        alpaka::queue::enqueue(dev->queue, conversion);
         alpaka::queue::enqueue(dev->queue, photonFinder);
-        // alpaka::queue::enqueue(dev->queue, summation);
-
-
-        alpaka::mem::view::copy(
-            dev->queue, dev->energyHost, dev->energy, DEV_FRAMES);
-
-        alpaka::mem::view::copy(
-            dev->queue, dev->photonHost, dev->photon, DEV_FRAMES);
-
-        alpaka::wait::wait(dev->queue); //! @todo: do we really have to wait????
-
-        unsigned long long d_ptr = (unsigned long long)data;
-        uint16_t uid = d_ptr;
-
-        save_image<DetectorData>(
-            static_cast<std::string>(std::to_string(dev->id) + "data" +
-                                     std::to_string(uid)),
-            data,
-            DEV_FRAMES - 1);
-
-        save_image<EnergyMap>(static_cast<std::string>(std::to_string(dev->id) +
-                                                       "energy" +
-                                                       std::to_string(uid)),
-                              alpaka::mem::view::getPtrNative(dev->energyHost),
-                              DEV_FRAMES - 1);
-
-        save_image<PhotonMap>(static_cast<std::string>(std::to_string(dev->id) +
-                                                       "photon" +
-                                                       std::to_string(uid)),
-                              alpaka::mem::view::getPtrNative(dev->photonHost),
-                              DEV_FRAMES - 1);
-
-        alpaka::wait::wait(dev->queue); //! @todo: do we really have to wait????
-
+        alpaka::queue::enqueue(dev->queue, summation);
+        alpaka::queue::enqueue(dev->queue, clusterFinder);
 
         // the event is used to wait for pedestal data
         alpaka::queue::enqueue(dev->queue, dev->event);

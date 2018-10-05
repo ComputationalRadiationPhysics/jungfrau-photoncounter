@@ -69,13 +69,14 @@ auto main() -> int
 
     FramePackage<PhotonMap, Accelerator, Dim, Size> photon(DEV_FRAMES);
     FramePackage<PhotonSumMap, Accelerator, Dim, Size> sum(DEV_FRAMES / SUM_FRAMES);
+    ClusterArray<Accelerator, Dim, Size> clusters;
     std::size_t offset = 0;
     std::size_t downloaded = 0;
 
     // process data maps
     while (downloaded < data.numFrames) {
         offset = dispenser->uploadData(data, offset);
-        if (dispenser->downloadData(photon, sum)) {
+        if (dispenser->downloadData(photon, sum, clusters)) {
           //! @todo: only correct if DEV_FRAMES were actually uploaded. 
             downloaded += DEV_FRAMES;
             DEBUG(downloaded << "/" << data.numFrames << " downloaded");

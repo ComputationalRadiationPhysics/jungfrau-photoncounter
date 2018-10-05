@@ -19,14 +19,16 @@ ALPAKA_FN_ACC ALPAKA_FN_INLINE auto getGainStage(TDataword dataword) -> uint8_t
 }
 
 template <typename TInputMap, typename TOutputMap>
-ALPAKA_FN_ACC ALPAKA_FN_INLINE auto copyFrameHeader(TInputMap const& src, TOutputMap& dst) -> void
+ALPAKA_FN_ACC ALPAKA_FN_INLINE auto copyFrameHeader(TInputMap const& src,
+                                                    TOutputMap& dst) -> void
 {
     dst.header = src.header;
 }
 
 template <typename TAcc, typename TAdcValue, typename TPedestal>
-ALPAKA_FN_ACC ALPAKA_FN_INLINE auto
-updatePedestal(const TAcc& acc, TAdcValue const adc, TPedestal& pedestal) -> void
+ALPAKA_FN_ACC ALPAKA_FN_INLINE auto updatePedestal(const TAcc& acc,
+                                                   TAdcValue const adc,
+                                                   TPedestal& pedestal) -> void
 {
     // online algorithm for variance by Welford
     auto& count = pedestal.count;
@@ -45,7 +47,8 @@ updatePedestal(const TAcc& acc, TAdcValue const adc, TPedestal& pedestal) -> voi
 }
 
 template <typename TThreadIndex>
-ALPAKA_FN_ACC ALPAKA_FN_INLINE auto indexQualifiesAsClusterCenter(TThreadIndex id) -> bool
+ALPAKA_FN_ACC ALPAKA_FN_INLINE auto
+indexQualifiesAsClusterCenter(TThreadIndex id) -> bool
 {
     constexpr auto n = CLUSTER_SIZE;
     return (id % DIMX >= n / 2 && id % DIMX <= DIMX - (n + 1) / 2 &&
@@ -54,9 +57,10 @@ ALPAKA_FN_ACC ALPAKA_FN_INLINE auto indexQualifiesAsClusterCenter(TThreadIndex i
 
 template <typename TMap, typename TThreadIndex, typename TSum>
 ALPAKA_FN_ACC ALPAKA_FN_INLINE auto findClusterSumAndMax(TMap const& map,
-                                        TThreadIndex const id,
-                                        TSum& sum,
-                                        TThreadIndex& max) -> void
+                                                         TThreadIndex const id,
+                                                         TSum& sum,
+                                                         TThreadIndex& max)
+    -> void
 {
     TThreadIndex it = 0;
     max = 0;
@@ -71,14 +75,16 @@ ALPAKA_FN_ACC ALPAKA_FN_INLINE auto findClusterSumAndMax(TMap const& map,
     }
 }
 
-template <typename TAcc, typename TClusterArray>
-ALPAKA_FN_ACC ALPAKA_FN_INLINE auto getClusterBuffer(TAcc const& acc,
-                                     TClusterArray* const clusterArray) -> TClusterArray&
+template <typename TAcc, typename TClusterArray, typename TNumClusters>
+ALPAKA_FN_ACC ALPAKA_FN_INLINE auto
+getClusterBuffer(TAcc const& acc,
+                 TClusterArray* const clusterArray,
+                 TNumClusters* const numClusters) -> TClusterArray&
 {
     // get next free index of buffer atomically
-    auto i = alpaka::atomic::atomicOp<alpaka::atomic::op::Add>(
-        acc, &clusterArray->size, 1);
-    return clusterArray->clusters[i];
+    auto i =
+        alpaka::atomic::atomicOp<alpaka::atomic::op::Add>(acc, numClusters, 1);
+    return clusterArray[i];
 }
 
 template <typename TMap, typename TThreadIndex, typename TCluster>
@@ -106,24 +112,23 @@ template <typename TAcc,
           typename TGainStageMap,
           typename TEnergyMap,
           typename TMaskMap,
-          typename TIndex
-          >
+          typename TIndex>
 ALPAKA_FN_ACC ALPAKA_FN_INLINE auto
 processInput(TAcc const& acc,
-              TDetectorData const& detectorData,
-              TGainMap const* const gainMaps,
-              TPedestalMap* const pedestalMaps,
-              TGainStageMap& gainStageMap,
-              TEnergyMap& energyMap,
-              TMaskMap* const mask,
-              TIndex const id) -> void
+             TDetectorData const& detectorData,
+             TGainMap const* const gainMaps,
+             TPedestalMap* const pedestalMaps,
+             TGainStageMap& gainStageMap,
+             TEnergyMap& energyMap,
+             TMaskMap* const mask,
+             TIndex const id) -> void
 {
     // use masks to check whether the channel is valid or masked out
     bool isValid = mask->data[id];
 
     auto dataword = detectorData.data[id];
     auto adc = getAdc(dataword);
-    
+
     auto& gainStage = gainStageMap.data[id];
     gainStage = getGainStage(dataword);
 

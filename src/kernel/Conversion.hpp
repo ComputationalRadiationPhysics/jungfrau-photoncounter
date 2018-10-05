@@ -34,28 +34,14 @@ struct ConversionKernel {
         bool isValid = mask->data[id];
 
         for (TNumFrames i = 0; i < numFrames; ++i) {
-            auto dataword = detectorData[i].data[id];
-            auto adc = getAdc(dataword);
-            
-            auto& gainStage = gainStageMaps[i].data[id];
-            gainStage = getGainStage(dataword);
-
-            // first thread copies frame header to output maps
-            if (id == 0) {
-                copyFrameHeader(detectorData[i], energyMaps[i]);
-                copyFrameHeader(detectorData[i], gainStageMaps[i]);
-            }
-
-            const auto& pedestal = pedestalMaps[gainStage][id].mean;
-            const auto& gain = gainMaps[gainStage][id];
-
-            // calculate energy of current channel
-            auto& energy = energyMaps[i].data[id];
-            energy = (adc - pedestal) / gain;
-
-            // set energy to zero if masked out
-            if (!isValid)
-                energy = 0;
+            processInput(acc, 
+                         detectorData[i], 
+                         gainMaps, 
+                         pedestalMaps, 
+                         gainStageMaps[i],
+                         energyMaps[i],
+                         mask,
+                         id);            
         }
     }
 };

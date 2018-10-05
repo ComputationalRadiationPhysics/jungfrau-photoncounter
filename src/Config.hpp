@@ -13,17 +13,23 @@ constexpr std::size_t FRAMESPERSTAGE_G2 = 999;
 constexpr std::size_t FRAME_HEADER_SIZE = 16;
 constexpr std::size_t DIMX = 1024;
 constexpr std::size_t DIMY = 512;
-constexpr std::size_t MAPSIZE = DIMX * DIMY;
-constexpr std::size_t SINGLEMAP = 1;
-constexpr std::size_t SUM_FRAMES = 100;
-constexpr std::size_t DEV_FRAMES = 1000;
+constexpr std::size_t SUM_FRAMES = 10;
+constexpr std::size_t DEV_FRAMES = 50;
 constexpr std::size_t PEDEMAPS = 3;
 constexpr std::size_t GAINMAPS = 3;
 constexpr float BEAMCONST = 6.2;
 constexpr float PHOTONCONST = (1. / 12.4);
-constexpr std::size_t MAXINT = std::numeric_limits<uint32_t>::max();
 constexpr int CLUSTER_SIZE = 3;
+
+// derived settings
+constexpr std::size_t MAPSIZE = DIMX * DIMY;
+constexpr std::size_t SINGLEMAP = 1;
+constexpr std::size_t MAXINT = std::numeric_limits<uint32_t>::max();
 constexpr char MASKED_VALUE = 4;
+//! @todo: verify this!!!
+constexpr uint64_t MAX_CLUSTER_NUM = (DIMX - CLUSTER_SIZE + 1) *
+                                     (DIMY - CLUSTER_SIZE + 1) /
+                                     ((CLUSTER_SIZE / 2) * (CLUSTER_SIZE / 2));
 
 struct FrameHeader {
     std::uint64_t frameNumber;
@@ -37,10 +43,10 @@ template <typename TData> struct Frame {
 
 struct Pedestal {
     std::size_t count;
-    float mean;
-    float m2;
-    float stddev;
-    float variance;
+    double mean;
+    double m2;
+    double stddev;
+    double variance;
 };
 
 struct Cluster {
@@ -50,9 +56,26 @@ struct Cluster {
     std::int32_t data[CLUSTER_SIZE * CLUSTER_SIZE];
 };
 
-struct ClusterArray {
+template <typename TAlpaka, typename TDim, typename TSize> struct ClusterArray {
     std::size_t used;
-    Cluster* clusters;
+  alpaka::mem::buf::Buf<typename TAlpaka::DevHost, std::size_t, TDim, TSize> usedPinned;
+    alpaka::mem::buf::Buf<typename TAlpaka::DevHost, Cluster, TDim, TSize>
+        clusters;
+
+    ClusterArray(std::size_t maxClusterCount = MAX_CLUSTER_NUM * DEV_FRAMES,
+                 typename TAlpaka::DevHost host =
+                     alpaka::pltf::getDevByIdx<typename TAlpaka::PltfHost>(0u))
+        : used(0),
+          usedPinned(
+              alpaka::mem::buf::alloc<Cluster, TSize>(host, SINGLEMAP))
+          clusters(
+              alpaka::mem::buf::alloc<Cluster, TSize>(host, maxClusterCount))
+    {
+        alpaka::mem::buf::pin(usedPinned);
+        alpaka::mem::buf::pin(clusters);
+
+        alpaka::mem::view::getPtrNative(usedPinned)[0] = used;
+    }
 };
 
 template <typename T, typename TAlpaka, typename TDim, typename TSize>
@@ -66,16 +89,17 @@ struct FramePackage {
         : numFrames(numFrames),
           data(alpaka::mem::buf::alloc<T, TSize>(host, numFrames))
     {
+        alpaka::mem::buf::pin(data);
     }
 };
 
 using DetectorData = Frame<std::uint16_t>;
 using PhotonMap = DetectorData;
 using PhotonSumMap = Frame<std::uint64_t>;
-using DriftMap = Frame<std::uint32_t>;
+using DriftMap = Frame<double>;
 using GainStageMap = Frame<char>;
 using MaskMap = Frame<bool>;
-using EnergyMap = Frame<float>;
+using EnergyMap = Frame<double>;
 using GainMap = double[DIMX * DIMY];
 using PedestalMap = Pedestal[DIMX * DIMY];
 

@@ -4,14 +4,14 @@
 struct SummationKernel {
     template <typename TAcc,
               typename TData,
-              typename TAmount,
-              typename TNum,
-              typename TSum>
+              typename TNumFrames,
+              typename TNumSumFrames,
+              typename TSumMap>
     ALPAKA_FN_ACC auto operator()(TAcc const& acc,
                                   TData const* const data,
-                                  TAmount const amount,
-                                  TNum const num,
-                                  TSum* const sum) const -> void
+                                  TNumFrames const numFrames,
+                                  TNumSumFrames const numSumFrames,
+                                  TSumMap* const sum) const -> void
     {
         auto const globalThreadIdx =
             alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc);
@@ -23,8 +23,8 @@ struct SummationKernel {
 
         auto id = linearizedGlobalThreadIdx[0u];
 
-        for (decltype(id) i = 0; i < num; ++i) {
-            sum[i / amount].imagedata[id] += data[i].imagedata[id];
+        for (TNumFrames i = 0; i < numFrames; ++i) {
+            sum[i / numSumFrames].data[id] += data[i].data[id];
         }
     }
 };

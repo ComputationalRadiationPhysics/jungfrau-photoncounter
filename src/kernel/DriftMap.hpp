@@ -20,7 +20,7 @@ struct DriftMapKernel {
             alpaka::idx::mapIdx<1u>(globalThreadIdx, globalThreadExtent);
 
         auto id = linearizedGlobalThreadIdx[0u];
-
+        
         driftMaps->data[id] = pedestalMaps[0][id].mean - initialPedestalMaps[0][id].mean;
     }
 };

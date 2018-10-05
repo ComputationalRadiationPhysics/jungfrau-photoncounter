@@ -28,7 +28,7 @@ template <typename TAlpaka, typename TDim, typename TSize> struct DeviceData {
 
     alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, PedestalMap, TDim, TSize>
         initialPedestal;
-  
+
     alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, PedestalMap, TDim, TSize>
         pedestal;
 
@@ -55,18 +55,11 @@ template <typename TAlpaka, typename TDim, typename TSize> struct DeviceData {
     alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, PhotonSumMap, TDim, TSize>
         sum;
 
-    // host maps
-    alpaka::mem::buf::Buf<typename TAlpaka::DevHost, PhotonMap, TDim, TSize>
-        photonHost;
-
-    alpaka::mem::buf::Buf<typename TAlpaka::DevHost, PhotonSumMap, TDim, TSize>
-        sumHost;
-
-    alpaka::mem::buf::Buf<typename TAlpaka::DevHost, EnergyMap, TDim, TSize>
-        maxValueHost;
-
-    alpaka::mem::buf::Buf<typename TAlpaka::DevHost, EnergyMap, TDim, TSize>
-        energyHost;
+    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, Cluster, TDim, TSize>
+        cluster;
+  
+  alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, std::size_t, TDim, TSize>
+        numClusters;
 
     DeviceData(std::size_t id,
                typename TAlpaka::DevAcc device,
@@ -96,34 +89,25 @@ template <typename TAlpaka, typename TDim, typename TSize> struct DeviceData {
           sum(alpaka::mem::buf::alloc<PhotonSumMap, TSize>(device,
                                                            numMaps /
                                                                SUM_FRAMES)),
-          maxValueHost(
-              alpaka::mem::buf::alloc<EnergyMap, TSize>(host, SINGLEMAP)),
-          photonHost(alpaka::mem::buf::alloc<PhotonMap, TSize>(host, numMaps)),
-          sumHost(alpaka::mem::buf::alloc<PhotonSumMap, TSize>(host,
-                                                               numMaps /
-                                                                   SUM_FRAMES)),
-          energyHost(alpaka::mem::buf::alloc<EnergyMap, TSize>(host, numMaps))
+          cluster(alpaka::mem::buf::alloc<Cluster, TSize>(device,
+                                                          MAX_CLUSTER_NUM *
+                                                              numMaps)),
+          numClusters(alpaka::mem::buf::alloc<std::size_t, TSize>(device,
+                                                          SINGLEMAP))
     {
-#ifdef ALPAKA_ACC_GPU_CUDA_ENABLED
-#if (SHOW_DEBUG == false)
         // pin all buffer
-        alpaka::mem::buf::pin(devices[num].data);
-        alpaka::mem::buf::pin(devices[num].gain);
-        alpaka::mem::buf::pin(devices[num].initialPedestal);
-        alpaka::mem::buf::pin(devices[num].pedestal);
-        alpaka::mem::buf::pin(devices[num].mask);
-        alpaka::mem::buf::pin(devices[num].drift);
-        alpaka::mem::buf::pin(devices[num].gainStage);
-        alpaka::mem::buf::pin(devices[num].energy);
-        alpaka::mem::buf::pin(devices[num].maxValue);
-        alpaka::mem::buf::pin(devices[num].photon);
-        alpaka::mem::buf::pin(devices[num].sum);
-        alpaka::mem::buf::pin(devices[num].photonHost);
-        alpaka::mem::buf::pin(devices[num].sumHost);
-        alpaka::mem::buf::pin(devices[num].maxValueHost);
-        alpaka::mem::buf::pin(devices[num].energyHost);
-        alpaka::mem::buf::pin(devices[num].gainStageHost);
-#endif
-#endif
+        alpaka::mem::buf::pin(data);
+        alpaka::mem::buf::pin(gain);
+        alpaka::mem::buf::pin(initialPedestal);
+        alpaka::mem::buf::pin(pedestal);
+        alpaka::mem::buf::pin(mask);
+        alpaka::mem::buf::pin(drift);
+        alpaka::mem::buf::pin(gainStage);
+        alpaka::mem::buf::pin(energy);
+        alpaka::mem::buf::pin(maxValue);
+        alpaka::mem::buf::pin(photon);
+        alpaka::mem::buf::pin(sum);
+        alpaka::mem::buf::pin(cluster);
+        alpaka::mem::buf::pin(numClusters);
     }
 };
