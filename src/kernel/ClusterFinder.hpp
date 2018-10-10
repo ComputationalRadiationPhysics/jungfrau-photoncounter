@@ -49,6 +49,7 @@ struct ClusterFinderKernel {
                     mask,
                     id);
             
+            alpaka::block::sync::syncBlockThreads(acc);
             auto adc = getAdc(detectorData[i].data[id]);
             const auto& gainStage = gainStageMaps[i].data[id];
             float sum;
