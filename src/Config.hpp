@@ -58,7 +58,8 @@ struct Cluster {
 
 template <typename TAlpaka, typename TDim, typename TSize> struct ClusterArray {
     std::size_t used;
-  alpaka::mem::buf::Buf<typename TAlpaka::DevHost, std::size_t, TDim, TSize> usedPinned;
+    alpaka::mem::buf::Buf<typename TAlpaka::DevHost, unsigned long long, TDim, TSize>
+        usedPinned;
     alpaka::mem::buf::Buf<typename TAlpaka::DevHost, Cluster, TDim, TSize>
         clusters;
 
@@ -67,7 +68,7 @@ template <typename TAlpaka, typename TDim, typename TSize> struct ClusterArray {
                      alpaka::pltf::getDevByIdx<typename TAlpaka::PltfHost>(0u))
         : used(0),
           usedPinned(
-              alpaka::mem::buf::alloc<Cluster, TSize>(host, SINGLEMAP))
+              alpaka::mem::buf::alloc<unsigned long long, TSize>(host, SINGLEMAP)),
           clusters(
               alpaka::mem::buf::alloc<Cluster, TSize>(host, maxClusterCount))
     {

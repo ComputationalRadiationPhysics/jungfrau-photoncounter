@@ -30,9 +30,6 @@ struct ConversionKernel {
 
         auto id = linearizedGlobalThreadIdx[0u];
 
-        // use masks to check whether the channel is valid or masked out
-        bool isValid = mask->data[id];
-
         for (TNumFrames i = 0; i < numFrames; ++i) {
             processInput(acc, 
                          detectorData[i], 

@@ -7,7 +7,7 @@
  * only change this line to change the backend
  * see Alpakaconfig.hpp for all available
  */
-using Accelerator = GpuCudaRt;
+using Accelerator = CpuSerial;//GpuCudaRt;
 
 auto main() -> int
 {

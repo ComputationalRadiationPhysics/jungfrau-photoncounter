@@ -10,6 +10,7 @@
 #include "kernel/DriftMap.hpp"
 #include "kernel/GainStageMasking.hpp"
 #include "kernel/PhotonFinder.hpp"
+#include "kernel/Reduction.hpp"
 #include "kernel/Summation.hpp"
 
 #include <boost/optional.hpp>
@@ -279,8 +280,7 @@ public:
      */
     auto downloadData(FramePackage<PhotonMap, TAlpaka, TDim, TSize>& photon,
                       FramePackage<PhotonSumMap, TAlpaka, TDim, TSize>& sum,
-                      ClusterArray<TAlpaka, TDim, TSize> &clusters)
-        -> bool
+                      ClusterArray<TAlpaka, TDim, TSize>& clusters) -> bool
     {
         std::lock_guard<std::mutex> lock(mutex);
         struct DeviceData<TAlpaka, TDim, TSize>* dev =
@@ -317,20 +317,16 @@ public:
 
         return true;
     }
-  
+
     /**
      * Tries to download one energy package.
-     * WARNING: currently under construction
      * @param pointer to empty struct for energy maps
      * @return boolean indicating whether maps were downloaded or not
      */
-    auto downloadEnergy(FramePackage<EnergyMap, TAlpaka, TDim, TSize>& energy/*,
-                      FramePackage<PhotonSumMap, TAlpaka, TDim, TSize>& sum,
-                      ClusterArray<TAlpaka, TDim, TSize> &clusters*/)
+    auto downloadEnergy(FramePackage<EnergyMap, TAlpaka, TDim, TSize>& energy)
         -> bool
     {
-      //! @todo: implement this
-      /*        std::lock_guard<std::mutex> lock(mutex);
+        std::lock_guard<std::mutex> lock(mutex);
         struct DeviceData<TAlpaka, TDim, TSize>* dev =
             &Dispenser::devices[nextFree.front()];
 
@@ -339,19 +335,9 @@ public:
         if (dev->state != READY)
             return false;
 
-        photon.numFrames = dev->numMaps;
+        energy.numFrames = dev->numMaps;
         alpaka::mem::view::copy(
-            dev->queue, photon.data, dev->photon, dev->numMaps);
-
-        sum.numFrames = dev->numMaps / SUM_FRAMES;
-        alpaka::mem::view::copy(
-            dev->queue, sum.data, dev->sum, (dev->numMaps / SUM_FRAMES));
-
-        //! |todo: continue here!!! asdf
-        //! @todo: find out, how much of data needs to be downloaded
-        //clusters.used = ???;
-        alpaka::mem::view::copy(
-            dev->queue, clusters.clusters, dev->cluster, clusters.used);
+            dev->queue, energy.data, dev->energy, dev->numMaps);
 
         alpaka::wait::wait(dev->queue, dev->event);
 
@@ -359,8 +345,8 @@ public:
         nextFree.pop_front();
         ringbuffer.push(dev);
         DEBUG("device " << dev->id << " freed");
-*/
-        return false;
+
+        return true;
     }
 
     /**
@@ -575,7 +561,6 @@ private:
                                 devices[nextFree.back()].pedestal,
                                 PEDEMAPS);
         nextFree.push_back(dev->id);
-
         
         ConversionKernel conversionKernel;
         auto const conversion(
@@ -603,6 +588,24 @@ private:
                 alpaka::mem::view::getPtrNative(dev->photon),
                 dev->numMaps,
                 alpaka::mem::view::getPtrNative(dev->mask)));
+
+        WorkDiv workdivRun1{TAlpaka::blocksPerGrid, TAlpaka::threadsPerBlock, static_cast<Size>(1)};
+        ReduceKernel<TAlpaka::threadsPerBlock, double> reduceKernelRun1;
+        auto const reduceRun1(alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
+            workdivRun1,
+            reduceKernelRun1,
+            alpaka::mem::view::getPtrNative(dev->energy),
+            alpaka::mem::view::getPtrNative(dev->maxValue),
+            DIMX * DIMY));
+
+        WorkDiv workdivRun2{static_cast<Size>(1), TAlpaka::threadsPerBlock, static_cast<Size>(1)};
+        ReduceKernel<TAlpaka::threadsPerBlock, double> reduceKernelRun2;
+        auto const reduceRun2(alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
+            workdivRun2,
+            reduceKernelRun2,
+            alpaka::mem::view::getPtrNative(dev->maxValue),
+            alpaka::mem::view::getPtrNative(dev->maxValue),
+            TAlpaka::blocksPerGrid));
         
         SummationKernel summationKernel;
         auto const summation(
@@ -628,9 +631,11 @@ private:
                 alpaka::mem::view::getPtrNative(dev->numClusters),
                 alpaka::mem::view::getPtrNative(dev->mask),
                 dev->numMaps));
-        
+
         alpaka::queue::enqueue(dev->queue, conversion);
         alpaka::queue::enqueue(dev->queue, photonFinder);
+        alpaka::queue::enqueue(dev->queue, reduceRun1);
+        alpaka::queue::enqueue(dev->queue, reduceRun2);
         alpaka::queue::enqueue(dev->queue, summation);
         alpaka::queue::enqueue(dev->queue, clusterFinder);
 

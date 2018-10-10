@@ -57,9 +57,10 @@ template <typename TAlpaka, typename TDim, typename TSize> struct DeviceData {
 
     alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, Cluster, TDim, TSize>
         cluster;
-  
-  alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, std::size_t, TDim, TSize>
-        numClusters;
+
+    alpaka::mem::buf::
+        Buf<typename TAlpaka::DevAcc, unsigned long long, TDim, TSize>
+            numClusters;
 
     DeviceData(std::size_t id,
                typename TAlpaka::DevAcc device,
@@ -92,8 +93,9 @@ template <typename TAlpaka, typename TDim, typename TSize> struct DeviceData {
           cluster(alpaka::mem::buf::alloc<Cluster, TSize>(device,
                                                           MAX_CLUSTER_NUM *
                                                               numMaps)),
-          numClusters(alpaka::mem::buf::alloc<std::size_t, TSize>(device,
-                                                          SINGLEMAP))
+          numClusters(
+              alpaka::mem::buf::alloc<unsigned long long, TSize>(device,
+                                                                 SINGLEMAP))
     {
         // pin all buffer
         alpaka::mem::buf::pin(data);
@@ -109,5 +111,8 @@ template <typename TAlpaka, typename TDim, typename TSize> struct DeviceData {
         alpaka::mem::buf::pin(sum);
         alpaka::mem::buf::pin(cluster);
         alpaka::mem::buf::pin(numClusters);
+
+        // set cluster counter to 0
+        alpaka::mem::view::set(queue, numClusters, 0, SINGLEMAP);
     }
 };

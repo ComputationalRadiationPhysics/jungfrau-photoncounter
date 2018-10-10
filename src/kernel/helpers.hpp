@@ -83,7 +83,7 @@ getClusterBuffer(TAcc const& acc,
 {
     // get next free index of buffer atomically
     auto i =
-        alpaka::atomic::atomicOp<alpaka::atomic::op::Add>(acc, numClusters, 1);
+    alpaka::atomic::atomicOp<alpaka::atomic::op::Add>(acc, numClusters, static_cast<TNumClusters>(1));
     return clusterArray[i];
 }
 
@@ -100,7 +100,8 @@ copyCluster(TMap const& map, TThreadIndex const id, TCluster& cluster) -> void
     for (int y = -n / 2; y < (n + 1) / 2; ++y) {
         for (int x = -n / 2; x < (n + 1) / 2; ++x) {
             it = id + y * DIMX + x;
-            cluster.data[i++] = map[it];
+            auto tmp = map.data[it];
+            cluster.data[i++] = tmp;
         }
     }
 }
