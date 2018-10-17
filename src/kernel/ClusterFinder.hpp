@@ -13,8 +13,7 @@ struct ClusterFinderKernel {
               typename TNumClusters,
               typename TMask,
               typename TNumFrames,
-              typename TNumStdDevs = int
-              >
+              typename TNumStdDevs = int>
     ALPAKA_FN_ACC auto operator()(TAcc const& acc,
                                   TDetectorData const* const detectorData,
                                   TGainMap const* const gainMaps,
@@ -25,8 +24,7 @@ struct ClusterFinderKernel {
                                   TNumClusters* const numClusters,
                                   TMask* const mask,
                                   TNumFrames const numFrames,
-                                  TNumStdDevs const c = 5
-                                  ) const -> void
+                                  TNumStdDevs const c = 5) const -> void
     {
         auto const globalThreadIdx =
             alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc);
@@ -38,18 +36,22 @@ struct ClusterFinderKernel {
 
         auto id = linearizedGlobalThreadIdx[0u];
 
+        if (id == 0)
+            numClusters[0] = 0;
+
         constexpr auto n = CLUSTER_SIZE;
         for (TNumFrames i = 0; i < numFrames; ++i) {
             processInput(acc,
-                    detectorData[i],
-                    gainMaps,
-                    pedestalMaps,
-                    gainStageMaps[i],
-                    energyMaps[i],
-                    mask,
-                    id);
-            
+                         detectorData[i],
+                         gainMaps,
+                         pedestalMaps,
+                         gainStageMaps[i],
+                         energyMaps[i],
+                         mask,
+                         id);
+
             alpaka::block::sync::syncBlockThreads(acc);
+
             auto adc = getAdc(detectorData[i].data[id]);
             const auto& gainStage = gainStageMaps[i].data[id];
             float sum;
@@ -58,14 +60,18 @@ struct ClusterFinderKernel {
             const auto& stddev = pedestalMaps[gainStage][id].stddev;
             if (indexQualifiesAsClusterCenter(id)) {
                 findClusterSumAndMax(energyMaps[i].data, id, sum, max);
+
                 // check cluster conditions
-                if ((energy > c * stddev || sum > n * c * stddev) 
-                        && id == max) {
-                  auto& cluster = getClusterBuffer(acc, clusterArray, numClusters);
+                if ((energy > c * stddev || sum > n * c * stddev) &&
+                    id == max) {
+                    auto& cluster =
+                        getClusterBuffer(acc, clusterArray, numClusters);
                     copyCluster(energyMaps[i], id, cluster);
                 }
+
                 // check dark pixel condition
                 else if (-c * stddev <= energy && c * stddev >= energy) {
+                    //! @todo: clustercheck correct???
                     updatePedestal(acc, adc, pedestalMaps[gainStage][id]);
                 }
             }

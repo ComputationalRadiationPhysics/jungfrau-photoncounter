@@ -83,14 +83,7 @@ auto main() -> int
         }
     }
     
-    /*
-    save_image<PedestalMap>(
-        static_cast<std::string>(std::to_string(dev->id) + "pedestal" +
-                                 std::to_string(std::rand() % 1000)),
-        alpaka::mem::view::getPtrNative(dev->energyHost),
-        DEV_FRAMES - 1);
-    */
-
+    saveClusters("clusters.bin", clusters);
 
     GainStageMap* gainStage = dispenser->downloadGainStages();
     save_image<GainStageMap>("gainstage", gainStage, 0);

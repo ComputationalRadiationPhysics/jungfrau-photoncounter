@@ -301,15 +301,27 @@ public:
 
         // download number of clusters
         alpaka::mem::view::copy(
-            dev->queue, clusters.usedPinned, dev->numClusters, clusters.used);
+            dev->queue, clusters.usedPinned, dev->numClusters, SINGLEMAP);
 
+        alpaka::wait::wait(dev->queue);
+        
         // download actual clusters
         clusters.used = alpaka::mem::view::getPtrNative(clusters.usedPinned)[0];
+
+        DEBUG("downloaded " << clusters.used << " clusters");
+
+
+        
+        DEBUG("max value: " << "not implemented yet");
+
+
+
+        
         alpaka::mem::view::copy(
             dev->queue, clusters.clusters, dev->cluster, clusters.used);
 
-        alpaka::wait::wait(dev->queue, dev->event);
-
+        alpaka::wait::wait(dev->queue);
+        
         dev->state = FREE;
         nextFree.pop_front();
         ringbuffer.push(dev);

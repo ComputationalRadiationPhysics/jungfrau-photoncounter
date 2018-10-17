@@ -58,8 +58,9 @@ struct Cluster {
 
 template <typename TAlpaka, typename TDim, typename TSize> struct ClusterArray {
     std::size_t used;
-    alpaka::mem::buf::Buf<typename TAlpaka::DevHost, unsigned long long, TDim, TSize>
-        usedPinned;
+    alpaka::mem::buf::
+        Buf<typename TAlpaka::DevHost, unsigned long long, TDim, TSize>
+            usedPinned;
     alpaka::mem::buf::Buf<typename TAlpaka::DevHost, Cluster, TDim, TSize>
         clusters;
 
@@ -68,7 +69,8 @@ template <typename TAlpaka, typename TDim, typename TSize> struct ClusterArray {
                      alpaka::pltf::getDevByIdx<typename TAlpaka::PltfHost>(0u))
         : used(0),
           usedPinned(
-              alpaka::mem::buf::alloc<unsigned long long, TSize>(host, SINGLEMAP)),
+              alpaka::mem::buf::alloc<unsigned long long, TSize>(host,
+                                                                 SINGLEMAP)),
           clusters(
               alpaka::mem::buf::alloc<Cluster, TSize>(host, maxClusterCount))
     {
@@ -121,9 +123,38 @@ static Clock::time_point t;
 #define DEBUG(msg)
 #endif
 
+template<typename TAlpaka, typename TDim, typename TSize>
+void saveClusters(std::string path, ClusterArray<TAlpaka, TDim, TSize> &clusters)
+{
 #if (SHOW_DEBUG)
-#include "Bitmap.hpp"
+    std::ofstream clusterFile;
+    clusterFile.open(path);
+    clusterFile << clusters.used << "\n";
+    Cluster* clusterPtr = alpaka::mem::view::getPtrNative(clusters.clusters);
+
+    DEBUG("writing " << clusters.used << " clusters");
+    
+    for (uint64_t i = 0; i < clusters.used; ++i) {
+      // write cluster information
+        clusterFile << clusterPtr[i].frameNumber << " "
+                    << clusterPtr[i].x << " " << clusterPtr[i].y
+                    << " ";
+
+        // write cluster
+        for (uint8_t y = 0; y < CLUSTER_SIZE; ++y) {
+            for (uint8_t x = 0; x < CLUSTER_SIZE; ++x) {
+                clusterFile << clusterPtr[i].data[x + y * CLUSTER_SIZE]
+                            << " ";
+            }
+
+            clusterFile << "\n";
+        }
+    }
+
+    clusterFile.close();
 #endif
+}
+
 template <typename TBuffer>
 void save_image(std::string path, TBuffer* data, std::size_t frame_number)
 {
