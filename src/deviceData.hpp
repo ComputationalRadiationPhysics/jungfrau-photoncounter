@@ -47,7 +47,10 @@ template <typename TAlpaka, typename TDim, typename TSize> struct DeviceData {
         energy;
 
     alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, EnergyMap, TDim, TSize>
-        maxValue;
+        maxValueMaps;
+  
+    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, EnergyValue, TDim, TSize>
+        maxValues;
 
     alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, PhotonMap, TDim, TSize>
         photon;
@@ -83,7 +86,8 @@ template <typename TAlpaka, typename TDim, typename TSize> struct DeviceData {
               alpaka::mem::buf::alloc<GainStageMap, TSize>(device, numMaps)),
           gainStageOutput(
               alpaka::mem::buf::alloc<GainStageMap, TSize>(device, SINGLEMAP)),
-          maxValue(alpaka::mem::buf::alloc<EnergyMap, TSize>(device, numMaps)),
+          maxValueMaps(alpaka::mem::buf::alloc<EnergyMap, TSize>(device, numMaps)),
+          maxValues(alpaka::mem::buf::alloc<EnergyValue, TSize>(device, numMaps)),
           energy(alpaka::mem::buf::alloc<EnergyMap, TSize>(device, numMaps)),
           mask(alpaka::mem::buf::alloc<MaskMap, TSize>(device, SINGLEMAP)),
           photon(alpaka::mem::buf::alloc<PhotonMap, TSize>(device, numMaps)),
@@ -106,7 +110,8 @@ template <typename TAlpaka, typename TDim, typename TSize> struct DeviceData {
         alpaka::mem::buf::pin(drift);
         alpaka::mem::buf::pin(gainStage);
         alpaka::mem::buf::pin(energy);
-        alpaka::mem::buf::pin(maxValue);
+        alpaka::mem::buf::pin(maxValueMaps);
+        alpaka::mem::buf::pin(maxValues);
         alpaka::mem::buf::pin(photon);
         alpaka::mem::buf::pin(sum);
         alpaka::mem::buf::pin(cluster);

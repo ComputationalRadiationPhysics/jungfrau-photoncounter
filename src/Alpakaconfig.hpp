@@ -199,6 +199,7 @@ struct GpuCudaRt {
 
     const std::size_t STREAMS_PER_DEV = 1;
 
+  //! @todo: check element layer
     static constexpr Size elementsPerThread = 4u;
     static constexpr Size threadsPerBlock = 1024u;
     static constexpr Size blocksPerGrid = 512u;

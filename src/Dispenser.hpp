@@ -12,6 +12,7 @@
 #include "kernel/PhotonFinder.hpp"
 #include "kernel/Reduction.hpp"
 #include "kernel/Summation.hpp"
+#include "kernel/MaxValueCopy.hpp"
 
 #include <boost/optional.hpp>
 
@@ -38,6 +39,8 @@ public:
           drift(alpaka::mem::buf::alloc<DriftMap, TSize>(host, SINGLEMAP)),
           gainStage(
               alpaka::mem::buf::alloc<GainStageMap, TSize>(host, SINGLEMAP)),
+          maxValueMaps(
+              alpaka::mem::buf::alloc<EnergyMap, TSize>(host, DEV_FRAMES)),
           workdiv(TAlpaka()),
           init(false),
           ringbuffer(workdiv.STREAMS_PER_DEV *
@@ -278,9 +281,11 @@ public:
      * @param pointer to empty struct for photon and sum maps and cluster data
      * @return boolean indicating whether maps were downloaded or not
      */
-    auto downloadData(FramePackage<PhotonMap, TAlpaka, TDim, TSize>& photon,
-                      FramePackage<PhotonSumMap, TAlpaka, TDim, TSize>& sum,
-                      ClusterArray<TAlpaka, TDim, TSize>& clusters) -> bool
+    auto
+    downloadData(FramePackage<PhotonMap, TAlpaka, TDim, TSize>& photon,
+                 FramePackage<PhotonSumMap, TAlpaka, TDim, TSize>& sum,
+                 FramePackage<EnergyValue, TAlpaka, TDim, TSize>& maxValues,
+                 ClusterArray<TAlpaka, TDim, TSize>& clusters) -> bool
     {
         std::lock_guard<std::mutex> lock(mutex);
         struct DeviceData<TAlpaka, TDim, TSize>* dev =
@@ -303,29 +308,24 @@ public:
         alpaka::mem::view::copy(
             dev->queue, clusters.usedPinned, dev->numClusters, SINGLEMAP);
 
+        // download maximum values
+        alpaka::mem::view::copy(
+            dev->queue, maxValues.data, dev->maxValues, DEV_FRAMES);
+
+        // wait for completion of copy operations
         alpaka::wait::wait(dev->queue);
-        
+
         // download actual clusters
         clusters.used = alpaka::mem::view::getPtrNative(clusters.usedPinned)[0];
 
-        DEBUG("downloaded " << clusters.used << " clusters");
-
-
-        
-        DEBUG("max value: " << "not implemented yet");
-
-
-
-        
         alpaka::mem::view::copy(
             dev->queue, clusters.clusters, dev->cluster, clusters.used);
 
         alpaka::wait::wait(dev->queue);
-        
+
         dev->state = FREE;
         nextFree.pop_front();
         ringbuffer.push(dev);
-        DEBUG("device " << dev->id << " freed");
 
         return true;
     }
@@ -397,6 +397,10 @@ private:
         drift;
     alpaka::mem::buf::Buf<typename TAlpaka::DevHost, GainStageMap, TDim, TSize>
         gainStage;
+    alpaka::mem::buf::Buf<typename TAlpaka::DevHost, EnergyMap, TDim, TSize>
+        maxValueMaps;
+
+    //! @todo: is this even used anywhere??
     FramePackage<PedestalMap, TAlpaka, TDim, TSize> pedestal;
 
     TAlpaka workdiv;
@@ -573,7 +577,10 @@ private:
                                 devices[nextFree.back()].pedestal,
                                 PEDEMAPS);
         nextFree.push_back(dev->id);
-        
+
+        // reset the number of clusters
+        alpaka::mem::view::set(dev->queue, dev->numClusters, 0, SINGLEMAP);
+
         ConversionKernel conversionKernel;
         auto const conversion(
             alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
@@ -601,24 +608,51 @@ private:
                 dev->numMaps,
                 alpaka::mem::view::getPtrNative(dev->mask)));
 
-        WorkDiv workdivRun1{TAlpaka::blocksPerGrid, TAlpaka::threadsPerBlock, static_cast<Size>(1)};
-        ReduceKernel<TAlpaka::threadsPerBlock, double> reduceKernelRun1;
-        auto const reduceRun1(alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
-            workdivRun1,
-            reduceKernelRun1,
-            alpaka::mem::view::getPtrNative(dev->energy),
-            alpaka::mem::view::getPtrNative(dev->maxValue),
-            DIMX * DIMY));
+        for (uint32_t i = 0; i < numMaps; ++i) {
+            // reduce all images
+            WorkDiv workdivRun1{TAlpaka::blocksPerGrid,
+                                TAlpaka::threadsPerBlock,
+                                static_cast<Size>(1)};
+            ReduceKernel<TAlpaka::threadsPerBlock, double> reduceKernelRun1;
+            auto const reduceRun1(
+                alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
+                    workdivRun1,
+                    reduceKernelRun1,
+                    &alpaka::mem::view::getPtrNative(dev->energy)[i],
+                    &alpaka::mem::view::getPtrNative(dev->maxValueMaps)[i],
+                    DIMX * DIMY));
 
-        WorkDiv workdivRun2{static_cast<Size>(1), TAlpaka::threadsPerBlock, static_cast<Size>(1)};
-        ReduceKernel<TAlpaka::threadsPerBlock, double> reduceKernelRun2;
-        auto const reduceRun2(alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
-            workdivRun2,
-            reduceKernelRun2,
-            alpaka::mem::view::getPtrNative(dev->maxValue),
-            alpaka::mem::view::getPtrNative(dev->maxValue),
-            TAlpaka::blocksPerGrid));
-        
+            WorkDiv workdivRun2{static_cast<Size>(1),
+                                TAlpaka::threadsPerBlock,
+                                static_cast<Size>(1)};
+            ReduceKernel<TAlpaka::threadsPerBlock, double> reduceKernelRun2;
+            auto const reduceRun2(
+                alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
+                    workdivRun2,
+                    reduceKernelRun2,
+                    &alpaka::mem::view::getPtrNative(dev->maxValueMaps)[i],
+                    &alpaka::mem::view::getPtrNative(dev->maxValueMaps)[i],
+                    TAlpaka::blocksPerGrid));
+            alpaka::queue::enqueue(dev->queue, reduceRun1);
+            alpaka::queue::enqueue(dev->queue, reduceRun2);
+        }
+
+        //! @todo: copy all results into one contineous  buffer
+        WorkDiv workdivMaxValueCopy{static_cast<Size>(std::ceil(
+                                (double)numMaps / TAlpaka::threadsPerBlock)),
+                            TAlpaka::threadsPerBlock,
+                            static_cast<Size>(1)};
+        MaxValueCopyKernel maxValueCopyKernel;
+        auto const maxValueCopy(
+            alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
+                workdivMaxValueCopy,
+                maxValueCopyKernel,
+                alpaka::mem::view::getPtrNative(dev->maxValueMaps),
+                alpaka::mem::view::getPtrNative(dev->maxValues),
+                numMaps));
+
+        alpaka::queue::enqueue(dev->queue, maxValueCopy);
+
         SummationKernel summationKernel;
         auto const summation(
             alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
@@ -629,27 +663,30 @@ private:
                 dev->numMaps,
                 alpaka::mem::view::getPtrNative(dev->sum)));
 
-        ClusterFinderKernel clusterFinderKernel;
-        auto const clusterFinder(
-            alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
-                workdiv.workdiv,
-                clusterFinderKernel,
-                alpaka::mem::view::getPtrNative(dev->data),
-                alpaka::mem::view::getPtrNative(dev->gain),
-                alpaka::mem::view::getPtrNative(dev->pedestal),
-                alpaka::mem::view::getPtrNative(dev->gainStage),
-                alpaka::mem::view::getPtrNative(dev->energy),
-                alpaka::mem::view::getPtrNative(dev->cluster),
-                alpaka::mem::view::getPtrNative(dev->numClusters),
-                alpaka::mem::view::getPtrNative(dev->mask),
-                dev->numMaps));
-
         alpaka::queue::enqueue(dev->queue, conversion);
         alpaka::queue::enqueue(dev->queue, photonFinder);
-        alpaka::queue::enqueue(dev->queue, reduceRun1);
-        alpaka::queue::enqueue(dev->queue, reduceRun2);
         alpaka::queue::enqueue(dev->queue, summation);
-        alpaka::queue::enqueue(dev->queue, clusterFinder);
+
+        for (uint32_t i = 0; i < numMaps + 1; ++i) {
+            // execute the clusterfinder with the pedestalupdate on every frame
+            ClusterFinderKernel clusterFinderKernel;
+            auto const clusterFinder(
+                alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
+                    workdiv.workdiv,
+                    clusterFinderKernel,
+                    alpaka::mem::view::getPtrNative(dev->data),
+                    alpaka::mem::view::getPtrNative(dev->gain),
+                    alpaka::mem::view::getPtrNative(dev->pedestal),
+                    alpaka::mem::view::getPtrNative(dev->gainStage),
+                    alpaka::mem::view::getPtrNative(dev->energy),
+                    alpaka::mem::view::getPtrNative(dev->cluster),
+                    alpaka::mem::view::getPtrNative(dev->numClusters),
+                    alpaka::mem::view::getPtrNative(dev->mask),
+                    dev->numMaps,
+                    i));
+
+            alpaka::queue::enqueue(dev->queue, clusterFinder);
+        }
 
         // the event is used to wait for pedestal data
         alpaka::queue::enqueue(dev->queue, dev->event);

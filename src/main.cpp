@@ -7,7 +7,7 @@
  * only change this line to change the backend
  * see Alpakaconfig.hpp for all available
  */
-using Accelerator = CpuSerial;//GpuCudaRt;
+using Accelerator = GpuCudaRt;//CpuSerial;
 
 auto main() -> int
 {
@@ -60,6 +60,7 @@ auto main() -> int
     if(mask.numFrames == SINGLEMAP)
       maskPtr = mask.data;
 
+    //! @todo: throw this new out
     Dispenser<Accelerator, Dim, Size>* dispenser =
       new Dispenser<Accelerator, Dim, Size>(gain, maskPtr);
 
@@ -70,13 +71,14 @@ auto main() -> int
     FramePackage<PhotonMap, Accelerator, Dim, Size> photon(DEV_FRAMES);
     FramePackage<PhotonSumMap, Accelerator, Dim, Size> sum(DEV_FRAMES / SUM_FRAMES);
     ClusterArray<Accelerator, Dim, Size> clusters;
+    FramePackage<EnergyValue, Accelerator, Dim, Size> maxValues(DEV_FRAMES);
     std::size_t offset = 0;
     std::size_t downloaded = 0;
 
     // process data maps
     while (downloaded < data.numFrames) {
         offset = dispenser->uploadData(data, offset);
-        if (dispenser->downloadData(photon, sum, clusters)) {
+        if (dispenser->downloadData(photon, sum, maxValues, clusters)) {
           //! @todo: only correct if DEV_FRAMES were actually uploaded. 
             downloaded += DEV_FRAMES;
             DEBUG(downloaded << "/" << data.numFrames << " downloaded");
@@ -90,6 +92,9 @@ auto main() -> int
 
     DriftMap* drift = dispenser->downloadDriftMaps();
     save_image<DriftMap>("driftmap", drift, 0);
+
+    for(uint32_t i = 0; i < maxValues.numFrames; ++i)
+      DEBUG("max value for frame " << i << ": " << alpaka::mem::view::getPtrNative(maxValues.data)[i]);
 
     
     auto sizes = dispenser->getMemSize();

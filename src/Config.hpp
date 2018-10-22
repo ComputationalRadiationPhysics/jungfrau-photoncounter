@@ -96,13 +96,14 @@ struct FramePackage {
     }
 };
 
+using EnergyValue = double;
 using DetectorData = Frame<std::uint16_t>;
 using PhotonMap = DetectorData;
 using PhotonSumMap = Frame<std::uint64_t>;
 using DriftMap = Frame<double>;
 using GainStageMap = Frame<char>;
 using MaskMap = Frame<bool>;
-using EnergyMap = Frame<double>;
+using EnergyMap = Frame<EnergyValue>;
 using GainMap = double[DIMX * DIMY];
 using PedestalMap = Pedestal[DIMX * DIMY];
 
