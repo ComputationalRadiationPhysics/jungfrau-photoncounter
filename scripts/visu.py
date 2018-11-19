@@ -1,8 +1,8 @@
 #!/bin/python
 
 # remove X11 dependecy
-import matplotlib as mpl
-mpl.use('Agg')
+#import matplotlib as mpl
+#mpl.use('Agg')
 
 from matplotlib import pyplot as plt
 from matplotlib import colors
@@ -23,6 +23,7 @@ for f in fileNames:
             plt.figure()
             plt.imshow(data, norm=colors.LogNorm(), origin='lower')
             plt.colorbar()
+            plt.show()
             plt.savefig('log/' + name + '.png')
             plt.close()
         except:

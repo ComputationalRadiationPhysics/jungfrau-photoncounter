@@ -580,7 +580,7 @@ private:
 
         // reset the number of clusters
         alpaka::mem::view::set(dev->queue, dev->numClusters, 0, SINGLEMAP);
-
+        /*
         ConversionKernel conversionKernel;
         auto const conversion(
             alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
@@ -593,7 +593,7 @@ private:
                 alpaka::mem::view::getPtrNative(dev->energy),
                 dev->numMaps,
                 alpaka::mem::view::getPtrNative(dev->mask)));
-
+        */
         PhotonFinderKernel photonFinderKernel;
         auto const photonFinder(
             alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
@@ -607,7 +607,7 @@ private:
                 alpaka::mem::view::getPtrNative(dev->photon),
                 dev->numMaps,
                 alpaka::mem::view::getPtrNative(dev->mask)));
-
+        /*
         for (uint32_t i = 0; i < numMaps; ++i) {
             // reduce all images
             WorkDiv workdivRun1{TAlpaka::blocksPerGrid,
@@ -664,7 +664,7 @@ private:
                 alpaka::mem::view::getPtrNative(dev->sum)));
 
         alpaka::queue::enqueue(dev->queue, conversion);
-        alpaka::queue::enqueue(dev->queue, photonFinder);
+        */alpaka::queue::enqueue(dev->queue, photonFinder);/*
         alpaka::queue::enqueue(dev->queue, summation);
 
         for (uint32_t i = 0; i < numMaps + 1; ++i) {
@@ -686,7 +686,7 @@ private:
                     i));
 
             alpaka::queue::enqueue(dev->queue, clusterFinder);
-        }
+        }*/
 
         // the event is used to wait for pedestal data
         alpaka::queue::enqueue(dev->queue, dev->event);
