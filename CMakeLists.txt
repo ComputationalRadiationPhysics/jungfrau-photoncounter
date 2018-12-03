@@ -38,8 +38,7 @@ endif()
 alpaka_add_executable(  
     ${_TARGET_NAME}
     src/main.cpp
-    src/Filecache.cpp
-    src/Bitmap.cpp)
+    src/Filecache.cpp)
 
 target_compile_options(
     ${_TARGET_NAME}
