@@ -1,8 +1,8 @@
 #!/bin/python
 
 # remove X11 dependecy
-import matplotlib as mpl
-mpl.use('Agg')
+#import matplotlib as mpl
+#mpl.use('Agg')
 
 from matplotlib import pyplot as plt
 from matplotlib import colors

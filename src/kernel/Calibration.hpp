@@ -42,7 +42,7 @@ struct CalibrationKernel {
             auto dataword = detectorData[i].data[id];
             auto adc = getAdc(dataword);
             uint8_t gainStage = getGainStage(dataword);
-            updatePedestal(acc, adc, pedestalMap[gainStage][id]);
+            initPedestal(acc, adc, pedestalMap[gainStage][id]);
             // mark pixel invalid if expected gainstage does not match
             if (expectedGainStage != gainStage) {
                 mask->data[id] = false;

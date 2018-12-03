@@ -18,7 +18,6 @@
 
 #include <iostream>
 #include <limits>
-#include <mutex>
 
 template <typename TAlpaka, typename TDim, typename TSize> class Dispenser {
 public:
@@ -106,7 +105,7 @@ public:
                 alpaka::mem::view::getPtrNative(data.data) + offset,
                 DEV_FRAMES);
             DEBUG(offset << "/" << data.numFrames
-                         << " pedestalframes uploaded");
+                  << " pedestalframes uploaded (1)");
         }
 
         // upload remaining frames
@@ -115,7 +114,7 @@ public:
                 alpaka::mem::view::getPtrNative(data.data) + offset,
                 data.numFrames % DEV_FRAMES);
             DEBUG(offset << "/" << data.numFrames
-                         << " pedestalframes uploaded");
+                         << " pedestalframes uploaded (2)");
         }
 
         distributeMaskMaps();
@@ -133,7 +132,9 @@ public:
 
         // create handle for the device with the current version of the pedestal
         // maps
-        auto current_device = devices[nextFree.back()];
+        auto current_device = devices[nextFree];
+        
+        DEBUG("downloading pedestaldata from device " << nextFree);
 
         // get the pedestal data from the device
         alpaka::mem::view::copy(current_device.queue,
@@ -142,7 +143,7 @@ public:
                                 PEDEMAPS);
 
         // wait for copy to finish
-        alpaka::wait::wait(current_device.queue, current_device.event);
+        alpaka::wait::wait(current_device.queue);
 
         pedestal.numFrames = PEDEMAPS;
 
@@ -159,7 +160,7 @@ public:
 
         // create handle for the device with the current version of the pedestal
         // maps
-        auto current_device = devices[nextFree.back()];
+        auto current_device = devices[nextFree];
 
         // get the pedestal data from the device
         alpaka::mem::view::copy(
@@ -172,6 +173,17 @@ public:
     }
 
     /**
+     * Flags alldevices as ready for download.
+     */
+    auto flush() -> void
+    {
+        DEBUG("flushing...");
+        synchronize();
+        for(auto & device : devices)
+          if(device.state != FREE)
+            device.state = READY;
+    }
+    /**
      * Downloads the current gain stage map.
      * @return gain stage map
      */
@@ -181,7 +193,7 @@ public:
 
         // create handle for the device with the current version of the pedestal
         // maps
-        auto current_device = devices[nextFree.back()];
+        auto current_device = devices[nextFree];
 
         // mask gain stage maps
         GainStageMaskingKernel gainStageMasking;
@@ -218,7 +230,7 @@ public:
 
         // create handle for the device with the current version of the pedestal
         // maps
-        auto current_device = devices[nextFree.back()];
+        auto current_device = devices[nextFree];
 
         // mask gain stage maps
         DriftMapKernel driftMapKernel;
@@ -267,9 +279,10 @@ public:
             }
             // force wait for one device to finish since there's no new data
             else {
-                alpaka::wait::wait(devices[nextFree.front()].queue,
-                                   devices[nextFree.front()].event);
-                devices[nextFree.front()].state = READY;
+              //TODO: CHECK THIS!!!
+                alpaka::wait::wait(devices[nextFull].queue,
+                                   devices[nextFull].event);
+                devices[nextFull].state = READY;
             }
         }
 
@@ -285,16 +298,27 @@ public:
     downloadData(FramePackage<PhotonMap, TAlpaka, TDim, TSize>& photon,
                  FramePackage<PhotonSumMap, TAlpaka, TDim, TSize>& sum,
                  FramePackage<EnergyValue, TAlpaka, TDim, TSize>& maxValues,
-                 ClusterArray<TAlpaka, TDim, TSize>& clusters) -> bool
+                 ClusterArray<TAlpaka, TDim, TSize>& clusters) -> size_t
     {
-        std::lock_guard<std::mutex> lock(mutex);
         struct DeviceData<TAlpaka, TDim, TSize>* dev =
-            &Dispenser::devices[nextFree.front()];
+            &Dispenser::devices[nextFree];
 
+
+        DEBUG("downloading from device " << nextFree << " (nextFull is " << nextFull << ")");
+        std::string s = "";
+        for(const auto& d : devices) {
+          s += (d.state == READY ? "READY" : "");
+          s += (d.state == FREE ? "FREE" : "");
+          s += (d.state == PROCESSING ? "PROCESSING" : "");
+          s += " ";
+        }
+        DEBUG("Current state: " << s);
+
+        
         // to keep frames in order only download if the longest running device
         // has finished
         if (dev->state != READY)
-            return false;
+            return 0;
 
         photon.numFrames = dev->numMaps;
         alpaka::mem::view::copy(
@@ -324,10 +348,10 @@ public:
         alpaka::wait::wait(dev->queue);
 
         dev->state = FREE;
-        nextFree.pop_front();
+        nextFree = (nextFree + 1) % devices.size();
         ringbuffer.push(dev);
 
-        return true;
+        return photon.numFrames;
     }
 
     /**
@@ -338,9 +362,8 @@ public:
     auto downloadEnergy(FramePackage<EnergyMap, TAlpaka, TDim, TSize>& energy)
         -> bool
     {
-        std::lock_guard<std::mutex> lock(mutex);
         struct DeviceData<TAlpaka, TDim, TSize>* dev =
-            &Dispenser::devices[nextFree.front()];
+            &Dispenser::devices[nextFree];
 
         // to keep frames in order only download if the longest running device
         // has finished
@@ -354,7 +377,7 @@ public:
         alpaka::wait::wait(dev->queue, dev->event);
 
         dev->state = FREE;
-        nextFree.pop_front();
+        nextFree = (nextFree + 1) % devices.size();
         ringbuffer.push(dev);
         DEBUG("device " << dev->id << " freed");
 
@@ -400,7 +423,6 @@ private:
     alpaka::mem::buf::Buf<typename TAlpaka::DevHost, EnergyMap, TDim, TSize>
         maxValueMaps;
 
-    //! @todo: is this even used anywhere??
     FramePackage<PedestalMap, TAlpaka, TDim, TSize> pedestal;
 
     TAlpaka workdiv;
@@ -408,8 +430,7 @@ private:
     Ringbuffer<DeviceData<TAlpaka, TDim, TSize>*> ringbuffer;
     std::vector<DeviceData<TAlpaka, TDim, TSize>> devices;
 
-    std::mutex mutex;
-    std::deque<std::size_t> nextFree;
+  std::size_t nextFree, nextFull;
 
     /**
      * Initializes all devices. Uploads gain data and creates buffer.
@@ -446,6 +467,8 @@ private:
         if (!ringbuffer.pop(dev))
             return 0;
 
+        DEBUG("calcPedestaldata on dev " << dev->id);
+        
         dev->state = PROCESSING;
         dev->numMaps = numMaps;
 
@@ -459,22 +482,21 @@ private:
             numMaps);
 
         // copy offset data from last initialized device
-        std::lock_guard<std::mutex> lock(mutex);
-        if (nextFree.size() > 0) {
-            alpaka::wait::wait(devices[nextFree.back()].queue);
+        auto prevDevice = (nextFull + devices.size() - 1) % devices.size();
+            alpaka::wait::wait(devices[prevDevice].queue);
             alpaka::mem::view::copy(dev->queue,
                                     dev->pedestal,
-                                    devices[nextFree.back()].pedestal,
+                                    devices[prevDevice].pedestal,
                                     PEDEMAPS);
 
             alpaka::mem::view::copy(dev->queue,
                                     dev->mask,
-                                    devices[nextFree.back()].mask,
+                                    devices[prevDevice].mask,
                                     SINGLEMAP);
 
-            nextFree.pop_front();
-        }
-        nextFree.push_back(dev->id);
+            // increase nextFull and nextFree (because pedestal data isn't downloaded like normal data)
+            nextFull = (nextFull + 1) % devices.size();
+            nextFree = (nextFree + 1) % devices.size();
 
         if (init == false) {
             alpaka::mem::view::set(dev->queue, dev->pedestal, 0, SINGLEMAP);
@@ -495,7 +517,6 @@ private:
         alpaka::queue::enqueue(dev->queue, calibration);
 
         alpaka::wait::wait(dev->queue);
-        DEBUG("device " << dev->id << " finished");
 
         dev->state = FREE;
 
@@ -513,7 +534,8 @@ private:
      */
     auto distributeMaskMaps() -> void
     {
-        uint64_t source = nextFree.front();
+      uint64_t source = (nextFull + devices.size() - 1) % devices.size();
+      DEBUG("distributeMaskMaps (from " << source << ")");
         for (uint64_t i = 1; i < devices.size(); ++i) {
             uint64_t destination =
                 (i + source + (i >= source ? 1 : 0)) % devices.size();
@@ -532,7 +554,8 @@ private:
     auto distributeInitialPedestalMaps() -> void
     {
         //! @todo: test if this works
-        uint64_t source = nextFree.front();
+      uint64_t source = (nextFull + devices.size() - 1) % devices.size();
+      DEBUG("distributeInitialPedestalMaps (from " << source << ")");
         for (uint64_t i = 0; i < devices.size(); ++i) {
             alpaka::mem::view::copy(devices[source].queue,
                                     devices[i].initialPedestal,
@@ -567,20 +590,20 @@ private:
             numMaps);
 
         // copy offset data from last device uploaded to
-        std::lock_guard<std::mutex> lock(mutex);
-        alpaka::wait::wait(dev->queue, devices[nextFree.back()].event);
-        DEBUG("device " << devices[nextFree.back()].id << " finished");
+        auto prevDevice = (nextFull + devices.size() - 1) % devices.size();
+        alpaka::wait::wait(dev->queue, devices[prevDevice].event);
+        DEBUG("device " << devices[prevDevice].id << " finished");
 
-        devices[nextFree.back()].state = READY;
+        devices[prevDevice].state = READY;
         alpaka::mem::view::copy(dev->queue,
                                 dev->pedestal,
-                                devices[nextFree.back()].pedestal,
+                                devices[prevDevice].pedestal,
                                 PEDEMAPS);
-        nextFree.push_back(dev->id);
+        nextFull = (nextFull + 1) % devices.size();
 
         // reset the number of clusters
         alpaka::mem::view::set(dev->queue, dev->numClusters, 0, SINGLEMAP);
-
+        /*
         ConversionKernel conversionKernel;
         auto const conversion(
             alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
@@ -593,7 +616,7 @@ private:
                 alpaka::mem::view::getPtrNative(dev->energy),
                 dev->numMaps,
                 alpaka::mem::view::getPtrNative(dev->mask)));
-
+        */
         PhotonFinderKernel photonFinderKernel;
         auto const photonFinder(
             alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
@@ -607,7 +630,7 @@ private:
                 alpaka::mem::view::getPtrNative(dev->photon),
                 dev->numMaps,
                 alpaka::mem::view::getPtrNative(dev->mask)));
-
+        /*
         for (uint32_t i = 0; i < numMaps; ++i) {
             // reduce all images
             WorkDiv workdivRun1{TAlpaka::blocksPerGrid,
@@ -664,7 +687,7 @@ private:
                 alpaka::mem::view::getPtrNative(dev->sum)));
 
         alpaka::queue::enqueue(dev->queue, conversion);
-        alpaka::queue::enqueue(dev->queue, photonFinder);
+        */alpaka::queue::enqueue(dev->queue, photonFinder);/*
         alpaka::queue::enqueue(dev->queue, summation);
 
         for (uint32_t i = 0; i < numMaps + 1; ++i) {
@@ -686,7 +709,7 @@ private:
                     i));
 
             alpaka::queue::enqueue(dev->queue, clusterFinder);
-        }
+        }*/
 
         // the event is used to wait for pedestal data
         alpaka::queue::enqueue(dev->queue, dev->event);

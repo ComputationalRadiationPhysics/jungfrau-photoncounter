@@ -26,7 +26,7 @@ ALPAKA_FN_ACC ALPAKA_FN_INLINE auto copyFrameHeader(TInputMap const& src,
 }
 
 template <typename TAcc, typename TAdcValue, typename TPedestal>
-ALPAKA_FN_ACC ALPAKA_FN_INLINE auto updatePedestal(const TAcc& acc,
+ALPAKA_FN_ACC ALPAKA_FN_INLINE auto initPedestal(const TAcc& acc,
                                                    TAdcValue const adc,
                                                    TPedestal& pedestal) -> void
 {
@@ -44,6 +44,20 @@ ALPAKA_FN_ACC ALPAKA_FN_INLINE auto updatePedestal(const TAcc& acc,
     m2 += delta * delta2;
     var = m2 / (count - 1);
     stddev = alpaka::math::sqrt(acc, var);
+}
+
+template <typename TAcc, typename TAdcValue, typename TPedestal>
+ALPAKA_FN_ACC ALPAKA_FN_INLINE auto updatePedestal(const TAcc& acc,
+                                                   TAdcValue const adc,
+                                                   TPedestal& pedestal) -> void
+{
+    // online algorithm for variance by Welford
+    auto& count = pedestal.count;
+    auto& mean = pedestal.mean;
+
+    ++count;
+    float delta = adc - mean;
+    mean += delta / count;
 }
 
 template <typename TThreadIndex>
