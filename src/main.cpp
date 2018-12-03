@@ -113,14 +113,14 @@ public:
 
   void push_back(FramePackage<PedestalMap, Accelerator, Dim, Size> raw_pedestals, FramePackage<DetectorData, Accelerator, Dim, Size> raw_input, size_t offset) {
     for(int i = 0; i < input.size(); ++i) {
-      input[i].push_back(alpaka::mem::view::getPtrNative(raw_input.data)[offset].data[positions[i].y * DIMY + positions[i].x]);
-      pedestal[i].push_back(alpaka::mem::view::getPtrNative(raw_pedestals.data)[0][positions[i].y * DIMY + positions[i].x].mean);
-      stddev[i].push_back(alpaka::mem::view::getPtrNative(raw_pedestals.data)[0][positions[i].y * DIMY + positions[i].x].stddev);
-      m2[i].push_back(alpaka::mem::view::getPtrNative(raw_pedestals.data)[0][positions[i].y * DIMY + positions[i].x].m2);
+      input[i].push_back(alpaka::mem::view::getPtrNative(raw_input.data)[offset].data[positions[i].y * DIMX + positions[i].x]);
+      pedestal[i].push_back(alpaka::mem::view::getPtrNative(raw_pedestals.data)[0][positions[i].y * DIMX + positions[i].x].mean);
+      stddev[i].push_back(alpaka::mem::view::getPtrNative(raw_pedestals.data)[0][positions[i].y * DIMX + positions[i].x].stddev);
+      m2[i].push_back(alpaka::mem::view::getPtrNative(raw_pedestals.data)[0][positions[i].y * DIMX + positions[i].x].m2);
 
 
 
-      DEBUG("dbug: " << input[i][input.size() - 1] << " " << pedestal[i][pedestal.size() - 1] << " " << m2[i][m2.size() - 1] << " " << stddev[i][stddev.size() - 1]);
+      //DEBUG("dbug: " << input[i][0] << " " << pedestal[i][0] << " " << m2[i][0] << " " << stddev[i][0]);
     }
   }
 
@@ -219,23 +219,21 @@ auto main(int argc, char* argv[]) -> int
     FramePackage<EnergyValue, Accelerator, Dim, Size> maxValues(DEV_FRAMES);
     std::size_t offset = 0;
     std::size_t downloaded = 0;
+    std::size_t currently_downloaded_frames = 0;
 
     PixelTracker pt(argc, argv);
 
     // process data maps
     while (downloaded < data.numFrames) {
         offset = dispenser->uploadData(data, offset);
-        if (downloaded += dispenser->downloadData(photon, sum, maxValues, clusters)) {
+        if (currently_downloaded_frames = dispenser->downloadData(photon, sum, maxValues, clusters)) {
           pt.push_back(dispenser->downloadPedestaldata(), data, offset - 1);
 
-
+          if(downloaded + currently_downloaded_frames == 9997)
+            exit(EXIT_FAILURE);
           
-          while(true);
-
-          
-
-          
-          DEBUG(downloaded << "/" << data.numFrames << " downloaded");
+          downloaded += currently_downloaded_frames;
+          DEBUG(downloaded << "/" << data.numFrames << " downloaded; " << offset << " uploaded");
         }
     }
     
