@@ -133,17 +133,8 @@ public:
         // create handle for the device with the current version of the pedestal
         // maps
         auto current_device = devices[nextFree];
-
-
-
-
-
         
         DEBUG("downloading pedestaldata from device " << nextFree);
-
-
-
-        
 
         // get the pedestal data from the device
         alpaka::mem::view::copy(current_device.queue,
@@ -152,7 +143,7 @@ public:
                                 PEDEMAPS);
 
         // wait for copy to finish
-        alpaka::wait::wait(current_device.queue, current_device.event);
+        alpaka::wait::wait(current_device.queue);
 
         pedestal.numFrames = PEDEMAPS;
 
@@ -181,6 +172,17 @@ public:
         return mask;
     }
 
+    /**
+     * Flags alldevices as ready for download.
+     */
+    auto flush() -> void
+    {
+        DEBUG("flushing...");
+        synchronize();
+        for(auto & device : devices)
+          if(device.state != FREE)
+            device.state = READY;
+    }
     /**
      * Downloads the current gain stage map.
      * @return gain stage map
@@ -421,7 +423,6 @@ private:
     alpaka::mem::buf::Buf<typename TAlpaka::DevHost, EnergyMap, TDim, TSize>
         maxValueMaps;
 
-    //! @todo: is this even used anywhere??
     FramePackage<PedestalMap, TAlpaka, TDim, TSize> pedestal;
 
     TAlpaka workdiv;
@@ -481,7 +482,7 @@ private:
             numMaps);
 
         // copy offset data from last initialized device
-        auto prevDevice = (nextFull - 1) % devices.size();
+        auto prevDevice = (nextFull + devices.size() - 1) % devices.size();
             alpaka::wait::wait(devices[prevDevice].queue);
             alpaka::mem::view::copy(dev->queue,
                                     dev->pedestal,
@@ -533,7 +534,7 @@ private:
      */
     auto distributeMaskMaps() -> void
     {
-      uint64_t source = (nextFull - 1) % devices.size();
+      uint64_t source = (nextFull + devices.size() - 1) % devices.size();
       DEBUG("distributeMaskMaps (from " << source << ")");
         for (uint64_t i = 1; i < devices.size(); ++i) {
             uint64_t destination =
@@ -553,7 +554,7 @@ private:
     auto distributeInitialPedestalMaps() -> void
     {
         //! @todo: test if this works
-      uint64_t source = (nextFull - 1) % devices.size();
+      uint64_t source = (nextFull + devices.size() - 1) % devices.size();
       DEBUG("distributeInitialPedestalMaps (from " << source << ")");
         for (uint64_t i = 0; i < devices.size(); ++i) {
             alpaka::mem::view::copy(devices[source].queue,
@@ -589,7 +590,7 @@ private:
             numMaps);
 
         // copy offset data from last device uploaded to
-        auto prevDevice = (nextFull - 1) % devices.size();
+        auto prevDevice = (nextFull + devices.size() - 1) % devices.size();
         alpaka::wait::wait(dev->queue, devices[prevDevice].event);
         DEBUG("device " << devices[prevDevice].id << " finished");
 

@@ -117,10 +117,6 @@ public:
       pedestal[i].push_back(alpaka::mem::view::getPtrNative(raw_pedestals.data)[0][positions[i].y * DIMX + positions[i].x].mean);
       stddev[i].push_back(alpaka::mem::view::getPtrNative(raw_pedestals.data)[0][positions[i].y * DIMX + positions[i].x].stddev);
       m2[i].push_back(alpaka::mem::view::getPtrNative(raw_pedestals.data)[0][positions[i].y * DIMX + positions[i].x].m2);
-
-
-
-      //DEBUG("dbug: " << input[i][0] << " " << pedestal[i][0] << " " << m2[i][0] << " " << stddev[i][0]);
     }
   }
 
@@ -223,14 +219,22 @@ auto main(int argc, char* argv[]) -> int
 
     PixelTracker pt(argc, argv);
 
+    int flag = 1;
+    
     // process data maps
     while (downloaded < data.numFrames) {
         offset = dispenser->uploadData(data, offset);
         if (currently_downloaded_frames = dispenser->downloadData(photon, sum, maxValues, clusters)) {
-          pt.push_back(dispenser->downloadPedestaldata(), data, offset - 1);
+          auto pdata = dispenser->downloadPedestaldata();
+          pt.push_back(pdata, data, offset - 1);
 
-          if(downloaded + currently_downloaded_frames == 9997)
-            exit(EXIT_FAILURE);
+          if(flag) {
+            flag = 0;
+            save_pedestal_update_mean("initial_pdata.txt", alpaka::mem::view::getPtrNative(pdata.data)[0]);
+          }
+          
+          if(offset == 10000)
+            dispenser->flush();
           
           downloaded += currently_downloaded_frames;
           DEBUG(downloaded << "/" << data.numFrames << " downloaded; " << offset << " uploaded");

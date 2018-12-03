@@ -23,7 +23,6 @@ for f in fileNames:
             plt.figure()
             plt.imshow(data, norm=colors.LogNorm(), origin='lower')
             plt.colorbar()
-            plt.show()
             plt.savefig('log/' + name + '.png')
             plt.close()
         except:
