@@ -7,14 +7,14 @@
 
 // general settings
 constexpr std::size_t FRAMESPERSTAGE_G0 = 1000;
-constexpr std::size_t FRAMESPERSTAGE_G1 = 1000;
-constexpr std::size_t FRAMESPERSTAGE_G2 = 999;
+constexpr std::size_t FRAMESPERSTAGE_G1 = 0;
+constexpr std::size_t FRAMESPERSTAGE_G2 = 0;
 
 constexpr std::size_t FRAME_HEADER_SIZE = 16;
-constexpr std::size_t DIMX = 1024;
-constexpr std::size_t DIMY = 512;
+constexpr std::size_t DIMX = 400;
+constexpr std::size_t DIMY = 400;
 constexpr std::size_t SUM_FRAMES = 10;
-constexpr std::size_t DEV_FRAMES = 1;
+constexpr std::size_t DEV_FRAMES = 1000;
 constexpr std::size_t PEDEMAPS = 3;
 constexpr std::size_t GAINMAPS = 3;
 constexpr float BEAMCONST = 6.2;
@@ -26,7 +26,6 @@ constexpr std::size_t MAPSIZE = DIMX * DIMY;
 constexpr std::size_t SINGLEMAP = 1;
 constexpr std::size_t MAXINT = std::numeric_limits<uint32_t>::max();
 constexpr char MASKED_VALUE = 4;
-//! @todo: verify this!!!
 constexpr uint64_t MAX_CLUSTER_NUM = (DIMX - CLUSTER_SIZE + 1) *
                                      (DIMY - CLUSTER_SIZE + 1) /
                                      ((CLUSTER_SIZE / 2) * (CLUSTER_SIZE / 2));
@@ -119,13 +118,14 @@ static Clock::time_point t;
 #define DEBUG(msg)                                                             \
     (std::cout << __FILE__ << "[" << __LINE__ << "]:\n\t"                      \
                << (std::chrono::duration_cast<ms>((Clock::now() - t))).count() \
-               << " ms\n\t" << msg << std::endl)
+               << " ms\n\t" << msg << "\n")
 #else
 #define DEBUG(msg)
 #endif
 
-template<typename TAlpaka, typename TDim, typename TSize>
-void saveClusters(std::string path, ClusterArray<TAlpaka, TDim, TSize> &clusters)
+template <typename TAlpaka, typename TDim, typename TSize>
+void saveClusters(std::string path,
+                  ClusterArray<TAlpaka, TDim, TSize>& clusters)
 {
 #if (SHOW_DEBUG)
     std::ofstream clusterFile;
@@ -133,19 +133,20 @@ void saveClusters(std::string path, ClusterArray<TAlpaka, TDim, TSize> &clusters
     clusterFile << clusters.used << "\n";
     Cluster* clusterPtr = alpaka::mem::view::getPtrNative(clusters.clusters);
 
-    DEBUG("writing " << clusters.used << " clusters");
-    
+    DEBUG("writing " << clusters.used << " clusters to " << path);
+
     for (uint64_t i = 0; i < clusters.used; ++i) {
-      // write cluster information
-        clusterFile << clusterPtr[i].frameNumber << " "
-                    << clusterPtr[i].x << " " << clusterPtr[i].y
-                    << " ";
+        // write cluster information
+        clusterFile << static_cast<uint32_t>(clusterPtr[i].frameNumber &
+                                             0xFFFFFFFF)
+                    << "\n\t" << clusterPtr[i].x << " " << clusterPtr[i].y
+                    << "\n";
 
         // write cluster
         for (uint8_t y = 0; y < CLUSTER_SIZE; ++y) {
+            clusterFile << "\t";
             for (uint8_t x = 0; x < CLUSTER_SIZE; ++x) {
-                clusterFile << clusterPtr[i].data[x + y * CLUSTER_SIZE]
-                            << " ";
+                clusterFile << clusterPtr[i].data[x + y * CLUSTER_SIZE] << " ";
             }
 
             clusterFile << "\n";
@@ -170,5 +171,50 @@ void save_image(std::string path, TBuffer* data, std::size_t frame_number)
         img << "\n";
     }
     img.close();
+#endif
+}
+
+
+template <typename TAlpaka, typename TDim, typename TSize>
+void saveClusterArray(std::string path,
+                      std::vector<ClusterArray<TAlpaka, TDim, TSize>>& clusters)
+{
+#if (SHOW_DEBUG)
+    std::ofstream clusterFile;
+    clusterFile.open(path);
+
+    uint64_t numClusters = 0;
+    for (const auto& clusterArray : clusters)
+        numClusters += clusterArray.used;
+
+    clusterFile << numClusters << "\n";
+
+    DEBUG("writing " << numClusters << " clusters to " << path);
+
+    for (auto& clusterArray : clusters) {
+        Cluster* clusterPtr =
+            alpaka::mem::view::getPtrNative(clusterArray.clusters);
+
+        for (uint64_t i = 0; i < clusterArray.used; ++i) {
+            // write cluster information
+            clusterFile << static_cast<int32_t>(clusterPtr[i].frameNumber &
+                                                0xFFFFFFFF)
+                        << "\n\t" << clusterPtr[i].x << "\n\t"
+                        << clusterPtr[i].y << "\n";
+
+            // write cluster
+            for (uint8_t y = 0; y < CLUSTER_SIZE; ++y) {
+                clusterFile << "\t";
+                for (uint8_t x = 0; x < CLUSTER_SIZE; ++x) {
+                    clusterFile << clusterPtr[i].data[x + y * CLUSTER_SIZE]
+                                << " ";
+                }
+
+                clusterFile << "\n";
+            }
+        }
+    }
+
+    clusterFile.close();
 #endif
 }

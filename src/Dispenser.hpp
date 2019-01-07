@@ -9,10 +9,10 @@
 #include "kernel/Conversion.hpp"
 #include "kernel/DriftMap.hpp"
 #include "kernel/GainStageMasking.hpp"
+#include "kernel/MaxValueCopy.hpp"
 #include "kernel/PhotonFinder.hpp"
 #include "kernel/Reduction.hpp"
 #include "kernel/Summation.hpp"
-#include "kernel/MaxValueCopy.hpp"
 
 #include <boost/optional.hpp>
 
@@ -53,8 +53,10 @@ public:
 
         // make room for live mask information
         if (!mask) {
-            alpaka::mem::view::set(
-                devices[0].queue, devices[0].mask, 1, SINGLEMAP);
+            alpaka::mem::view::set(devices[devices.size() - 1].queue,
+                                   devices[devices.size() - 1].mask,
+                                   1,
+                                   SINGLEMAP);
         }
 
 #ifdef ALPAKA_ACC_GPU_CUDA_ENABLED
@@ -105,7 +107,7 @@ public:
                 alpaka::mem::view::getPtrNative(data.data) + offset,
                 DEV_FRAMES);
             DEBUG(offset << "/" << data.numFrames
-                  << " pedestalframes uploaded (1)");
+                         << " pedestalframes uploaded (1)");
         }
 
         // upload remaining frames
@@ -133,7 +135,7 @@ public:
         // create handle for the device with the current version of the pedestal
         // maps
         auto current_device = devices[nextFree];
-        
+
         DEBUG("downloading pedestaldata from device " << nextFree);
 
         // get the pedestal data from the device
@@ -167,7 +169,7 @@ public:
             current_device.queue, &mask, current_device.mask, SINGLEMAP);
 
         // wait for copy to finish
-        alpaka::wait::wait(current_device.queue, current_device.event);
+        alpaka::wait::wait(current_device.queue);
 
         return mask;
     }
@@ -179,9 +181,9 @@ public:
     {
         DEBUG("flushing...");
         synchronize();
-        for(auto & device : devices)
-          if(device.state != FREE)
-            device.state = READY;
+        for (auto& device : devices)
+            if (device.state != FREE)
+                device.state = READY;
     }
     /**
      * Downloads the current gain stage map.
@@ -215,7 +217,7 @@ public:
                                 SINGLEMAP);
 
         // wait for copy to finish
-        alpaka::wait::wait(current_device.queue, current_device.event);
+        alpaka::wait::wait(current_device.queue);
 
         return alpaka::mem::view::getPtrNative(gainStage);
     }
@@ -246,10 +248,10 @@ public:
 
         // get the pedestal data from the device
         alpaka::mem::view::copy(
-            current_device.queue, drift, current_device.drift, 1);
+            current_device.queue, drift, current_device.drift, SINGLEMAP);
 
         // wait for copy to finish
-        alpaka::wait::wait(current_device.queue, current_device.event);
+        alpaka::wait::wait(current_device.queue);
 
         return alpaka::mem::view::getPtrNative(drift);
     }
@@ -279,10 +281,15 @@ public:
             }
             // force wait for one device to finish since there's no new data
             else {
-              //TODO: CHECK THIS!!!
-                alpaka::wait::wait(devices[nextFull].queue,
-                                   devices[nextFull].event);
-                devices[nextFull].state = READY;
+                //! @todo: CHECK THIS!!!
+                //! @todo: does this conflict with the other flush????
+                //! @todo: does this concept even make sense???
+                uint64_t currentFull =
+                    (nextFull + devices.size() - 1) % devices.size();
+                DEBUG("flushing stuff ... (" << currentFull << ")");
+                alpaka::wait::wait(devices[currentFull].queue,
+                                   devices[currentFull].event);
+                devices[currentFull].state = READY;
             }
         }
 
@@ -304,17 +311,18 @@ public:
             &Dispenser::devices[nextFree];
 
 
-        DEBUG("downloading from device " << nextFree << " (nextFull is " << nextFull << ")");
+        DEBUG("downloading from device " << nextFree << " (nextFull is "
+                                         << nextFull << ")");
         std::string s = "";
-        for(const auto& d : devices) {
-          s += (d.state == READY ? "READY" : "");
-          s += (d.state == FREE ? "FREE" : "");
-          s += (d.state == PROCESSING ? "PROCESSING" : "");
-          s += " ";
+        for (const auto& d : devices) {
+            s += (d.state == READY ? "READY" : "");
+            s += (d.state == FREE ? "FREE" : "");
+            s += (d.state == PROCESSING ? "PROCESSING" : "");
+            s += " ";
         }
         DEBUG("Current state: " << s);
 
-        
+
         // to keep frames in order only download if the longest running device
         // has finished
         if (dev->state != READY)
@@ -339,11 +347,33 @@ public:
         // wait for completion of copy operations
         alpaka::wait::wait(dev->queue);
 
-        // download actual clusters
+        // reserve space in the cluster array for the new data and save the
+        // number of clusters to download temporarily
+        auto oldNumClusters = clusters.used;
+        auto clustersToDownload =
+            alpaka::mem::view::getPtrNative(clusters.usedPinned)[0];
+        alpaka::mem::view::getPtrNative(clusters.usedPinned)[0] +=
+            oldNumClusters;
         clusters.used = alpaka::mem::view::getPtrNative(clusters.usedPinned)[0];
 
+
+        //! @todo: remove this line later
+        DEBUG("clustersToDownload: " << clustersToDownload);
+
+
+        // create a subview in the cluster buffer where the new data shuld be
+        // downloaded to
+        auto const extentView(alpaka::vec::Vec<TDim, TSize>(
+            static_cast<TSize>(clustersToDownload)));
+        auto const offsetView(
+            alpaka::vec::Vec<TDim, TSize>(static_cast<TSize>(oldNumClusters)));
+        alpaka::mem::view::
+            ViewSubView<typename TAlpaka::DevHost, Cluster, TDim, TSize>
+                clusterView(clusters.clusters, extentView, offsetView);
+
+        // download actual clusters
         alpaka::mem::view::copy(
-            dev->queue, clusters.clusters, dev->cluster, clusters.used);
+            dev->queue, clusterView, dev->cluster, clustersToDownload);
 
         alpaka::wait::wait(dev->queue);
 
@@ -374,7 +404,7 @@ public:
         alpaka::mem::view::copy(
             dev->queue, energy.data, dev->energy, dev->numMaps);
 
-        alpaka::wait::wait(dev->queue, dev->event);
+        alpaka::wait::wait(dev->queue);
 
         dev->state = FREE;
         nextFree = (nextFree + 1) % devices.size();
@@ -430,7 +460,7 @@ private:
     Ringbuffer<DeviceData<TAlpaka, TDim, TSize>*> ringbuffer;
     std::vector<DeviceData<TAlpaka, TDim, TSize>> devices;
 
-  std::size_t nextFree, nextFull;
+    std::size_t nextFree, nextFull;
 
     /**
      * Initializes all devices. Uploads gain data and creates buffer.
@@ -468,7 +498,7 @@ private:
             return 0;
 
         DEBUG("calcPedestaldata on dev " << dev->id);
-        
+
         dev->state = PROCESSING;
         dev->numMaps = numMaps;
 
@@ -483,20 +513,17 @@ private:
 
         // copy offset data from last initialized device
         auto prevDevice = (nextFull + devices.size() - 1) % devices.size();
-            alpaka::wait::wait(devices[prevDevice].queue);
-            alpaka::mem::view::copy(dev->queue,
-                                    dev->pedestal,
-                                    devices[prevDevice].pedestal,
-                                    PEDEMAPS);
+        alpaka::wait::wait(devices[prevDevice].queue);
+        alpaka::mem::view::copy(
+            dev->queue, dev->pedestal, devices[prevDevice].pedestal, PEDEMAPS);
 
-            alpaka::mem::view::copy(dev->queue,
-                                    dev->mask,
-                                    devices[prevDevice].mask,
-                                    SINGLEMAP);
+        alpaka::mem::view::copy(
+            dev->queue, dev->mask, devices[prevDevice].mask, SINGLEMAP);
 
-            // increase nextFull and nextFree (because pedestal data isn't downloaded like normal data)
-            nextFull = (nextFull + 1) % devices.size();
-            nextFree = (nextFree + 1) % devices.size();
+        // increase nextFull and nextFree (because pedestal data isn't
+        // downloaded like normal data)
+        nextFull = (nextFull + 1) % devices.size();
+        nextFree = (nextFree + 1) % devices.size();
 
         if (init == false) {
             alpaka::mem::view::set(dev->queue, dev->pedestal, 0, SINGLEMAP);
@@ -517,7 +544,7 @@ private:
         alpaka::queue::enqueue(dev->queue, calibration);
 
         alpaka::wait::wait(dev->queue);
-
+        
         dev->state = FREE;
 
         if (!ringbuffer.push(dev)) {
@@ -534,9 +561,9 @@ private:
      */
     auto distributeMaskMaps() -> void
     {
-      uint64_t source = (nextFull + devices.size() - 1) % devices.size();
-      DEBUG("distributeMaskMaps (from " << source << ")");
-        for (uint64_t i = 1; i < devices.size(); ++i) {
+        uint64_t source = (nextFull + devices.size() - 1) % devices.size();
+        DEBUG("distributeMaskMaps (from " << source << ")");
+        for (uint64_t i = 0; i < devices.size() - 1; ++i) {
             uint64_t destination =
                 (i + source + (i >= source ? 1 : 0)) % devices.size();
             alpaka::mem::view::copy(devices[source].queue,
@@ -553,10 +580,9 @@ private:
      */
     auto distributeInitialPedestalMaps() -> void
     {
-        //! @todo: test if this works
-      uint64_t source = (nextFull + devices.size() - 1) % devices.size();
-      DEBUG("distributeInitialPedestalMaps (from " << source << ")");
-        for (uint64_t i = 0; i < devices.size(); ++i) {
+        uint64_t source = (nextFull + devices.size() - 1) % devices.size();
+        DEBUG("distributeInitialPedestalMaps (from " << source << ")");
+        for (uint64_t i = 0; i < devices.size(); ++i) { 
             alpaka::mem::view::copy(devices[source].queue,
                                     devices[i].initialPedestal,
                                     devices[source].pedestal,
@@ -595,10 +621,8 @@ private:
         DEBUG("device " << devices[prevDevice].id << " finished");
 
         devices[prevDevice].state = READY;
-        alpaka::mem::view::copy(dev->queue,
-                                dev->pedestal,
-                                devices[prevDevice].pedestal,
-                                PEDEMAPS);
+        alpaka::mem::view::copy(
+            dev->queue, dev->pedestal, devices[prevDevice].pedestal, PEDEMAPS);
         nextFull = (nextFull + 1) % devices.size();
 
         // reset the number of clusters
@@ -616,7 +640,7 @@ private:
                 alpaka::mem::view::getPtrNative(dev->energy),
                 dev->numMaps,
                 alpaka::mem::view::getPtrNative(dev->mask)));
-        */
+
         PhotonFinderKernel photonFinderKernel;
         auto const photonFinder(
             alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
@@ -630,7 +654,7 @@ private:
                 alpaka::mem::view::getPtrNative(dev->photon),
                 dev->numMaps,
                 alpaka::mem::view::getPtrNative(dev->mask)));
-        /*
+
         for (uint32_t i = 0; i < numMaps; ++i) {
             // reduce all images
             WorkDiv workdivRun1{TAlpaka::blocksPerGrid,
@@ -660,11 +684,11 @@ private:
             alpaka::queue::enqueue(dev->queue, reduceRun2);
         }
 
-        //! @todo: copy all results into one contineous  buffer
-        WorkDiv workdivMaxValueCopy{static_cast<Size>(std::ceil(
-                                (double)numMaps / TAlpaka::threadsPerBlock)),
-                            TAlpaka::threadsPerBlock,
-                            static_cast<Size>(1)};
+        WorkDiv workdivMaxValueCopy{
+            static_cast<Size>(
+                std::ceil((double)numMaps / TAlpaka::threadsPerBlock)),
+            TAlpaka::threadsPerBlock,
+            static_cast<Size>(1)};
         MaxValueCopyKernel maxValueCopyKernel;
         auto const maxValueCopy(
             alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
@@ -687,8 +711,9 @@ private:
                 alpaka::mem::view::getPtrNative(dev->sum)));
 
         alpaka::queue::enqueue(dev->queue, conversion);
-        */alpaka::queue::enqueue(dev->queue, photonFinder);/*
-        alpaka::queue::enqueue(dev->queue, summation);
+
+        alpaka::queue::enqueue(dev->queue, photonFinder);
+        alpaka::queue::enqueue(dev->queue, summation);*/
 
         for (uint32_t i = 0; i < numMaps + 1; ++i) {
             // execute the clusterfinder with the pedestalupdate on every frame
@@ -709,7 +734,7 @@ private:
                     i));
 
             alpaka::queue::enqueue(dev->queue, clusterFinder);
-        }*/
+        }
 
         // the event is used to wait for pedestal data
         alpaka::queue::enqueue(dev->queue, dev->event);

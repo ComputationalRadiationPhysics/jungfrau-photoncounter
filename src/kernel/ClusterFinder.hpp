@@ -39,15 +39,15 @@ struct ClusterFinderKernel {
         auto id = linearizedGlobalThreadIdx[0u];
 
         constexpr auto n = CLUSTER_SIZE;
-
-        if (currentFrame) {
+        
+        if (currentFrame) {                
             auto adc = getAdc(detectorData[currentFrame - 1].data[id]);
             const auto& gainStage = gainStageMaps[currentFrame - 1].data[id];
             float sum;
             decltype(id) max;
             const auto& energy = energyMaps[currentFrame - 1].data[id];
             const auto& stddev = pedestalMaps[gainStage][id].stddev;
-            if (indexQualifiesAsClusterCenter(id)) {
+            if (indexQualifiesAsClusterCenter(id)) {                
                 findClusterSumAndMax(
                     energyMaps[currentFrame - 1].data, id, sum, max);
 
@@ -61,7 +61,6 @@ struct ClusterFinderKernel {
 
                 // check dark pixel condition
                 else if (-c * stddev <= energy && c * stddev >= energy) {
-                    //! @todo: clustercheck correct???
                     updatePedestal(acc, adc, pedestalMaps[gainStage][id]);
                 }
             }
