@@ -43,8 +43,10 @@ template <typename TData> struct Frame {
 
 struct Pedestal {
     std::size_t count;
+    double oldM;
     double mean;
-    double m2;
+    double oldS;
+    double newS;
     double stddev;
     double variance;
 };

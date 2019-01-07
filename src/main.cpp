@@ -43,7 +43,7 @@ void save_pedestal_stddev(std::string path, Pedestal* data)
     img.close();
 #endif
 }
-
+/*
 void save_pedestal_m2(std::string path, Pedestal* data)
 {
 #if (SHOW_DEBUG)
@@ -75,12 +75,13 @@ void save_pedestal_update_mean(std::string path, Pedestal* data)
     img.close();
 #endif
 }
-
+*/
 
 struct Point {
   uint16_t x, y;
 };
 
+/*
 class PixelTracker {
 private:
   std::vector<Point> positions;
@@ -148,7 +149,7 @@ public:
     }
   }
 };
-
+*/
 
 
 auto main(int argc, char* argv[]) -> int
@@ -217,7 +218,7 @@ auto main(int argc, char* argv[]) -> int
     std::size_t downloaded = 0;
     std::size_t currently_downloaded_frames = 0;
 
-    PixelTracker pt(argc, argv);
+    //PixelTracker pt(argc, argv);
 
     int flag = 1;
     
@@ -226,11 +227,11 @@ auto main(int argc, char* argv[]) -> int
         offset = dispenser->uploadData(data, offset);
         if (currently_downloaded_frames = dispenser->downloadData(photon, sum, maxValues, clusters)) {
           auto pdata = dispenser->downloadPedestaldata();
-          pt.push_back(pdata, data, offset - 1);
+          //pt.push_back(pdata, data, offset - 1);
 
           if(flag) {
             flag = 0;
-            save_pedestal_update_mean("initial_pdata.txt", alpaka::mem::view::getPtrNative(pdata.data)[0]);
+            //save_pedestal_update_mean("initial_pdata.txt", alpaka::mem::view::getPtrNative(pdata.data)[0]);
           }
           
           if(offset == 10000)
@@ -246,13 +247,13 @@ auto main(int argc, char* argv[]) -> int
     //GainStageMap* gainStage = dispenser->downloadGainStages();
     //save_image<GainStageMap>("gainstage", gainStage, 0);
 
-    pt.save();
+    //pt.save();
     
     DriftMap* drift = dispenser->downloadDriftMaps();
     save_image<DriftMap>("tokyodriftmap", drift, 0);
 
     FramePackage<PedestalMap, Accelerator, Dim, Size> pedestals(dispenser->downloadPedestaldata());
-    save_pedestal_update_count("pedestal_updates", alpaka::mem::view::getPtrNative(pedestals.data)[0]);
+    //save_pedestal_update_count("pedestal_updates", alpaka::mem::view::getPtrNative(pedestals.data)[0]);
 
     for(uint32_t i = 0; i < maxValues.numFrames; ++i)
       DEBUG("max value for frame " << i << ": " << alpaka::mem::view::getPtrNative(maxValues.data)[i]);
