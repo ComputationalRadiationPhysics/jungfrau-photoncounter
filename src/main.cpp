@@ -244,11 +244,11 @@ auto main(int argc, char* argv[]) -> int
     ClusterArray<Accelerator, Dim, Size> clusters_data(30000 * 40000 / 50);
     FramePackage<EnergyValue, Accelerator, Dim, Size> maxValues_data(DEV_FRAMES);
 
-    boost::optional<FramePackage<EnergyMap, Accelerator, Dim, Size>&> energy;
-    boost::optional<FramePackage<PhotonMap, Accelerator, Dim, Size>&> photon;
-    boost::optional<FramePackage<EnergySumMap, Accelerator, Dim, Size>&> sum;
-    boost::optional<ClusterArray<Accelerator, Dim, Size>&> clusters;
-    boost::optional<FramePackage<EnergyValue, Accelerator, Dim, Size>&> maxValues;
+    boost::optional<FramePackage<EnergyMap, Accelerator, Dim, Size>&> energy = energy_data;
+    boost::optional<FramePackage<PhotonMap, Accelerator, Dim, Size>&> photon;// = photon_data;
+    boost::optional<FramePackage<EnergySumMap, Accelerator, Dim, Size>&> sum = sum_data;
+    boost::optional<ClusterArray<Accelerator, Dim, Size>&> clusters = clusters_data;
+    boost::optional<FramePackage<EnergyValue, Accelerator, Dim, Size>&> maxValues = maxValues_data;
     
     std::size_t offset = 0;
     std::size_t downloaded = 0;
@@ -259,17 +259,16 @@ auto main(int argc, char* argv[]) -> int
 
     int flag = 1;
     ExecutionFlags ef;
-    ef.energy = 0;
-    ef.photon_or_cluster = 0;
-    ef.summation = 0;
-    ef.masking = 0;
-    ef.maxValue = 0;
+    ef.mode = 2;
+    ef.summation = 1;
+    ef.masking = 1;
+    ef.maxValue = 1;
     
     // process data maps
     while (downloaded < data.numFrames) {
       offset = dispenser->uploadData(data, offset, ef);
       if (currently_downloaded_frames = dispenser->downloadData(energy, photon, sum, maxValues, clusters)) {
-          auto pdata = dispenser->downloadPedestaldata();
+        //auto pdata = dispenser->downloadPedestaldata();
           //pt.push_back(pdata, data, offset - 1);
 
           if(flag) {

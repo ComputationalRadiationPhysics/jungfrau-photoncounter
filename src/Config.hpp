@@ -58,10 +58,8 @@ struct Cluster {
 };
 
 struct ExecutionFlags {
-  // 0 = off, 1 = on
-  uint8_t energy : 1;
-  // 0 = nothing, 1 = photon output, 2 = clustering output
-  uint8_t photon_or_cluster : 2;
+  // 0 = only energy output, 1 = photon (and energy) output, 2 = clustering (and energy) output
+  uint8_t mode : 2;
   // 0 = off, 1 = on
   uint8_t summation : 1;
   // 0 = off, 1 = on

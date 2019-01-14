@@ -199,9 +199,9 @@ struct GpuCudaRt {
 
     static constexpr std::size_t STREAMS_PER_DEV = 1;
 
-    static const Size elementsPerThread = 1u;
-    static const Size threadsPerBlock = DIMX;
-    static const Size blocksPerGrid = DIMY;
+    static constexpr Size elementsPerThread = 1u;
+    static constexpr Size threadsPerBlock = DIMX;
+    static constexpr Size blocksPerGrid = DIMY;
     WorkDiv workdiv{blocksPerGrid, threadsPerBlock, elementsPerThread};
 };
 
