@@ -55,7 +55,7 @@ template <typename TAlpaka, typename TDim, typename TSize> struct DeviceData {
     alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, PhotonMap, TDim, TSize>
         photon;
 
-    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, PhotonSumMap, TDim, TSize>
+    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, EnergySumMap, TDim, TSize>
         sum;
 
     alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, Cluster, TDim, TSize>
@@ -91,7 +91,7 @@ template <typename TAlpaka, typename TDim, typename TSize> struct DeviceData {
           energy(alpaka::mem::buf::alloc<EnergyMap, TSize>(device, numMaps)),
           mask(alpaka::mem::buf::alloc<MaskMap, TSize>(device, SINGLEMAP)),
           photon(alpaka::mem::buf::alloc<PhotonMap, TSize>(device, numMaps)),
-          sum(alpaka::mem::buf::alloc<PhotonSumMap, TSize>(device,
+          sum(alpaka::mem::buf::alloc<EnergySumMap, TSize>(device,
                                                            numMaps /
                                                                SUM_FRAMES)),
           cluster(alpaka::mem::buf::alloc<Cluster, TSize>(device,

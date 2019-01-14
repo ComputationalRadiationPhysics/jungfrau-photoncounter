@@ -197,11 +197,11 @@ struct GpuCudaRt {
     using Queue = alpaka::queue::QueueCudaRtAsync;
     using Event = alpaka::event::Event<Queue>;
 
-    const std::size_t STREAMS_PER_DEV = 1;
+    static constexpr std::size_t STREAMS_PER_DEV = 1;
 
-    const Size elementsPerThread = 1u;
-    const Size threadsPerBlock = DIMX;
-    const Size blocksPerGrid = DIMY;
+    static const Size elementsPerThread = 1u;
+    static const Size threadsPerBlock = DIMX;
+    static const Size blocksPerGrid = DIMY;
     WorkDiv workdiv{blocksPerGrid, threadsPerBlock, elementsPerThread};
 };
 

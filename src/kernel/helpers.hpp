@@ -33,17 +33,27 @@ ALPAKA_FN_ACC ALPAKA_FN_INLINE auto initPedestal(const TAcc& acc,
     // online algorithm for variance by Welford
     auto& count = pedestal.count;
     auto& mean = pedestal.mean;
-    auto& m2 = pedestal.m2;
-    auto& var = pedestal.variance; // sample variance
+    auto& oldM = pedestal.oldM;
+    auto& oldS = pedestal.oldS;
+    auto& newS = pedestal.newS;
+    auto& variance = pedestal.variance; // sample variance
     auto& stddev = pedestal.stddev;
 
     ++count;
-    float delta = adc - mean;
-    mean += delta / count;
-    float delta2 = adc - mean;
-    m2 += delta * delta2;
-    var = m2 / (count - 1);
-    stddev = alpaka::math::sqrt(acc, var);
+    if (count == 1) {
+        mean = oldM = adc;
+        oldS = 0;
+        variance = 0;
+        stddev = 0;
+    }
+    else {
+        mean = oldM + (adc - oldM) / count;
+        newS = oldS + (adc - oldM) * (adc - mean);
+        oldM = mean;
+        oldS = newS;
+        variance = newS / (count - 1);
+        stddev = alpaka::math::sqrt(acc, variance);
+    }
 }
 
 template <typename TAcc, typename TAdcValue, typename TPedestal>
@@ -51,13 +61,12 @@ ALPAKA_FN_ACC ALPAKA_FN_INLINE auto updatePedestal(const TAcc& acc,
                                                    TAdcValue const adc,
                                                    TPedestal& pedestal) -> void
 {
-    // online algorithm for variance by Welford
     auto& count = pedestal.count;
     auto& mean = pedestal.mean;
+    auto& oldM = pedestal.oldM;
 
     ++count;
-    float delta = adc - mean;
-    mean += delta / count;
+    mean = oldM + (adc - oldM) / count;
 }
 
 template <typename TThreadIndex>
@@ -139,7 +148,7 @@ processInput(TAcc const& acc,
              TIndex const id) -> void
 {
     // use masks to check whether the channel is valid or masked out
-    bool isValid = mask->data[id];
+  bool isValid = !mask ? 1 : mask->data[id];
 
     auto dataword = detectorData.data[id];
     auto adc = getAdc(dataword);

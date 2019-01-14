@@ -24,7 +24,7 @@ struct GainStageMaskingKernel {
         auto id = linearizedGlobalThreadIdx[0u];
 
         // use masks to check whether the channel is valid or masked out
-        bool isValid = mask->data[id];
+        bool isValid = !mask ? 1 : mask->data[id];
 
         outputGainStageMaps->data[id] =
             (isValid ? inputGainStageMaps[numFrame].data[id] : MASKED_VALUE);

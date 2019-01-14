@@ -41,7 +41,7 @@ void save_pedestal_stddev(std::string path, Pedestal* data)
     img.close();
 #endif
 }
-
+/*
 void save_pedestal_m2(std::string path, Pedestal* data)
 {
 #if (SHOW_DEBUG)
@@ -73,12 +73,13 @@ void save_pedestal_update_mean(std::string path, Pedestal* data)
     img.close();
 #endif
 }
-
+*/
 
 struct Point {
     uint16_t x, y;
 };
 
+/*
 class PixelTracker {
 private:
     std::vector<Point> positions;
@@ -173,8 +174,9 @@ public:
             stddev_file.flush();
             stddev_file.close();
         }
-    }
+  }
 };
+*/
 
 
 auto main(int argc, char* argv[]) -> int
@@ -235,59 +237,67 @@ auto main(int argc, char* argv[]) -> int
     // upload and calculate pedestal data
     dispenser->uploadPedestaldata(pedestaldata);
 
-    FramePackage<PhotonMap, Accelerator, Dim, Size> photon(DEV_FRAMES);
-    FramePackage<PhotonSumMap, Accelerator, Dim, Size> sum(DEV_FRAMES /
+    FramePackage<EnergyMap, Accelerator, Dim, Size> energy_data(DEV_FRAMES);
+    FramePackage<PhotonMap, Accelerator, Dim, Size> photon_data(DEV_FRAMES);
+    FramePackage<EnergySumMap, Accelerator, Dim, Size> sum_data(DEV_FRAMES /
                                                            SUM_FRAMES);
-    ClusterArray<Accelerator, Dim, Size> clusters(30000 * 40000 / 50);
-    FramePackage<EnergyValue, Accelerator, Dim, Size> maxValues(DEV_FRAMES);
+    ClusterArray<Accelerator, Dim, Size> clusters_data(30000 * 40000 / 50);
+    FramePackage<EnergyValue, Accelerator, Dim, Size> maxValues_data(DEV_FRAMES);
+
+    boost::optional<FramePackage<EnergyMap, Accelerator, Dim, Size>&> energy;
+    boost::optional<FramePackage<PhotonMap, Accelerator, Dim, Size>&> photon;
+    boost::optional<FramePackage<EnergySumMap, Accelerator, Dim, Size>&> sum;
+    boost::optional<ClusterArray<Accelerator, Dim, Size>&> clusters;
+    boost::optional<FramePackage<EnergyValue, Accelerator, Dim, Size>&> maxValues;
+    
     std::size_t offset = 0;
     std::size_t downloaded = 0;
 
     std::size_t currently_downloaded_frames = 0;
 
-    PixelTracker pt(argc, argv);
+    //PixelTracker pt(argc, argv);
 
     int flag = 1;
+    ExecutionFlags ef;
+    ef.energy = 0;
+    ef.photon_or_cluster = 0;
+    ef.summation = 0;
+    ef.masking = 0;
+    ef.maxValue = 0;
     
     // process data maps
     while (downloaded < data.numFrames) {
-        offset = dispenser->uploadData(data, offset);
-        if (currently_downloaded_frames =
-                dispenser->downloadData(photon, sum, maxValues, clusters)) {
-            auto pdata = dispenser->downloadPedestaldata();
-            pt.push_back(pdata, data, offset - 1);
-            
-            if (flag) {
-                flag = 0;
-                save_pedestal_update_mean(
-                    "initial_pdata.txt",
-                    alpaka::mem::view::getPtrNative(pdata.data)[0]);
-            }
+      offset = dispenser->uploadData(data, offset, ef);
+      if (currently_downloaded_frames = dispenser->downloadData(energy, photon, sum, maxValues, clusters)) {
+          auto pdata = dispenser->downloadPedestaldata();
+          //pt.push_back(pdata, data, offset - 1);
 
-            downloaded += currently_downloaded_frames;
-            DEBUG(downloaded << "/" << data.numFrames << " downloaded; "
-                             << offset << " uploaded");
+          if(flag) {
+            flag = 0;
+            //save_pedestal_update_mean("initial_pdata.txt", alpaka::mem::view::getPtrNative(pdata.data)[0]);
+          }
+          
+          if(offset == 10000)
+            dispenser->flush();
+          
+          downloaded += currently_downloaded_frames;
+          DEBUG(downloaded << "/" << data.numFrames << " downloaded; " << offset << " uploaded");
         }
     }
 
-    saveClusters("clusters.bin", clusters);
+    if(clusters)
+      saveClusters("clusters.bin", *clusters);
     
     // GainStageMap* gainStage = dispenser->downloadGainStages();
     // save_image<GainStageMap>("gainstage", gainStage, 0);
 
-    pt.save();
-
+    //pt.save();
+    
     DriftMap* drift = dispenser->downloadDriftMaps();
     save_image<DriftMap>("tokyodriftmap", drift, 0);
 
-    FramePackage<PedestalMap, Accelerator, Dim, Size> pedestals(
-        dispenser->downloadPedestaldata());
-    save_pedestal_update_count(
-        "pedestal_updates", alpaka::mem::view::getPtrNative(pedestals.data)[0]);
-
-    // for(uint32_t i = 0; i < maxValues.numFrames; ++i)
-    //  DEBUG("max value for frame " << i << ": " <<
-    //  alpaka::mem::view::getPtrNative(maxValues.data)[i]);
+    FramePackage<PedestalMap, Accelerator, Dim, Size> pedestals(dispenser->downloadPedestaldata());
+    //save_pedestal_update_count("pedestal_updates", alpaka::mem::view::getPtrNative(pedestals.data)[0]);
 
 
     auto sizes = dispenser->getMemSize();

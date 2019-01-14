@@ -42,8 +42,10 @@ template <typename TData> struct Frame {
 
 struct Pedestal {
     std::size_t count;
+    double oldM;
     double mean;
-    double m2;
+    double oldS;
+    double newS;
     double stddev;
     double variance;
 };
@@ -53,6 +55,19 @@ struct Cluster {
     std::int16_t x;
     std::int16_t y;
     std::int32_t data[CLUSTER_SIZE * CLUSTER_SIZE];
+};
+
+struct ExecutionFlags {
+  // 0 = off, 1 = on
+  uint8_t energy : 1;
+  // 0 = nothing, 1 = photon output, 2 = clustering output
+  uint8_t photon_or_cluster : 2;
+  // 0 = off, 1 = on
+  uint8_t summation : 1;
+  // 0 = off, 1 = on
+  uint8_t masking : 1;
+  // 0 = off, 1 = on
+  uint8_t maxValue : 1;
 };
 
 template <typename TAlpaka, typename TDim, typename TSize> struct ClusterArray {
@@ -98,7 +113,7 @@ struct FramePackage {
 using EnergyValue = double;
 using DetectorData = Frame<std::uint16_t>;
 using PhotonMap = DetectorData;
-using PhotonSumMap = Frame<std::uint64_t>;
+using EnergySumMap = Frame<std::uint64_t>;
 using DriftMap = Frame<double>;
 using GainStageMap = Frame<char>;
 using MaskMap = Frame<bool>;

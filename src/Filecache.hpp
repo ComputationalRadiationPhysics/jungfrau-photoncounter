@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Config.hpp"
+#include "Alpakaconfig.hpp"
 
 #include <fstream>
 #include <memory>
