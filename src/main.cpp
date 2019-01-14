@@ -1,7 +1,7 @@
-#include "Alpakaconfig.hpp"
-#include "Config.hpp"
-#include "Dispenser.hpp"
-#include "Filecache.hpp"
+#include "jungfrau-photoncounter/Alpakaconfig.hpp"
+#include "jungfrau-photoncounter/Config.hpp"
+#include "jungfrau-photoncounter/Dispenser.hpp"
+#include "jungfrau-photoncounter/Filecache.hpp"
 
 /**
  * only change this line to change the backend
