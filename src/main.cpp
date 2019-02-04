@@ -7,8 +7,11 @@
  * only change this line to change the backend
  * see Alpakaconfig.hpp for all available
  */
-using Accelerator = GpuCudaRt; // CpuSerial;
+//using Accelerator = GpuCudaRt; // CpuSerial;
 
+//using Accelerator = GpuCudaRt;
+//typedef Accelerator GpuCudaRt
+#define Accelerator GpuCudaRt
 
 void save_pedestal_update_count(std::string path, Pedestal* data)
 {

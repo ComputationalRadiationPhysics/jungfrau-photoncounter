@@ -40,9 +40,8 @@ public:
               alpaka::mem::buf::alloc<GainStageMap, TSize>(host, SINGLEMAP)),
           maxValueMaps(
               alpaka::mem::buf::alloc<EnergyMap, TSize>(host, DEV_FRAMES)),
-          workdiv(TAlpaka()),
           init(false),
-          ringbuffer(workdiv.STREAMS_PER_DEV *
+          ringbuffer(TAlpaka::STREAMS_PER_DEV *
                      alpaka::pltf::getDevCount<typename TAlpaka::PltfAcc>()),
           pedestal(PEDEMAPS, host)
     {
@@ -201,7 +200,7 @@ public:
         GainStageMaskingKernel gainStageMasking;
         auto const gainStageMasker(
             alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
-                workdiv.workdiv,
+                getWorkDiv<TAlpaka>(),
                 gainStageMasking,
                 alpaka::mem::view::getPtrNative(current_device.gainStage),
                 alpaka::mem::view::getPtrNative(current_device.gainStageOutput),
@@ -238,7 +237,7 @@ public:
         DriftMapKernel driftMapKernel;
         auto const driftMap(
             alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
-                workdiv.workdiv,
+                getWorkDiv<TAlpaka>(),
                 driftMapKernel,
                 alpaka::mem::view::getPtrNative(current_device.initialPedestal),
                 alpaka::mem::view::getPtrNative(current_device.pedestal),
@@ -456,7 +455,6 @@ private:
 
     FramePackage<PedestalMap, TAlpaka, TDim, TSize> pedestal;
 
-    TAlpaka workdiv;
     bool init;
     Ringbuffer<DeviceData<TAlpaka, TDim, TSize>*> ringbuffer;
     std::vector<DeviceData<TAlpaka, TDim, TSize>> devices;
@@ -469,11 +467,11 @@ private:
      */
     auto initDevices(std::vector<typename TAlpaka::DevAcc> devs) -> void
     {
-        devices.reserve(devs.size() * workdiv.STREAMS_PER_DEV);
-        for (std::size_t num = 0; num < devs.size() * workdiv.STREAMS_PER_DEV;
+      devices.reserve(devs.size() * TAlpaka::STREAMS_PER_DEV);
+        for (std::size_t num = 0; num < devs.size() * TAlpaka::STREAMS_PER_DEV;
              ++num) {
             // initialize variables
-            devices.emplace_back(num, devs[num / workdiv.STREAMS_PER_DEV]);
+            devices.emplace_back(num, devs[num / TAlpaka::STREAMS_PER_DEV]);
             alpaka::mem::view::copy(
                 devices[num].queue, devices[num].gain, gain.data, GAINMAPS);
 
@@ -535,7 +533,7 @@ private:
         CalibrationKernel calibrationKernel;
         auto const calibration(
             alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
-                workdiv.workdiv,
+                getWorkDiv<TAlpaka>(),
                 calibrationKernel,
                 alpaka::mem::view::getPtrNative(dev->data),
                 alpaka::mem::view::getPtrNative(dev->pedestal),
@@ -643,7 +641,7 @@ private:
             ConversionKernel conversionKernel;
             auto const conversion(
                 alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
-                    workdiv.workdiv,
+                    getWorkDiv<TAlpaka>(),
                     conversionKernel,
                     alpaka::mem::view::getPtrNative(dev->data),
                     alpaka::mem::view::getPtrNative(dev->gain),
@@ -662,7 +660,7 @@ private:
             PhotonFinderKernel photonFinderKernel;
             auto const photonFinder(
                 alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
-                    workdiv.workdiv,
+                    getWorkDiv<TAlpaka>(),
                     photonFinderKernel,
                     alpaka::mem::view::getPtrNative(dev->data),
                     alpaka::mem::view::getPtrNative(dev->gain),
@@ -687,7 +685,7 @@ private:
                 ClusterFinderKernel clusterFinderKernel;
                 auto const clusterFinder(
                     alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
-                        workdiv.workdiv,
+                        getWorkDiv<TAlpaka>(),
                         clusterFinderKernel,
                         alpaka::mem::view::getPtrNative(dev->data),
                         alpaka::mem::view::getPtrNative(dev->gain),
@@ -703,7 +701,7 @@ private:
                 alpaka::queue::enqueue(dev->queue, clusterFinder);
             }
         }
-        
+
         // find max value
         if (flags.maxValue) {
             // get the max value
@@ -753,15 +751,15 @@ private:
             DEBUG("enqueueing max value extraction kernel");
             alpaka::queue::enqueue(dev->queue, maxValueCopy);
         }
-        
+
         // summation
         if (flags.summation) {
             DEBUG("enqueueing summation kernel");
-            
+
             SummationKernel summationKernel;
             auto const summation(
                 alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
-                    workdiv.workdiv,
+                    getWorkDiv<TAlpaka>(),
                     summationKernel,
                     alpaka::mem::view::getPtrNative(dev->energy),
                     SUM_FRAMES,

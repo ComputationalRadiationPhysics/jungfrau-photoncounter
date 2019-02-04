@@ -1,35 +1,7 @@
 #pragma once
 
 #include <alpaka/alpaka.hpp>
-
-//#############################################################################
-//! A cheap wrapper around a C-style array in heap memory.
-template <typename T, uint64_t size> struct cheapArray {
-    T data[size];
-
-    //-----------------------------------------------------------------------------
-    //! Access operator.
-    //!
-    //! \param index The index of the element to be accessed.
-    //!
-    //! Returns the requested element per reference.
-    ALPAKA_FN_HOST_ACC ALPAKA_FN_INLINE T& operator[](uint64_t index)
-    {
-        return data[index];
-    }
-
-    //-----------------------------------------------------------------------------
-    //! Access operator.
-    //!
-    //! \param index The index of the element to be accessed.
-    //!
-    //! Returns the requested element per constant reference.
-    ALPAKA_FN_HOST_ACC ALPAKA_FN_INLINE const T&
-    operator[](uint64_t index) const
-    {
-        return data[index];
-    }
-};
+#include "../CheapArray.hpp"
 
 //#############################################################################
 //! A reduction kernel.
@@ -59,7 +31,7 @@ template <uint32_t TBlockSize, typename T> struct ReduceKernel {
                                   TIdx const& n) const -> void
     {
         auto& sdata(
-            alpaka::block::shared::st::allocVar<cheapArray<T, TBlockSize>,
+            alpaka::block::shared::st::allocVar<CheapArray<T, TBlockSize>,
                                                 __COUNTER__>(acc));
 
         const uint32_t blockIndex(static_cast<uint32_t>(

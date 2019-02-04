@@ -5,6 +5,8 @@
 #include <fstream>
 #include <iostream>
 
+#include "CheapArray.hpp"
+
 // general settings
 constexpr std::size_t FRAMESPERSTAGE_G0 = 1000;
 constexpr std::size_t FRAMESPERSTAGE_G1 = 0;
@@ -116,8 +118,8 @@ using DriftMap = Frame<double>;
 using GainStageMap = Frame<char>;
 using MaskMap = Frame<bool>;
 using EnergyMap = Frame<EnergyValue>;
-using GainMap = double[DIMX * DIMY];
-using PedestalMap = Pedestal[DIMX * DIMY];
+using GainMap = CheapArray<double, DIMX * DIMY>;
+using PedestalMap = CheapArray<Pedestal, DIMX * DIMY>;
 
 // debug statements
 typedef std::chrono::high_resolution_clock Clock;

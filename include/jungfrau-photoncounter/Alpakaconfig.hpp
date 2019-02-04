@@ -31,6 +31,11 @@ using Dim = alpaka::dim::DimInt<1u>;
 using Size = uint64_t;
 using WorkDiv = alpaka::workdiv::WorkDivMembers<Dim, Size>;
 
+template<typename TAccelerator>
+WorkDiv getWorkDiv() {
+  return WorkDiv(TAccelerator::blocksPerGrid, TAccelerator::threadsPerBlock, TAccelerator::elementsPerThread);
+}
+
 //#############################################################################
 //! Get Trait via struct.
 //!
@@ -82,9 +87,7 @@ struct CpuOmp2Blocks {
     static constexpr Size elementsPerThread = 1u;
     static constexpr Size threadsPerBlock = 1u;
     static constexpr Size blocksPerGrid = MAPSIZE;
-    WorkDiv workdiv{blocksPerGrid, threadsPerBlock, elementsPerThread};
 };
-
 
 template <typename T, typename TBuf, typename... TArgs>
 struct GetIterator<T, TBuf, alpaka::acc::AccCpuOmp2Blocks<TArgs...>> {
@@ -114,7 +117,6 @@ struct CpuOmp4 {
     static constexpr Size elementsPerThread = 1u;
     static constexpr Size threadsPerBlock = 1u;
     static constexpr Size blocksPerGrid = MAPSIZE;
-    WorkDiv workdiv{blocksPerGrid, threadsPerBlock, elementsPerThread};
 };
 
 template <typename T, typename TBuf, typename... TArgs>
@@ -144,7 +146,6 @@ struct CpuSerial {
     static constexpr Size elementsPerThread = 1u;
     static constexpr Size threadsPerBlock = 1u;
     static constexpr Size blocksPerGrid = MAPSIZE;
-    WorkDiv workdiv{blocksPerGrid, threadsPerBlock, elementsPerThread};
 };
 
 template <typename T, typename TBuf, typename... TArgs>
@@ -172,7 +173,6 @@ struct CpuThreads {
     static constexpr Size elementsPerThread = 1u;
     static constexpr Size threadsPerBlock = 1u;
     static constexpr Size blocksPerGrid = MAPSIZE;
-    WorkDiv workdiv{blocksPerGrid, threadsPerBlock, elementsPerThread};
 };
 
 template <typename T, typename TBuf, typename... TArgs>
@@ -202,7 +202,6 @@ struct GpuCudaRt {
     static constexpr Size elementsPerThread = 1u;
     static constexpr Size threadsPerBlock = DIMX;
     static constexpr Size blocksPerGrid = DIMY;
-    WorkDiv workdiv{blocksPerGrid, threadsPerBlock, elementsPerThread};
 };
 
 template <typename T, typename TBuf, typename... TArgs>
