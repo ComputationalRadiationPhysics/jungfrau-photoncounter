@@ -45,10 +45,10 @@ public:
                      alpaka::pltf::getDevCount<typename TAlpaka::PltfAcc>()),
           pedestal(PEDEMAPS, host)
     {
-        std::vector<typename TAlpaka::DevAcc> devs(
+        std::vector<typename TAlpaka::DevAcc> allDevices(
             alpaka::pltf::getDevs<typename TAlpaka::PltfAcc>());
 
-        initDevices(devs);
+        initDevices(allDevices);
 
         // make room for live mask information
         if (!mask) {
@@ -465,13 +465,13 @@ private:
      * Initializes all devices. Uploads gain data and creates buffer.
      * @param vector with devices to be initialized
      */
-    auto initDevices(std::vector<typename TAlpaka::DevAcc> devs) -> void
+    auto initDevices(std::vector<typename TAlpaka::DevAcc> allDevices) -> void
     {
-      devices.reserve(devs.size() * TAlpaka::STREAMS_PER_DEV);
-        for (std::size_t num = 0; num < devs.size() * TAlpaka::STREAMS_PER_DEV;
+      devices.reserve(allDevices.size() * TAlpaka::STREAMS_PER_DEV);
+        for (std::size_t num = 0; num < allDevices.size() * TAlpaka::STREAMS_PER_DEV;
              ++num) {
             // initialize variables
-            devices.emplace_back(num, devs[num / TAlpaka::STREAMS_PER_DEV]);
+            devices.emplace_back(num, allDevices[num / TAlpaka::STREAMS_PER_DEV]);
             alpaka::mem::view::copy(
                 devices[num].queue, devices[num].gain, gain.data, GAINMAPS);
 
