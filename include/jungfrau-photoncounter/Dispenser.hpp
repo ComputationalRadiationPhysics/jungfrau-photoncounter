@@ -199,7 +199,7 @@ public:
         // mask gain stage maps
         GainStageMaskingKernel gainStageMasking;
         auto const gainStageMasker(
-            alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
+            alpaka::kernel::createTaskKernel<typename TAlpaka::Acc>(
                 getWorkDiv<TAlpaka>(),
                 gainStageMasking,
                 alpaka::mem::view::getPtrNative(current_device.gainStage),
@@ -236,7 +236,7 @@ public:
         // mask gain stage maps
         DriftMapKernel driftMapKernel;
         auto const driftMap(
-            alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
+            alpaka::kernel::createTaskKernel<typename TAlpaka::Acc>(
                 getWorkDiv<TAlpaka>(),
                 driftMapKernel,
                 alpaka::mem::view::getPtrNative(current_device.initialPedestal),
@@ -532,7 +532,7 @@ private:
 
         CalibrationKernel calibrationKernel;
         auto const calibration(
-            alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
+            alpaka::kernel::createTaskKernel<typename TAlpaka::Acc>(
                 getWorkDiv<TAlpaka>(),
                 calibrationKernel,
                 alpaka::mem::view::getPtrNative(dev->data),
@@ -640,7 +640,7 @@ private:
         if (flags.mode == 0) {
             ConversionKernel conversionKernel;
             auto const conversion(
-                alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
+                alpaka::kernel::createTaskKernel<typename TAlpaka::Acc>(
                     getWorkDiv<TAlpaka>(),
                     conversionKernel,
                     alpaka::mem::view::getPtrNative(dev->data),
@@ -659,7 +659,7 @@ private:
         if (flags.mode == 1) {
             PhotonFinderKernel photonFinderKernel;
             auto const photonFinder(
-                alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
+                alpaka::kernel::createTaskKernel<typename TAlpaka::Acc>(
                     getWorkDiv<TAlpaka>(),
                     photonFinderKernel,
                     alpaka::mem::view::getPtrNative(dev->data),
@@ -684,7 +684,7 @@ private:
                 // frame
                 ClusterFinderKernel clusterFinderKernel;
                 auto const clusterFinder(
-                    alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
+                    alpaka::kernel::createTaskKernel<typename TAlpaka::Acc>(
                         getWorkDiv<TAlpaka>(),
                         clusterFinderKernel,
                         alpaka::mem::view::getPtrNative(dev->data),
@@ -712,7 +712,7 @@ private:
                                     static_cast<Size>(1)};
                 ReduceKernel<TAlpaka::threadsPerBlock, double> reduceKernelRun1;
                 auto const reduceRun1(
-                    alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
+                    alpaka::kernel::createTaskKernel<typename TAlpaka::Acc>(
                         workdivRun1,
                         reduceKernelRun1,
                         &alpaka::mem::view::getPtrNative(dev->energy)[i],
@@ -724,7 +724,7 @@ private:
                                     static_cast<Size>(1)};
                 ReduceKernel<TAlpaka::threadsPerBlock, double> reduceKernelRun2;
                 auto const reduceRun2(
-                    alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
+                    alpaka::kernel::createTaskKernel<typename TAlpaka::Acc>(
                         workdivRun2,
                         reduceKernelRun2,
                         &alpaka::mem::view::getPtrNative(dev->maxValueMaps)[i],
@@ -741,7 +741,7 @@ private:
                 static_cast<Size>(1)};
             MaxValueCopyKernel maxValueCopyKernel;
             auto const maxValueCopy(
-                alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
+                alpaka::kernel::createTaskKernel<typename TAlpaka::Acc>(
                     workdivMaxValueCopy,
                     maxValueCopyKernel,
                     alpaka::mem::view::getPtrNative(dev->maxValueMaps),
@@ -758,7 +758,7 @@ private:
 
             SummationKernel summationKernel;
             auto const summation(
-                alpaka::kernel::createTaskExec<typename TAlpaka::Acc>(
+                alpaka::kernel::createTaskKernel<typename TAlpaka::Acc>(
                     getWorkDiv<TAlpaka>(),
                     summationKernel,
                     alpaka::mem::view::getPtrNative(dev->energy),
