@@ -9,6 +9,7 @@
 #include "kernel/Conversion.hpp"
 #include "kernel/DriftMap.hpp"
 #include "kernel/GainStageMasking.hpp"
+#include "kernel/GainmapInversion.hpp"
 #include "kernel/MaxValueCopy.hpp"
 #include "kernel/PhotonFinder.hpp"
 #include "kernel/Reduction.hpp"
@@ -467,13 +468,21 @@ private:
      */
     auto initDevices(std::vector<typename TAlpaka::DevAcc> allDevices) -> void
     {
-      devices.reserve(allDevices.size() * TAlpaka::STREAMS_PER_DEV);
+        const GainmapInversionKernel gainmapInversionKernel;
+        devices.reserve(allDevices.size() * TAlpaka::STREAMS_PER_DEV);
         for (std::size_t num = 0; num < allDevices.size() * TAlpaka::STREAMS_PER_DEV;
              ++num) {
             // initialize variables
             devices.emplace_back(num, allDevices[num / TAlpaka::STREAMS_PER_DEV]);
             alpaka::mem::view::copy(
                 devices[num].queue, devices[num].gain, gain.data, GAINMAPS);
+            // compute reciprocals of gain maps
+            auto const gainmapInversion(
+                alpaka::kernel::createTaskKernel<typename TAlpaka::Acc>(
+                    getWorkDiv<TAlpaka>(),
+                    gainmapInversionKernel,
+                    alpaka::mem::view::getPtrNative(devices[num].gain)));
+            alpaka::queue::enqueue(devices[num].queue, gainmapInversion);
 
             if (!ringbuffer.push(&devices[num])) {
                 fputs("FATAL ERROR (RingBuffer): Unexpected size!\n", stderr);
