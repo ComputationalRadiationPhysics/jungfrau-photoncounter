@@ -1,5 +1,4 @@
 #include "../Config.hpp"
-#include <type_traits>
 
 struct SummationKernel {
     template <typename TAcc,
