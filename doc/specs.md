@@ -2,7 +2,7 @@
 
 ### General
 
-(for general information on the process see [Jungfrau_GPU.pdf](https://github.com/ComputationalRadiationPhysics/jungfrau-photoncounter/blob/master/doc/Jungfrau_GPU.pdf) and the presentations [2017_04_08](https://github.com/ComputationalRadiationPhysics/jungfrau-photoncounter/blob/master/doc/presentation_2017_04_08/psi_presentation.pdf) and [2017_01_31](https://github.com/ComputationalRadiationPhysics/jungfrau-photoncounter/blob/master/doc/presentation_2017_01_31/jungfrau-photoncounter_eng.pdf))
+(for general information on the process see [Jungfrau_GPU.pdf](Jungfrau_GPU.pdf) and the presentations [2017_04_08](presentation_2017_04_08/psi_presentation.pdf) and [2017_01_31](presentation_2017_01_31/jungfrau-photoncounter_eng.pdf))
 
 - process up to 32 modules (this requires handling throughput around 10 GB/s and mutliple modules per node)
 - possibility to process different sized modules (mainly Jungfrau and Mönch)
