@@ -168,7 +168,7 @@ processInput(TAcc const& acc,
     // calculate energy of current channel
     auto& energy = energyMap.data[id];
 
-    energy = (adc - pedestal) / gain;
+    energy = (adc - pedestal) * gain;
 
     // set energy to zero if masked out
     if (!isValid)
