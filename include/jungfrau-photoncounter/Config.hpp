@@ -9,14 +9,14 @@
 
 // general settings
 constexpr std::size_t FRAMESPERSTAGE_G0 = 1000;
-constexpr std::size_t FRAMESPERSTAGE_G1 = 0;
-constexpr std::size_t FRAMESPERSTAGE_G2 = 0;
+constexpr std::size_t FRAMESPERSTAGE_G1 = 1000;
+constexpr std::size_t FRAMESPERSTAGE_G2 = 999;
 
 constexpr std::size_t FRAME_HEADER_SIZE = 16;
-constexpr std::size_t DIMX = 400;
-constexpr std::size_t DIMY = 400;
+constexpr std::size_t DIMX = 1024;
+constexpr std::size_t DIMY = 512;
 constexpr std::size_t SUM_FRAMES = 10;
-constexpr std::size_t DEV_FRAMES = 1000;
+constexpr std::size_t DEV_FRAMES = 300;
 constexpr std::size_t PEDEMAPS = 3;
 constexpr std::size_t GAINMAPS = 3;
 constexpr float BEAMCONST = 6.2;
@@ -28,9 +28,15 @@ constexpr std::size_t MAPSIZE = DIMX * DIMY;
 constexpr std::size_t SINGLEMAP = 1;
 constexpr std::size_t MAXINT = std::numeric_limits<uint32_t>::max();
 constexpr char MASKED_VALUE = 4;
+
+// maximal number of clusters possible:
 constexpr uint64_t MAX_CLUSTER_NUM = (DIMX - CLUSTER_SIZE + 1) *
                                      (DIMY - CLUSTER_SIZE + 1) /
                                      ((CLUSTER_SIZE / 2) * (CLUSTER_SIZE / 2));
+
+// maximal number of seperated clusters:
+constexpr uint64_t MAX_CLUSTER_NUM_USER =
+    DIMX * DIMY / ((CLUSTER_SIZE + 1) * (CLUSTER_SIZE + 1));
 
 struct FrameHeader {
     std::uint64_t frameNumber;
@@ -60,14 +66,15 @@ struct Cluster {
 };
 
 struct ExecutionFlags {
-  // 0 = only energy output, 1 = photon (and energy) output, 2 = clustering (and energy) output
-  uint8_t mode : 2;
-  // 0 = off, 1 = on
-  uint8_t summation : 1;
-  // 0 = off, 1 = on
-  uint8_t masking : 1;
-  // 0 = off, 1 = on
-  uint8_t maxValue : 1;
+    // 0 = only energy output, 1 = photon (and energy) output, 2 = clustering
+    // (and energy) output
+    uint8_t mode : 2;
+    // 0 = off, 1 = on
+    uint8_t summation : 1;
+    // 0 = off, 1 = on
+    uint8_t masking : 1;
+    // 0 = off, 1 = on
+    uint8_t maxValue : 1;
 };
 
 template <typename TAlpaka, typename TDim, typename TSize> struct ClusterArray {
@@ -113,7 +120,7 @@ struct FramePackage {
 using EnergyValue = double;
 using DetectorData = Frame<std::uint16_t>;
 using PhotonMap = DetectorData;
-using EnergySumMap = Frame<std::uint64_t>;
+using SumMap = Frame<double>;
 using DriftMap = Frame<double>;
 using GainStageMap = Frame<char>;
 using MaskMap = Frame<bool>;

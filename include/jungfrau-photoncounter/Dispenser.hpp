@@ -306,7 +306,7 @@ public:
     auto downloadData(
         boost::optional<FramePackage<EnergyMap, TAlpaka, TDim, TSize>&> energy,
         boost::optional<FramePackage<PhotonMap, TAlpaka, TDim, TSize>&> photon,
-        boost::optional<FramePackage<EnergySumMap, TAlpaka, TDim, TSize>&> sum,
+        boost::optional<FramePackage<SumMap, TAlpaka, TDim, TSize>&> sum,
         boost::optional<FramePackage<EnergyValue, TAlpaka, TDim, TSize>&>
             maxValues,
         boost::optional<ClusterArray<TAlpaka, TDim, TSize>&> clusters) -> size_t
@@ -411,7 +411,7 @@ public:
         nextFree = (nextFree + 1) % devices.size();
         ringbuffer.push(dev);
 
-        return DEV_FRAMES; //(*photon).numFrames;
+        return dev->numMaps;
     }
 
     /**
@@ -762,8 +762,8 @@ private:
                     getWorkDiv<TAlpaka>(),
                     summationKernel,
                     alpaka::mem::view::getPtrNative(dev->energy),
-                    SUM_FRAMES,
                     dev->numMaps,
+                    SUM_FRAMES,
                     alpaka::mem::view::getPtrNative(dev->sum)));
 
             alpaka::queue::enqueue(dev->queue, summation);
