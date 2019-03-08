@@ -11,7 +11,7 @@ The current `main.cpp` file is configured to work with CUDA devices. If it is pr
 ## Usage
 
 First, the headers files need to be included and an alpaka Accelerator has to be selected:
-```
+```C++
 #include "Alpakaconfig.hpp"
 #include "Config.hpp"
 #include "Dispenser.hpp"
@@ -23,7 +23,7 @@ using Accelerator = GpuCudaRt;
 The `Config.hpp` contains project specific configurations like the image size and the package size while the `Alpakaconfig.hpp` contains alpaka specific configurations. 
 
 After this, the data should be loaded. For this we provide the class `Filecache` but this is not strictly required. It is also possible to provide other data sources, as long as the memory is pinned using alpaka.
-```
+```C++
 // create a sufficiently large Filecache
 Filecache fc(1024UL * 1024 * 1024 * 16);
 
@@ -45,28 +45,92 @@ Maps<Data, Accelerator> data(
     true));
 ```
 
-After this step, the `Dispenser` class can be initialized:
+This is now a good time to allocate space for the output data:
+```C++
+    // allocate space for the optional mask map
+    FramePackage<MaskMap, Accelerator, Dim, Size> mask(SINGLEMAP);
+    mask.numFrames = 0;
+    
+    // create empty, optional input mask
+    boost::optional<alpaka::mem::buf::
+                        Buf<typename Accelerator::DevHost, MaskMap, Dim, Size>>
+        maskPtr;
+    if (mask.numFrames == SINGLEMAP)
+        maskPtr = mask.data;
+
+    // allocate space for output data
+    FramePackage<EnergyMap, Accelerator, Dim, Size> energy_data(DEV_FRAMES);
+    FramePackage<PhotonMap, Accelerator, Dim, Size> photon_data(DEV_FRAMES);
+    FramePackage<SumMap, Accelerator, Dim, Size> sum_data(DEV_FRAMES /
+                                                                SUM_FRAMES);
+    // allocate space for the clustering results if needed
+    ClusterArray<Accelerator, Dim, Size> clusters_data(
+                                         MAX_CLUSTER_NUM_USER * DEV_FRAMES);
+    
+    // allocate space for the maximal values
+    FramePackage<EnergyValue, Accelerator, Dim, Size> maxValues_data(
+        DEV_FRAMES);
+
+    // create placeholder for output data
+    boost::optional<FramePackage<EnergyMap, Accelerator, Dim, Size>&> energy =
+        energy_data;
+    boost::optional<FramePackage<PhotonMap, Accelerator, Dim, Size>&> photon =
+        photon_data;
+    boost::optional<FramePackage<SumMap, Accelerator, Dim, Size>&> sum =
+        sum_data;
+    
+    // Note: remove the = cluster_data if the clustering result should not be
+    //       downloaded
+    boost::optional<ClusterArray<Accelerator, Dim, Size>&>
+        clusters = clusters_data;
+    boost::optional<FramePackage<EnergyValue, Accelerator, Dim, Size>&>
+        maxValues = maxValues_data;
 ```
-Dispenser<Accelerator> dispenser(gain);
+
+After this step, the `Dispenser` class can be initialized:
+```C++
+Dispenser<Accelerator> dispenser(gain, maskPtr);
 
 // calibrate pedestal data
 dispenser.uploadPedestaldata(pedestaldata);
 ```
+For simultaneous of multiple modules, one instance of the `Dispenser` class per module is needed:
+```C++
+Dispenser<Accelerator> dispenser1(gain1, maskPtr1);
+Dispenser<Accelerator> dispenser2(gain2, maskPtr2);
+// ...
 
-Now it is possible to upload (`std::size_t dispenser.uploadData(data, offset)`) and download (`bool dispenser.downloadData(&photon, &sum)`) data. It is recommended process all data with a loop:
+// calibrate pedestal data
+dispenser1.uploadPedestaldata(pedestaldata1);
+dispenser2.uploadPedestaldata(pedestaldata2);
+//...
 ```
-Maps<Photon, Accelerator> photon{};
-Maps<PhotonSum, Accelerator> sum{};
-std::size_t offset = 0;
-std::size_t downloaded = 0;
 
-while (downloaded < data.numMaps) {
-  offset = dispenser.uploadData(data, offset);
-  if (dispenser.downloadData(&photon, &sum))
-    downloaded += DEV_FRAMES;
-}
+Now it is possible to upload (`std::size_t uploadData(data, offset, flags)`) and download (`std::size_t downloadData(energy, photon, sum, maxValues, clusters)`) data. It is recommended process all data with a loop:
+```C++
+    std::size_t offset = 0;
+    std::size_t downloaded = 0;
+    std::size_t currently_downloaded_frames = 0;
+
+    ExecutionFlags ef;
+    ef.mode = 1; // photon and energy values are calculated
+    ef.summation = 1;
+    ef.masking = 1;
+    ef.maxValue = 1;
+
+    // process data maps
+    while (downloaded < data.numFrames) {
+        offset = dispenser->uploadData(data, offset, ef);
+        if (currently_downloaded_frames = dispenser->downloadData(
+                energy, photon, sum, maxValues, clusters)) {
+            downloaded += currently_downloaded_frames;
+
+            DEBUG(downloaded << "/" << data.numFrames << " downloaded; "
+                             << offset << " uploaded");
+        }
+    }
 ```
 
 The upload function returns the number of uploaded frames and the download function returns true if frames could be downloaded.
 
-A current example can be found in the [main.cpp](https://github.com/ComputationalRadiationPhysics/jungfrau-photoncounter/blob/master/src/main.cpp).
+A current example can be found in the [main.cpp](../src/main.cpp).

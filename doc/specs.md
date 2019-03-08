@@ -2,11 +2,11 @@
 
 ### General
 
-(for general information on the process see [Jungfrau_GPU.pdf](https://github.com/ComputationalRadiationPhysics/jungfrau-photoncounter/blob/master/doc/Jungfrau_GPU.pdf) and the presentations [2017_04_08](https://github.com/ComputationalRadiationPhysics/jungfrau-photoncounter/blob/master/doc/presentation_2017_04_08/psi_presentation.pdf) and [2017_01_31](https://github.com/ComputationalRadiationPhysics/jungfrau-photoncounter/blob/master/doc/presentation_2017_01_31/jungfrau-photoncounter_eng.pdf))
+(for general information on the process see [Jungfrau_GPU.pdf](Jungfrau_GPU.pdf) and the presentations [2017_04_08](presentation_2017_04_08/psi_presentation.pdf) and [2017_01_31](presentation_2017_01_31/jungfrau-photoncounter_eng.pdf))
 
 - process up to 32 modules (this requires handling throughput around 10 GB/s and mutliple modules per node)
 - possibility to process different sized modules (mainly Jungfrau and Mönch)
-- flag to switch between photon and energy output
+- flag to switch between photon and energy output and clustering
 - sum every 10-100 images
 - possibility to mask single pixels (manually and automatically)
 - initial pedestal calibration
@@ -23,7 +23,7 @@
 ### Online pedestal correction
 
 - update pedestal values with every frame using its dark pixels
-- use moving average as described by [John D. Cook](https://www.johndcook.com/blog/standard_deviation/)
+- use a modified version of the moving average as described by [John D. Cook](https://www.johndcook.com/blog/standard_deviation/)
 - log difference between initial calibration and the current state of the pedestal maps
 - resetable by user (stop online correction afterwards and fall back to initial callibration data)
 - if a recallibration is needed, restart the program
@@ -40,6 +40,7 @@
 
 ### Live System
 
+- supply interface for live displaying capabilities
 - 1-5 Hz
 - show photon maps, current pedestal map, gain stage map and pedestal drift data
 - show highest value
