@@ -50,7 +50,6 @@ struct PhotonFinderKernel {
             auto adc = getAdc(dataword);
 
             const auto& gainStage = gainStageMaps[i].data[id];
-            //printf("%d ", gainStage);
             // first thread copies frame header to output
             if (id == 0) {
                 copyFrameHeader(detectorData[i], photonMaps[i]);
