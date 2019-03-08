@@ -133,4 +133,4 @@ Now it is possible to upload (`std::size_t uploadData(data, offset, flags)`) and
 
 The upload function returns the number of uploaded frames and the download function returns true if frames could be downloaded.
 
-A current example can be found in the [main.cpp](https://github.com/ComputationalRadiationPhysics/jungfrau-photoncounter/blob/clustering/src/main.cpp).
+A current example can be found in the [main.cpp](../src/main.cpp).
