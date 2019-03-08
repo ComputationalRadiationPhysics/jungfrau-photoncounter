@@ -4,10 +4,13 @@ Conversion of Jungfrau pixel detector data to photon count rate.
 # Installing
 
 What is needed?
-- alpaka (see [alpaka](https://github.com/ComputationalRadiationPhysics/alpaka))
-- boost (dependency of alpaka)
+- alpaka (see [alpaka](https://github.com/ComputationalRadiationPhysics/alpaka) or install through this [spack repo](https://github.com/ComputationalRadiationPhysics/spack-repo) using the [spack package manager](https://spack.io/))
+- boost ([dependency of alpaka](https://github.com/ComputationalRadiationPhysics/alpaka#dependencies))
 - CUDA 8.0 (preferably 9.2 or higher; only needed if GPU are being used)
-- a compatible compiler 
+- CMake 3.11 or newer
+- a compatible compiler (see [alpaka](https://github.com/ComputationalRadiationPhysics/alpaka))
+
+See also [Issue #42](https://github.com/ComputationalRadiationPhysics/jungfrau-photoncounter/issues/42#issuecomment-457198329).
 
 After downloading the repository, make sure that all the data files are in palce. The pedestal cailibration data (1000 images for stage G0, 1000 images for stage G1, 999 images for stage G2) has to be located at `jungfrau-photoncounter/data_pool/px_101016/allpede_250us_1243__B_000000.dat`, the gain maps (one for every stage) need to be located at `jungfrau-photoncounter/data_pool/px_101016/gainMaps_M022.bin` and the image data has to be located at `jungfrau-photoncounter/data_pool/px_101016/Insu_6_tr_1_45d_250us__B_000000.dat`. For more information see [doc/usage.md](doc/usage.md).
 
@@ -27,7 +30,7 @@ make
 
 # Documentation
 
-Most parts of the documentation can be found in the [doc](https://github.com/ComputationalRadiationPhysics/jungfrau-photoncounter/tree/master/doc) folder. 
+Most parts of the documentation can be found in the [doc](doc) folder. 
 
 The [description.md](doc/description.md) file contains a general overview of the workflow. The usage of the interface can be found in the [usage.md](doc/usage.md) file. 
 
