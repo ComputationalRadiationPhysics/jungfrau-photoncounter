@@ -33,7 +33,7 @@ using WorkDiv = alpaka::workdiv::WorkDivMembers<Dim, Size>;
 
 template<typename TAccelerator>
 WorkDiv getWorkDiv() {
-  return WorkDiv(TAccelerator::blocksPerGrid, TAccelerator::threadsPerBlock, TAccelerator::elementsPerThread);
+  return WorkDiv(decltype(TAccelerator::blocksPerGrid)(TAccelerator::blocksPerGrid), decltype(TAccelerator::threadsPerBlock)(TAccelerator::threadsPerBlock), decltype(TAccelerator::elementsPerThread)(TAccelerator::elementsPerThread));
 }
 
 //#############################################################################
@@ -82,7 +82,7 @@ struct CpuOmp2Blocks {
     using Queue = alpaka::queue::QueueCpuSync;
     using Event = alpaka::event::Event<Queue>;
 
-    const std::size_t STREAMS_PER_DEV = 4;
+    static constexpr std::size_t STREAMS_PER_DEV = 4;
 
     static constexpr Size elementsPerThread = 1u;
     static constexpr Size threadsPerBlock = 1u;
@@ -112,7 +112,7 @@ struct CpuOmp4 {
     using Queue = alpaka::queue::QueueCpuSync;
     using Event = alpaka::event::Event<Queue>;
 
-    const std::size_t STREAMS_PER_DEV = 4;
+    static constexpr std::size_t STREAMS_PER_DEV = 4;
 
     static constexpr Size elementsPerThread = 1u;
     static constexpr Size threadsPerBlock = 1u;
@@ -140,8 +140,8 @@ struct CpuSerial {
     using PltfAcc = alpaka::pltf::Pltf<DevAcc>;
     using Queue = alpaka::queue::QueueCpuSync;
     using Event = alpaka::event::Event<Queue>;
-
-    const std::size_t STREAMS_PER_DEV = 4;
+  
+    static constexpr std::size_t STREAMS_PER_DEV = 4;
 
     static constexpr Size elementsPerThread = 1u;
     static constexpr Size threadsPerBlock = 1u;
@@ -169,6 +169,7 @@ struct CpuThreads {
     using Queue = alpaka::queue::QueueCpuSync;
     using Event = alpaka::event::Event<Queue>;
 
+    static constexpr std::size_t STREAMS_PER_DEV = 1;
 
     static constexpr Size elementsPerThread = 1u;
     static constexpr Size threadsPerBlock = 1u;

@@ -18,6 +18,7 @@ constexpr std::size_t DIMY = 400;
 constexpr std::size_t SUM_FRAMES = 10;
 constexpr std::size_t DEV_FRAMES = 1000;
 constexpr std::size_t PEDEMAPS = 3;
+constexpr std::size_t MOVING_STAT_WINDOW_SIZE = 100;
 constexpr std::size_t GAINMAPS = 3;
 constexpr float BEAMCONST = 6.2;
 constexpr float PHOTONCONST = (1. / 12.4);
@@ -32,6 +33,11 @@ constexpr uint64_t MAX_CLUSTER_NUM = (DIMX - CLUSTER_SIZE + 1) *
                                      (DIMY - CLUSTER_SIZE + 1) /
                                      ((CLUSTER_SIZE / 2) * (CLUSTER_SIZE / 2));
 
+static_assert(
+    FRAMESPERSTAGE_G0 >= MOVING_STAT_WINDOW_SIZE,
+    "Moving stat window size is bigger than the frames supplied for the "
+    "callibration of the pedestal values for the first gain stage. ");
+
 struct FrameHeader {
     std::uint64_t frameNumber;
     std::uint64_t bunchId;
@@ -42,14 +48,13 @@ template <typename TData> struct Frame {
     TData data[DIMX * DIMY];
 };
 
-struct Pedestal {
+struct InitPedestal {
     std::size_t count;
     double oldM;
     double mean;
     double oldS;
     double newS;
     double stddev;
-    double variance;
 };
 
 struct Cluster {
@@ -60,14 +65,15 @@ struct Cluster {
 };
 
 struct ExecutionFlags {
-  // 0 = only energy output, 1 = photon (and energy) output, 2 = clustering (and energy) output
-  uint8_t mode : 2;
-  // 0 = off, 1 = on
-  uint8_t summation : 1;
-  // 0 = off, 1 = on
-  uint8_t masking : 1;
-  // 0 = off, 1 = on
-  uint8_t maxValue : 1;
+    // 0 = only energy output, 1 = photon (and energy) output, 2 = clustering
+    // (and energy) output
+    uint8_t mode : 2;
+    // 0 = off, 1 = on
+    uint8_t summation : 1;
+    // 0 = off, 1 = on
+    uint8_t masking : 1;
+    // 0 = off, 1 = on
+    uint8_t maxValue : 1;
 };
 
 template <typename TAlpaka, typename TDim, typename TSize> struct ClusterArray {
@@ -88,8 +94,8 @@ template <typename TAlpaka, typename TDim, typename TSize> struct ClusterArray {
           clusters(
               alpaka::mem::buf::alloc<Cluster, TSize>(host, maxClusterCount))
     {
-        alpaka::mem::buf::pin(usedPinned);
-        alpaka::mem::buf::pin(clusters);
+        alpaka::mem::buf::prepareForAsyncCopy(usedPinned);
+        alpaka::mem::buf::prepareForAsyncCopy(clusters);
 
         alpaka::mem::view::getPtrNative(usedPinned)[0] = used;
     }
@@ -106,10 +112,11 @@ struct FramePackage {
         : numFrames(numFrames),
           data(alpaka::mem::buf::alloc<T, TSize>(host, numFrames))
     {
-        alpaka::mem::buf::pin(data);
+        alpaka::mem::buf::prepareForAsyncCopy(data);
     }
 };
 
+using Pedestal = double;
 using EnergyValue = double;
 using DetectorData = Frame<std::uint16_t>;
 using PhotonMap = DetectorData;
@@ -119,21 +126,22 @@ using GainStageMap = Frame<char>;
 using MaskMap = Frame<bool>;
 using EnergyMap = Frame<EnergyValue>;
 using GainMap = CheapArray<double, DIMX * DIMY>;
-using PedestalMap = CheapArray<Pedestal, DIMX * DIMY>;
+using PedestalMap = CheapArray<double, DIMX * DIMY>;
+using InitPedestalMap = CheapArray<InitPedestal, DIMX * DIMY>;
 
 // debug statements
 typedef std::chrono::high_resolution_clock Clock;
 typedef std::chrono::milliseconds ms;
 static Clock::time_point t;
 
-#define SHOW_DEBUG true
+//#define SHOW_DEBUG true
 
 #if (SHOW_DEBUG)
 #include <iostream>
 #define DEBUG(msg)                                                             \
     (std::cout << __FILE__ << "[" << __LINE__ << "]:\n\t"                      \
                << (std::chrono::duration_cast<ms>((Clock::now() - t))).count() \
-               << " ms\n\t" << msg << "\n")
+     << " ms\n\t" << msg << std::endl)//"\n")
 #else
 #define DEBUG(msg)
 #endif
@@ -230,6 +238,42 @@ void saveClusterArray(std::string path,
         }
     }
 
+    clusterFile.close();
+#endif
+}
+
+template <typename TAlpaka, typename TDim, typename TSize>
+void saveClustersBin(std::string path,
+                     ClusterArray<TAlpaka, TDim, TSize>& clusters)
+{
+#if (SHOW_DEBUG)
+    std::ofstream clusterFile(path.c_str(), std::ios::binary);
+    Cluster* clusterPtr = alpaka::mem::view::getPtrNative(clusters.clusters);
+
+    DEBUG("writing " << clusters.used << " clusters to " << path);
+
+    for (uint64_t i = 0; i < clusters.used; ++i) {
+        // write cluster information
+        int32_t frameNumber = clusterPtr[i].frameNumber & 0xFFFFFFFF;
+        clusterFile.write(reinterpret_cast<char*>(&frameNumber),
+                          sizeof(int32_t));
+        clusterFile.write(reinterpret_cast<char*>(&clusterPtr[i].x),
+                          sizeof(clusterPtr[i].x));
+        clusterFile.write(reinterpret_cast<char*>(&clusterPtr[i].y),
+                          sizeof(clusterPtr[i].y));
+
+        // write cluster
+        for (uint8_t y = 0; y < CLUSTER_SIZE; ++y) {
+            for (uint8_t x = 0; x < CLUSTER_SIZE; ++x) {
+                clusterFile.write(
+                    reinterpret_cast<char*>(
+                        &clusterPtr[i].data[x + y * CLUSTER_SIZE]),
+                    sizeof(clusterPtr[i].data[x + y * CLUSTER_SIZE]));
+            }
+        }
+    }
+
+    clusterFile.flush();
     clusterFile.close();
 #endif
 }

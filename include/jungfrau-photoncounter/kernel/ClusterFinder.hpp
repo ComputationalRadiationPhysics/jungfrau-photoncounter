@@ -6,6 +6,7 @@ struct ClusterFinderKernel {
     template <typename TAcc,
               typename TDetectorData,
               typename TGainMap,
+              typename TInitPedestalMap,
               typename TPedestalMap,
               typename TGainStageMap,
               typename TEnergyMap,
@@ -18,6 +19,7 @@ struct ClusterFinderKernel {
     ALPAKA_FN_ACC auto operator()(TAcc const& acc,
                                   TDetectorData const* const detectorData,
                                   TGainMap const* const gainMaps,
+                                  TInitPedestalMap* const initPedestalMaps,
                                   TPedestalMap* const pedestalMaps,
                                   TGainStageMap* const gainStageMaps,
                                   TEnergyMap* const energyMaps,
@@ -39,15 +41,15 @@ struct ClusterFinderKernel {
         auto id = linearizedGlobalThreadIdx[0u];
 
         constexpr auto n = CLUSTER_SIZE;
-        
-        if (currentFrame) {                
+
+        if (currentFrame) {
             auto adc = getAdc(detectorData[currentFrame - 1].data[id]);
             const auto& gainStage = gainStageMaps[currentFrame - 1].data[id];
             float sum;
             decltype(id) max;
             const auto& energy = energyMaps[currentFrame - 1].data[id];
-            const auto& stddev = pedestalMaps[gainStage][id].stddev;
-            if (indexQualifiesAsClusterCenter(id)) {                
+            const auto& stddev = initPedestalMaps[gainStage][id].stddev;
+            if (indexQualifiesAsClusterCenter(id)) {
                 findClusterSumAndMax(
                     energyMaps[currentFrame - 1].data, id, sum, max);
 
@@ -61,7 +63,7 @@ struct ClusterFinderKernel {
 
                 // check dark pixel condition
                 else if (-c * stddev <= energy && c * stddev >= energy) {
-                    updatePedestal(acc, adc, pedestalMaps[gainStage][id]);
+                  updatePedestal(adc, MOVING_STAT_WINDOW_SIZE, pedestalMaps[gainStage][id]);
                 }
             }
         }

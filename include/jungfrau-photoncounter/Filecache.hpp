@@ -8,7 +8,7 @@
 
 class Filecache {
 private:
-    std::unique_ptr<char> buffer;
+  std::unique_ptr<char, std::function<void(char*)>> buffer;
     char* bufferPointer;
     const std::size_t sizeBytes;
     auto getFileSize(const std::string path) const -> off_t;
@@ -46,11 +46,7 @@ auto Filecache::loadMaps(const std::string& path, bool header)
 
     FramePackage<TData, TAlpaka, TDim, TSize> maps(numFrames);
 
-#ifdef ALPAKA_ACC_GPU_CUDA_ENABLED
-#if (SHOW_DEBUG == false)
-    alpaka::mem::buf::pin(maps.data);
-#endif
-#endif
+    alpaka::mem::buf::prepareForAsyncCopy(maps.data);
 
     alpaka::queue::QueueCpuSync streamBuf =
         alpaka::pltf::getDevByIdx<typename TAlpaka::PltfHost>(0u);

@@ -5,11 +5,13 @@
 struct CalibrationKernel {
     template <typename TAcc,
               typename TDetectorData,
+              typename TInitPedestalMap,
               typename TPedestalMap,
               typename TMaskMap,
               typename TNumFrames>
     ALPAKA_FN_ACC auto operator()(TAcc const& acc,
                                   TDetectorData const* const detectorData,
+                                  TInitPedestalMap* const initPedestalMap,
                                   TPedestalMap* const pedestalMap,
                                   TMaskMap* const mask,
                                   TNumFrames const numFrames) const -> void
@@ -29,7 +31,7 @@ struct CalibrationKernel {
         // find expected gain stage
         char expectedGainStage;
         for (int i = 0; i < PEDEMAPS; ++i) {
-            if (pedestalMap[i][id].count != FRAMESPERSTAGE[i]) {
+            if (initPedestalMap[i][id].count != FRAMESPERSTAGE[i]) {
                 expectedGainStage = i;
                 break;
             }
@@ -37,12 +39,33 @@ struct CalibrationKernel {
 
         // determine expected gain stage
         for (TNumFrames i = 0; i < numFrames; ++i) {
-            if (pedestalMap[expectedGainStage][id].count == FRAMESPERSTAGE[expectedGainStage])
+            if (initPedestalMap[expectedGainStage][id].count ==
+                FRAMESPERSTAGE[expectedGainStage]) {
+
+                // copy readily calculated pedestal values into output pedestal
+                // map
+                pedestalMap[expectedGainStage][id] =
+                    initPedestalMap[expectedGainStage][id].mean;
+
                 ++expectedGainStage;
+            }
+
             auto dataword = detectorData[i].data[id];
             auto adc = getAdc(dataword);
             uint8_t gainStage = getGainStage(dataword);
-            initPedestal(acc, adc, pedestalMap[gainStage][id]);
+
+            if (initPedestalMap[expectedGainStage][id].count <
+                MOVING_STAT_WINDOW_SIZE) {
+                initPedestal(acc, adc, initPedestalMap[gainStage][id]);
+            }
+            else {
+                // manually increment counter
+                ++initPedestalMap[expectedGainStage][id].count;
+                updatePedestal(adc,
+                               MOVING_STAT_WINDOW_SIZE,
+                               pedestalMap[expectedGainStage][id]);
+            }
+
             // mark pixel invalid if expected gainstage does not match
             if (expectedGainStage != gainStage) {
                 mask->data[id] = false;

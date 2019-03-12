@@ -4,10 +4,11 @@
 
 struct DriftMapKernel {
     template <typename TAcc,
+              typename TInitPedestalMap,
               typename TPedestalMap,
               typename TDriftMap>
     ALPAKA_FN_ACC auto operator()(TAcc const& acc,
-                                  TPedestalMap const* const initialPedestalMaps,
+                                  TInitPedestalMap const* const initialPedestalMaps,
                                   TPedestalMap const* const pedestalMaps,
                                   TDriftMap *driftMaps) const -> void
     {
@@ -21,6 +22,6 @@ struct DriftMapKernel {
 
         auto id = linearizedGlobalThreadIdx[0u];
         
-        driftMaps->data[id] = pedestalMaps[0][id].mean - initialPedestalMaps[0][id].mean;
+        driftMaps->data[id] = pedestalMaps[0][id] - initialPedestalMaps[0][id].mean;
     }
 };

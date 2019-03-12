@@ -26,8 +26,9 @@ template <typename TAlpaka, typename TDim, typename TSize> struct DeviceData {
 
     alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, GainMap, TDim, TSize> gain;
 
-    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, PedestalMap, TDim, TSize>
-        initialPedestal;
+    alpaka::mem::buf::
+        Buf<typename TAlpaka::DevAcc, InitPedestalMap, TDim, TSize>
+            initialPedestal;
 
     alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, PedestalMap, TDim, TSize>
         pedestal;
@@ -48,7 +49,7 @@ template <typename TAlpaka, typename TDim, typename TSize> struct DeviceData {
 
     alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, EnergyMap, TDim, TSize>
         maxValueMaps;
-  
+
     alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, EnergyValue, TDim, TSize>
         maxValues;
 
@@ -80,20 +81,23 @@ template <typename TAlpaka, typename TDim, typename TSize> struct DeviceData {
           pedestal(
               alpaka::mem::buf::alloc<PedestalMap, TSize>(device, PEDEMAPS)),
           initialPedestal(
-              alpaka::mem::buf::alloc<PedestalMap, TSize>(device, PEDEMAPS)),
+              alpaka::mem::buf::alloc<InitPedestalMap, TSize>(device,
+                                                              PEDEMAPS)),
           drift(alpaka::mem::buf::alloc<DriftMap, TSize>(device, numMaps)),
           gainStage(
               alpaka::mem::buf::alloc<GainStageMap, TSize>(device, numMaps)),
           gainStageOutput(
               alpaka::mem::buf::alloc<GainStageMap, TSize>(device, SINGLEMAP)),
-          maxValueMaps(alpaka::mem::buf::alloc<EnergyMap, TSize>(device, numMaps)),
-          maxValues(alpaka::mem::buf::alloc<EnergyValue, TSize>(device, numMaps)),
+          maxValueMaps(
+              alpaka::mem::buf::alloc<EnergyMap, TSize>(device, numMaps)),
+          maxValues(
+              alpaka::mem::buf::alloc<EnergyValue, TSize>(device, numMaps)),
           energy(alpaka::mem::buf::alloc<EnergyMap, TSize>(device, numMaps)),
           mask(alpaka::mem::buf::alloc<MaskMap, TSize>(device, SINGLEMAP)),
           photon(alpaka::mem::buf::alloc<PhotonMap, TSize>(device, numMaps)),
-          sum(alpaka::mem::buf::alloc<EnergySumMap, TSize>(device,
-                                                           numMaps /
-                                                               SUM_FRAMES)),
+          sum(alpaka::mem::buf::alloc<EnergySumMap, TSize>(
+              device,
+              (numMaps + SUM_FRAMES - 1) / SUM_FRAMES)),
           cluster(alpaka::mem::buf::alloc<Cluster, TSize>(device,
                                                           MAX_CLUSTER_NUM *
                                                               numMaps)),
@@ -102,20 +106,20 @@ template <typename TAlpaka, typename TDim, typename TSize> struct DeviceData {
                                                                  SINGLEMAP))
     {
         // pin all buffer
-        alpaka::mem::buf::pin(data);
-        alpaka::mem::buf::pin(gain);
-        alpaka::mem::buf::pin(initialPedestal);
-        alpaka::mem::buf::pin(pedestal);
-        alpaka::mem::buf::pin(mask);
-        alpaka::mem::buf::pin(drift);
-        alpaka::mem::buf::pin(gainStage);
-        alpaka::mem::buf::pin(energy);
-        alpaka::mem::buf::pin(maxValueMaps);
-        alpaka::mem::buf::pin(maxValues);
-        alpaka::mem::buf::pin(photon);
-        alpaka::mem::buf::pin(sum);
-        alpaka::mem::buf::pin(cluster);
-        alpaka::mem::buf::pin(numClusters);
+        alpaka::mem::buf::prepareForAsyncCopy(data);
+        alpaka::mem::buf::prepareForAsyncCopy(gain);
+        alpaka::mem::buf::prepareForAsyncCopy(initialPedestal);
+        alpaka::mem::buf::prepareForAsyncCopy(pedestal);
+        alpaka::mem::buf::prepareForAsyncCopy(mask);
+        alpaka::mem::buf::prepareForAsyncCopy(drift);
+        alpaka::mem::buf::prepareForAsyncCopy(gainStage);
+        alpaka::mem::buf::prepareForAsyncCopy(energy);
+        alpaka::mem::buf::prepareForAsyncCopy(maxValueMaps);
+        alpaka::mem::buf::prepareForAsyncCopy(maxValues);
+        alpaka::mem::buf::prepareForAsyncCopy(photon);
+        alpaka::mem::buf::prepareForAsyncCopy(sum);
+        alpaka::mem::buf::prepareForAsyncCopy(cluster);
+        alpaka::mem::buf::prepareForAsyncCopy(numClusters);
 
         // set cluster counter to 0
         alpaka::mem::view::set(queue, numClusters, 0, SINGLEMAP);

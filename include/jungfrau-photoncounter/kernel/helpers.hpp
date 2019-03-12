@@ -25,25 +25,23 @@ ALPAKA_FN_ACC ALPAKA_FN_INLINE auto copyFrameHeader(TInputMap const& src,
     dst.header = src.header;
 }
 
-template <typename TAcc, typename TAdcValue, typename TPedestal>
-ALPAKA_FN_ACC ALPAKA_FN_INLINE auto initPedestal(const TAcc& acc,
-                                                   TAdcValue const adc,
-                                                   TPedestal& pedestal) -> void
+template <typename TAcc, typename TAdcValue, typename TInitPedestal>
+ALPAKA_FN_ACC ALPAKA_FN_INLINE auto
+initPedestal(const TAcc& acc, TAdcValue const adc, TInitPedestal& initPedestal)
+    -> void
 {
     // online algorithm for variance by Welford
-    auto& count = pedestal.count;
-    auto& mean = pedestal.mean;
-    auto& oldM = pedestal.oldM;
-    auto& oldS = pedestal.oldS;
-    auto& newS = pedestal.newS;
-    auto& variance = pedestal.variance; // sample variance
-    auto& stddev = pedestal.stddev;
+    auto& count = initPedestal.count;
+    auto& mean = initPedestal.mean;
+    auto& oldM = initPedestal.oldM;
+    auto& oldS = initPedestal.oldS;
+    auto& newS = initPedestal.newS;
+    auto& stddev = initPedestal.stddev;
 
     ++count;
     if (count == 1) {
         mean = oldM = adc;
         oldS = 0;
-        variance = 0;
         stddev = 0;
     }
     else {
@@ -51,22 +49,16 @@ ALPAKA_FN_ACC ALPAKA_FN_INLINE auto initPedestal(const TAcc& acc,
         newS = oldS + (adc - oldM) * (adc - mean);
         oldM = mean;
         oldS = newS;
-        variance = newS / (count - 1);
-        stddev = alpaka::math::sqrt(acc, variance);
+        stddev = alpaka::math::sqrt(acc, newS / (count - 1));
     }
 }
 
-template <typename TAcc, typename TAdcValue, typename TPedestal>
-ALPAKA_FN_ACC ALPAKA_FN_INLINE auto updatePedestal(const TAcc& acc,
-                                                   TAdcValue const adc,
+template <typename TAdcValue, typename TCountValue, typename TPedestal>
+ALPAKA_FN_ACC ALPAKA_FN_INLINE auto updatePedestal(TAdcValue const adc,
+                                                   TCountValue const count,
                                                    TPedestal& pedestal) -> void
 {
-    auto& count = pedestal.count;
-    auto& mean = pedestal.mean;
-    auto& oldM = pedestal.oldM;
-
-    ++count;
-    mean = oldM + (adc - oldM) / count;
+    pedestal += (adc - pedestal) / count;
 }
 
 template <typename TThreadIndex>
@@ -105,8 +97,8 @@ getClusterBuffer(TAcc const& acc,
                  TNumClusters* const numClusters) -> TClusterArray&
 {
     // get next free index of buffer atomically
-    auto i =
-    alpaka::atomic::atomicOp<alpaka::atomic::op::Add>(acc, numClusters, static_cast<TNumClusters>(1));
+    auto i = alpaka::atomic::atomicOp<alpaka::atomic::op::Add>(
+        acc, numClusters, static_cast<TNumClusters>(1));
     return clusterArray[i];
 }
 
@@ -148,7 +140,7 @@ processInput(TAcc const& acc,
              TIndex const id) -> void
 {
     // use masks to check whether the channel is valid or masked out
-  bool isValid = !mask ? 1 : mask->data[id];
+    bool isValid = !mask ? 1 : mask->data[id];
 
     auto dataword = detectorData.data[id];
     auto adc = getAdc(dataword);
@@ -162,7 +154,7 @@ processInput(TAcc const& acc,
         copyFrameHeader(detectorData, gainStageMap);
     }
 
-    const auto& pedestal = pedestalMaps[gainStage][id].mean;
+    const auto& pedestal = pedestalMaps[gainStage][id];
     const auto& gain = gainMaps[gainStage][id];
 
     // calculate energy of current channel

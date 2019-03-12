@@ -6,6 +6,7 @@ struct PhotonFinderKernel {
     template <typename TAcc,
               typename TDetectorData,
               typename TGainMap,
+              typename TInitPedestalMap,
               typename TPedestalMap,
               typename TGainStageMap,
               typename TEnergyMap,
@@ -16,6 +17,7 @@ struct PhotonFinderKernel {
     ALPAKA_FN_ACC auto operator()(TAcc const& acc,
                                   TDetectorData const* const detectorData,
                                   TGainMap const* const gainMaps,
+                                  TInitPedestalMap* const initPedestalMaps,
                                   TPedestalMap* const pedestalMaps,
                                   TGainStageMap* const gainStageMaps,
                                   TEnergyMap* const energyMaps,
@@ -48,9 +50,8 @@ struct PhotonFinderKernel {
             // read data from generated maps
             auto dataword = detectorData[i].data[id];
             auto adc = getAdc(dataword);
-
             const auto& gainStage = gainStageMaps[i].data[id];
-            //printf("%d ", gainStage);
+            
             // first thread copies frame header to output
             if (id == 0) {
                 copyFrameHeader(detectorData[i], photonMaps[i]);
@@ -62,12 +63,12 @@ struct PhotonFinderKernel {
             // calculate photon count from calibrated energy
             photonCount = (energy + BEAMCONST) * PHOTONCONST;
 
-            const auto& pedestal = pedestalMaps[gainStage][id].mean;
-            const auto& stddev = pedestalMaps[gainStage][id].stddev;
+            const auto& pedestal = pedestalMaps[gainStage][id];
+            const auto& stddev = initPedestalMaps[gainStage][id].stddev;
 
             // check "dark pixel" condition
             if (pedestal - c * stddev <= adc && pedestal + c * stddev >= adc) {
-              updatePedestal(acc, adc, pedestalMaps[gainStage][id]);
+              updatePedestal(adc, MOVING_STAT_WINDOW_SIZE, pedestalMaps[gainStage][id]);
             }
         }
     }

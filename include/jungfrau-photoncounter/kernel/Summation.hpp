@@ -9,8 +9,8 @@ struct SummationKernel {
               typename TSumMap>
     ALPAKA_FN_ACC auto operator()(TAcc const& acc,
                                   TData const* const data,
-                                  TNumFrames const numFrames,
                                   TNumSumFrames const numSumFrames,
+                                  TNumFrames const numFrames,
                                   TSumMap* const sum) const -> void
     {
         auto const globalThreadIdx =
