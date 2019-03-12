@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Alpakaconfig.hpp"
+#include "jungfrau-photoncounter/Alpakaconfig.hpp"
 
 #include <fstream>
 #include <memory>

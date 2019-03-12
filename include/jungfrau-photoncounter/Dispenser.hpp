@@ -105,8 +105,6 @@ public:
             offset += calcPedestaldata(
                 alpaka::mem::view::getPtrNative(data.data) + offset,
                 DEV_FRAMES);
-            DEBUG(offset << "/" << data.numFrames
-                         << " pedestalframes uploaded (1)");
         }
 
         // upload remaining frames
@@ -114,8 +112,6 @@ public:
             offset += calcPedestaldata(
                 alpaka::mem::view::getPtrNative(data.data) + offset,
                 data.numFrames % DEV_FRAMES);
-            DEBUG(offset << "/" << data.numFrames
-                         << " pedestalframes uploaded (2)");
         }
 
         distributeMaskMaps();
@@ -129,13 +125,11 @@ public:
     auto downloadPedestaldata()
         -> FramePackage<PedestalMap, TAlpaka, TDim, TSize>
     {
-        DEBUG("downloading pedestaldata...");
-
         // create handle for the device with the current version of the pedestal
         // maps
         auto current_device = devices[nextFree];
 
-        DEBUG("downloading pedestaldata from device " << nextFree);
+        DEBUG("downloading pedestaldata from device", nextFree);
 
         // get the pedestal data from the device
         alpaka::mem::view::copy(current_device.queue,
@@ -158,13 +152,11 @@ public:
     auto downloadInitialPedestaldata()
         -> FramePackage<InitPedestalMap, TAlpaka, TDim, TSize>
     {
-        DEBUG("downloading pedestaldata...");
-
         // create handle for the device with the current version of the pedestal
         // maps
         auto current_device = devices[nextFree];
 
-        DEBUG("downloading pedestaldata from device " << nextFree);
+        DEBUG("downloading pedestaldata from device", nextFree);
 
         // get the pedestal data from the device
         alpaka::mem::view::copy(current_device.queue,
@@ -255,7 +247,7 @@ public:
      * Downloads the current drift map.
      * @return drift map
      */
-    auto downloadDriftMaps() -> DriftMap*
+    auto downloadDriftMap() -> DriftMap*
     {
         DEBUG("downloading drift map...");
 
@@ -292,13 +284,9 @@ public:
      */
     auto uploadData(FramePackage<DetectorData, TAlpaka, TDim, TSize> data,
                     std::size_t offset,
-                    ExecutionFlags flags) -> std::size_t
+                    ExecutionFlags flags,
+                    bool flushWhenFinished = true) -> std::size_t
     {
-
-
-        DEBUG("sanity check");
-        std::cout << std::flush;
-
         if (!ringbuffer.isEmpty()) {
             // try uploading one data package
             if (offset <= data.numFrames - DEV_FRAMES) {
@@ -306,7 +294,7 @@ public:
                                        offset,
                                    DEV_FRAMES,
                                    flags);
-                DEBUG(offset << "/" << data.numFrames << " frames uploaded");
+                DEBUG(offset, "/", data.numFrames, "frames uploaded");
             }
             // upload remaining frames
             else if (offset != data.numFrames) {
@@ -314,19 +302,12 @@ public:
                                        offset,
                                    data.numFrames % DEV_FRAMES,
                                    flags);
-                DEBUG(offset << "/" << data.numFrames << " frames uploaded");
+                DEBUG(offset, "/", data.numFrames, "frames uploaded");
             }
-            // force wait for one device to finish since there's no new data
-            else {
-                //! @todo: CHECK THIS!!!
-                //! @todo: does this conflict with the other flush????
-                //! @todo: does this concept even make sense???
-                uint64_t currentFull =
-                    (nextFull + devices.size() - 1) % devices.size();
-                DEBUG("flushing stuff ... (" << currentFull << ")");
-                alpaka::wait::wait(devices[currentFull].queue,
-                                   devices[currentFull].event);
-                devices[currentFull].state = READY;
+            // force wait for one device to finish since there's no new data and
+            // the user wants the data flushed
+            else if (flushWhenFinished) {
+                flush();
             }
         }
 
@@ -350,8 +331,8 @@ public:
             &Dispenser::devices[nextFree];
 
 
-        DEBUG("downloading from device " << nextFree << " (nextFull is "
-                                         << nextFull << ")");
+        DEBUG(
+            "downloading from device", nextFree, "(nextFull is", nextFull, ")");
         std::string s = "";
         for (const auto& d : devices) {
             s += (d.state == READY ? "READY" : "");
@@ -359,7 +340,7 @@ public:
             s += (d.state == PROCESSING ? "PROCESSING" : "");
             s += " ";
         }
-        DEBUG("Current state: " << s);
+        DEBUG("Current state: ", s);
 
 
         // to keep frames in order only download if the longest running device
@@ -420,10 +401,7 @@ public:
             (*clusters).used =
                 alpaka::mem::view::getPtrNative((*clusters).usedPinned)[0];
 
-
-            //! @todo: remove this line later
-            DEBUG("clustersToDownload: " << clustersToDownload);
-
+            DEBUG("clustersToDownload:", clustersToDownload);
 
             // create a subview in the cluster buffer where the new data shuld
             // be downloaded to
@@ -505,7 +483,8 @@ private:
     {
         const GainmapInversionKernel gainmapInversionKernel;
         devices.reserve(allDevices.size() * TAlpaka::STREAMS_PER_DEV);
-        for (std::size_t num = 0; num < allDevices.size() * TAlpaka::STREAMS_PER_DEV;
+        for (std::size_t num = 0;
+             num < allDevices.size() * TAlpaka::STREAMS_PER_DEV;
              ++num) {
             // initialize variables
             devices.emplace_back(num,
@@ -524,7 +503,7 @@ private:
                 fputs("FATAL ERROR (RingBuffer): Unexpected size!\n", stderr);
                 exit(EXIT_FAILURE);
             }
-            DEBUG("Device # " << (num + 1) << " init");
+            DEBUG("Device #", (num + 1), "initialized!");
         }
     }
 
@@ -541,7 +520,7 @@ private:
         if (!ringbuffer.pop(dev))
             return 0;
 
-        DEBUG("calcPedestaldata on dev " << dev->id);
+        DEBUG("calculate pedestal data on device", dev->id);
 
         dev->state = PROCESSING;
         dev->numMaps = numMaps;
@@ -611,7 +590,7 @@ private:
     auto distributeMaskMaps() -> void
     {
         uint64_t source = (nextFull + devices.size() - 1) % devices.size();
-        DEBUG("distributeMaskMaps (from " << source << ")");
+        DEBUG("distributeMaskMaps (from", source, ")");
         for (uint64_t i = 0; i < devices.size() - 1; ++i) {
             uint64_t destination =
                 (i + source + (i >= source ? 1 : 0)) % devices.size();
@@ -630,7 +609,7 @@ private:
     auto distributeInitialPedestalMaps() -> void
     {
         uint64_t source = (nextFull + devices.size() - 1) % devices.size();
-        DEBUG("distributeInitialPedestalMaps (from " << source << ")");
+        DEBUG("distribute initial pedestal maps (from", source, ")");
         for (uint64_t i = 0; i < devices.size(); ++i) {
             alpaka::mem::view::copy(devices[source].queue,
                                     devices[i].initialPedestal,
@@ -669,7 +648,7 @@ private:
         // copy offset data from last device uploaded to
         auto prevDevice = (nextFull + devices.size() - 1) % devices.size();
         alpaka::wait::wait(dev->queue, devices[prevDevice].event);
-        DEBUG("device " << devices[prevDevice].id << " finished");
+        DEBUG("device", devices[prevDevice].id, "finished");
 
         devices[prevDevice].state = READY;
         alpaka::mem::view::copy(

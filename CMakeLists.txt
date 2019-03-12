@@ -9,5 +9,6 @@ target_include_directories(${CMAKE_PROJECT_NAME} INTERFACE include/)
 target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC alpaka)
 
 alpaka_add_executable(photoncounter src/main.cpp)
+target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE include/)
 target_compile_options(photoncounter PUBLIC cxx_std_14)
 target_link_libraries(photoncounter PUBLIC alpaka PRIVATE ${CMAKE_PROJECT_NAME})

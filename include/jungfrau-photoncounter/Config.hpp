@@ -44,16 +44,19 @@ static_assert(
 constexpr uint64_t MAX_CLUSTER_NUM_USER =
     DIMX * DIMY / ((CLUSTER_SIZE + 1) * (CLUSTER_SIZE + 1));
 
+// a struct for the frame header
 struct FrameHeader {
     std::uint64_t frameNumber;
     std::uint64_t bunchId;
 };
 
+// a struct for the frames
 template <typename TData> struct Frame {
     FrameHeader header;
     TData data[DIMX * DIMY];
 };
 
+// the struct for the initial pedestal data
 struct InitPedestal {
     std::size_t count;
     double oldM;
@@ -63,13 +66,7 @@ struct InitPedestal {
     double stddev;
 };
 
-struct Cluster {
-    std::uint64_t frameNumber;
-    std::int16_t x;
-    std::int16_t y;
-    std::int32_t data[CLUSTER_SIZE * CLUSTER_SIZE];
-};
-
+// execution flags to select the various kernels
 struct ExecutionFlags {
     // 0 = only energy output, 1 = photon (and energy) output, 2 = clustering
     // (and energy) output
@@ -82,6 +79,15 @@ struct ExecutionFlags {
     uint8_t maxValue : 1;
 };
 
+// a struct to hold one cluster
+struct Cluster {
+    std::uint64_t frameNumber;
+    std::int16_t x;
+    std::int16_t y;
+    std::int32_t data[CLUSTER_SIZE * CLUSTER_SIZE];
+};
+
+// a struct to hold multiple clusters (on host and device)
 template <typename TAlpaka, typename TDim, typename TSize> struct ClusterArray {
     std::size_t used;
     alpaka::mem::buf::
@@ -107,6 +113,7 @@ template <typename TAlpaka, typename TDim, typename TSize> struct ClusterArray {
     }
 };
 
+// a struct to hold multiple frames (on host and device)
 template <typename T, typename TAlpaka, typename TDim, typename TSize>
 struct FramePackage {
     std::size_t numFrames;
@@ -122,6 +129,7 @@ struct FramePackage {
     }
 };
 
+// type definitions
 using Pedestal = double;
 using EnergyValue = double;
 using DetectorData = Frame<std::uint16_t>;
@@ -140,146 +148,35 @@ typedef std::chrono::high_resolution_clock Clock;
 typedef std::chrono::milliseconds ms;
 static Clock::time_point t;
 
-#define SHOW_DEBUG true
-
-#if (SHOW_DEBUG)
+#ifdef NDEBUG
 #include <iostream>
-#define DEBUG(msg)                                                             \
-    (std::cout << __FILE__ << "[" << __LINE__ << "]:\n\t"                      \
-               << (std::chrono::duration_cast<ms>((Clock::now() - t))).count() \
-     << " ms\n\t" << msg << std::endl)//"\n")
+
+// empty print to end recursion
+template<typename... TArgs>
+void printArgs() {
+  std::cout << std::endl;  
+}
+
+// print one or more argument
+template<typename TFirst, typename... TArgs>
+void printArgs(TFirst first, TArgs... args) {
+  std::cout << first << " ";
+  printArgs(args ...);
+}
+
+// general debug print function
+template<typename... TArgs>
+void debugPrint(const char* file, unsigned int line, TArgs ... args) {
+  std::cout << __FILE__ << "[" << __LINE__ << "]:\n\t"
+               << (std::chrono::duration_cast<ms>((Clock::now() - t))).count()
+            << " ms\n\t";
+  printArgs(args ...);
+}
+
+#define DEBUG(...) debugPrint(__FILE__, __LINE__, ##__VA_ARGS__);//                   \
+  //(std::cout << __FILE__ << "[" << __LINE__ << "]:\n\t"               \
+  //             << (std::chrono::duration_cast<ms>((Clock::now() - t))).count() \
+  //             << " ms\n\t" << msg << std::endl) //"\n")
 #else
-#define DEBUG(msg)
+#define DEBUG(...)
 #endif
-
-template <typename TAlpaka, typename TDim, typename TSize>
-void saveClusters(std::string path,
-                  ClusterArray<TAlpaka, TDim, TSize>& clusters)
-{
-#if (SHOW_DEBUG)
-    std::ofstream clusterFile;
-    clusterFile.open(path);
-    clusterFile << clusters.used << "\n";
-    Cluster* clusterPtr = alpaka::mem::view::getPtrNative(clusters.clusters);
-
-    DEBUG("writing " << clusters.used << " clusters to " << path);
-
-    for (uint64_t i = 0; i < clusters.used; ++i) {
-        // write cluster information
-        clusterFile << static_cast<uint32_t>(clusterPtr[i].frameNumber &
-                                             0xFFFFFFFF)
-                    << "\n\t" << clusterPtr[i].x << " " << clusterPtr[i].y
-                    << "\n";
-
-        // write cluster
-        for (uint8_t y = 0; y < CLUSTER_SIZE; ++y) {
-            clusterFile << "\t";
-            for (uint8_t x = 0; x < CLUSTER_SIZE; ++x) {
-                clusterFile << clusterPtr[i].data[x + y * CLUSTER_SIZE] << " ";
-            }
-
-            clusterFile << "\n";
-        }
-    }
-
-    clusterFile.close();
-#endif
-}
-
-template <typename TBuffer>
-void save_image(std::string path, TBuffer* data, std::size_t frame_number)
-{
-#if (SHOW_DEBUG)
-    std::ofstream img;
-    img.open(path + ".txt");
-    for (std::size_t j = 0; j < 512; j++) {
-        for (std::size_t k = 0; k < 1024; k++) {
-            double h = double(data[frame_number].data[(j * 1024) + k]);
-            img << h << " ";
-        }
-        img << "\n";
-    }
-    img.close();
-#endif
-}
-
-
-template <typename TAlpaka, typename TDim, typename TSize>
-void saveClusterArray(std::string path,
-                      std::vector<ClusterArray<TAlpaka, TDim, TSize>>& clusters)
-{
-#if (SHOW_DEBUG)
-    std::ofstream clusterFile;
-    clusterFile.open(path);
-
-    uint64_t numClusters = 0;
-    for (const auto& clusterArray : clusters)
-        numClusters += clusterArray.used;
-
-    clusterFile << numClusters << "\n";
-
-    DEBUG("writing " << numClusters << " clusters to " << path);
-
-    for (auto& clusterArray : clusters) {
-        Cluster* clusterPtr =
-            alpaka::mem::view::getPtrNative(clusterArray.clusters);
-
-        for (uint64_t i = 0; i < clusterArray.used; ++i) {
-            // write cluster information
-            clusterFile << static_cast<int32_t>(clusterPtr[i].frameNumber &
-                                                0xFFFFFFFF)
-                        << "\n\t" << clusterPtr[i].x << "\n\t"
-                        << clusterPtr[i].y << "\n";
-
-            // write cluster
-            for (uint8_t y = 0; y < CLUSTER_SIZE; ++y) {
-                clusterFile << "\t";
-                for (uint8_t x = 0; x < CLUSTER_SIZE; ++x) {
-                    clusterFile << clusterPtr[i].data[x + y * CLUSTER_SIZE]
-                                << " ";
-                }
-
-                clusterFile << "\n";
-            }
-        }
-    }
-
-    clusterFile.close();
-#endif
-}
-
-template <typename TAlpaka, typename TDim, typename TSize>
-void saveClustersBin(std::string path,
-                     ClusterArray<TAlpaka, TDim, TSize>& clusters)
-{
-#if (SHOW_DEBUG)
-    std::ofstream clusterFile(path.c_str(), std::ios::binary);
-    Cluster* clusterPtr = alpaka::mem::view::getPtrNative(clusters.clusters);
-
-    DEBUG("writing " << clusters.used << " clusters to " << path);
-
-    for (uint64_t i = 0; i < clusters.used; ++i) {
-        // write cluster information
-        int32_t frameNumber = clusterPtr[i].frameNumber & 0xFFFFFFFF;
-        clusterFile.write(reinterpret_cast<char*>(&frameNumber),
-                          sizeof(int32_t));
-        clusterFile.write(reinterpret_cast<char*>(&clusterPtr[i].x),
-                          sizeof(clusterPtr[i].x));
-        clusterFile.write(reinterpret_cast<char*>(&clusterPtr[i].y),
-                          sizeof(clusterPtr[i].y));
-
-        // write cluster
-        for (uint8_t y = 0; y < CLUSTER_SIZE; ++y) {
-            for (uint8_t x = 0; x < CLUSTER_SIZE; ++x) {
-                clusterFile.write(
-                    reinterpret_cast<char*>(
-                        &clusterPtr[i].data[x + y * CLUSTER_SIZE]),
-                    sizeof(clusterPtr[i].data[x + y * CLUSTER_SIZE]));
-            }
-        }
-    }
-
-    clusterFile.flush();
-    clusterFile.close();
-#endif
-}
