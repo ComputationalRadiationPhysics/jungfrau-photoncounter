@@ -3,14 +3,6 @@
 #include "jungfrau-photoncounter/Dispenser.hpp"
 #include "jungfrau-photoncounter/Filecache.hpp"
 
-
-constexpr std::size_t CpuSerial::STREAMS_PER_DEV;
-
-constexpr Size CpuSerial::elementsPerThread;
-constexpr Size CpuSerial::threadsPerBlock;
-constexpr Size CpuSerial::blocksPerGrid;
-
-
 /**
  * only change this line to change the backend
  * see Alpakaconfig.hpp for all available
@@ -146,12 +138,12 @@ public:
     }
 };
 
-
 auto main(int argc, char* argv[]) -> int
 {
     // t is used in all debug-messages
     t = Clock::now();
 
+    // create a file cache for all input files 
     Filecache* fc = new Filecache(1024UL * 1024 * 1024 * 16);
     DEBUG("filecache created");
 
@@ -193,6 +185,7 @@ auto main(int argc, char* argv[]) -> int
     DEBUG("cpu count: " << (alpaka::pltf::getDevCount<
                             alpaka::pltf::Pltf<typename Accelerator::Acc>>()));
 
+    // create empty, optional input mask
     boost::optional<alpaka::mem::buf::
                         Buf<typename Accelerator::DevHost, MaskMap, Dim, Size>>
         maskPtr;
@@ -206,9 +199,10 @@ auto main(int argc, char* argv[]) -> int
     // upload and calculate pedestal data
     dispenser->uploadPedestaldata(pedestaldata);
 
+    // allocate space for output data
     FramePackage<EnergyMap, Accelerator, Dim, Size> energy_data(DEV_FRAMES);
     FramePackage<PhotonMap, Accelerator, Dim, Size> photon_data(DEV_FRAMES);
-    FramePackage<EnergySumMap, Accelerator, Dim, Size> sum_data(DEV_FRAMES /
+    FramePackage<SumMap, Accelerator, Dim, Size> sum_data(DEV_FRAMES /
                                                                 SUM_FRAMES);
     ClusterArray<Accelerator, Dim, Size> clusters_data(30000 * 40000 / 50);
     FramePackage<EnergyValue, Accelerator, Dim, Size> maxValues_data(
@@ -218,22 +212,22 @@ auto main(int argc, char* argv[]) -> int
         energy_data;
     boost::optional<FramePackage<PhotonMap, Accelerator, Dim, Size>&>
         photon; // = photon_data;
-    boost::optional<FramePackage<EnergySumMap, Accelerator, Dim, Size>&> sum =
+    boost::optional<FramePackage<SumMap, Accelerator, Dim, Size>&> sum =
         sum_data;
     boost::optional<ClusterArray<Accelerator, Dim, Size>&> clusters =
         clusters_data;
+
     boost::optional<FramePackage<EnergyValue, Accelerator, Dim, Size>&>
         maxValues = maxValues_data;
 
     std::size_t offset = 0;
     std::size_t downloaded = 0;
-
     std::size_t currently_downloaded_frames = 0;
 
     PixelTracker pt(argc, argv);
 
     ExecutionFlags ef;
-    ef.mode = 2;
+    ef.mode = 2; // photon and energy values are calculated
     ef.summation = 1;
     ef.masking = 1;
     ef.maxValue = 1;

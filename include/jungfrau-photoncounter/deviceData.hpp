@@ -13,7 +13,7 @@ enum State { FREE, PROCESSING, READY };
  */
 template <typename TAlpaka, typename TDim, typename TSize> struct DeviceData {
     std::size_t id;
-    std::size_t numMaps; //! @todo: is this ever used?
+    std::size_t numMaps;
     typename TAlpaka::DevHost host;
     typename TAlpaka::DevAcc device;
     typename TAlpaka::Queue queue;
@@ -56,7 +56,7 @@ template <typename TAlpaka, typename TDim, typename TSize> struct DeviceData {
     alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, PhotonMap, TDim, TSize>
         photon;
 
-    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, EnergySumMap, TDim, TSize>
+    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, SumMap, TDim, TSize>
         sum;
 
     alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, Cluster, TDim, TSize>
@@ -95,7 +95,7 @@ template <typename TAlpaka, typename TDim, typename TSize> struct DeviceData {
           energy(alpaka::mem::buf::alloc<EnergyMap, TSize>(device, numMaps)),
           mask(alpaka::mem::buf::alloc<MaskMap, TSize>(device, SINGLEMAP)),
           photon(alpaka::mem::buf::alloc<PhotonMap, TSize>(device, numMaps)),
-          sum(alpaka::mem::buf::alloc<EnergySumMap, TSize>(
+          sum(alpaka::mem::buf::alloc<SumMap, TSize>(
               device,
               (numMaps + SUM_FRAMES - 1) / SUM_FRAMES)),
           cluster(alpaka::mem::buf::alloc<Cluster, TSize>(device,

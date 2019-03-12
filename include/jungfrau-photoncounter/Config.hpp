@@ -16,7 +16,7 @@ constexpr std::size_t FRAME_HEADER_SIZE = 16;
 constexpr std::size_t DIMX = 400;
 constexpr std::size_t DIMY = 400;
 constexpr std::size_t SUM_FRAMES = 10;
-constexpr std::size_t DEV_FRAMES = 1000;
+constexpr std::size_t DEV_FRAMES = 300;
 constexpr std::size_t PEDEMAPS = 3;
 constexpr std::size_t MOVING_STAT_WINDOW_SIZE = 100;
 constexpr std::size_t GAINMAPS = 3;
@@ -29,6 +29,8 @@ constexpr std::size_t MAPSIZE = DIMX * DIMY;
 constexpr std::size_t SINGLEMAP = 1;
 constexpr std::size_t MAXINT = std::numeric_limits<uint32_t>::max();
 constexpr char MASKED_VALUE = 4;
+
+// maximal number of clusters possible:
 constexpr uint64_t MAX_CLUSTER_NUM = (DIMX - CLUSTER_SIZE + 1) *
                                      (DIMY - CLUSTER_SIZE + 1) /
                                      ((CLUSTER_SIZE / 2) * (CLUSTER_SIZE / 2));
@@ -37,6 +39,10 @@ static_assert(
     FRAMESPERSTAGE_G0 >= MOVING_STAT_WINDOW_SIZE,
     "Moving stat window size is bigger than the frames supplied for the "
     "callibration of the pedestal values for the first gain stage. ");
+
+// maximal number of seperated clusters:
+constexpr uint64_t MAX_CLUSTER_NUM_USER =
+    DIMX * DIMY / ((CLUSTER_SIZE + 1) * (CLUSTER_SIZE + 1));
 
 struct FrameHeader {
     std::uint64_t frameNumber;
@@ -120,7 +126,7 @@ using Pedestal = double;
 using EnergyValue = double;
 using DetectorData = Frame<std::uint16_t>;
 using PhotonMap = DetectorData;
-using EnergySumMap = Frame<std::uint64_t>;
+using SumMap = Frame<double>;
 using DriftMap = Frame<double>;
 using GainStageMap = Frame<char>;
 using MaskMap = Frame<bool>;
@@ -134,7 +140,7 @@ typedef std::chrono::high_resolution_clock Clock;
 typedef std::chrono::milliseconds ms;
 static Clock::time_point t;
 
-//#define SHOW_DEBUG true
+#define SHOW_DEBUG true
 
 #if (SHOW_DEBUG)
 #include <iostream>

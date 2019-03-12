@@ -1,6 +1,5 @@
 #include "../Config.hpp"
 
-
 struct SummationKernel {
     template <typename TAcc,
               typename TData,
@@ -24,7 +23,10 @@ struct SummationKernel {
         auto id = linearizedGlobalThreadIdx[0u];
 
         for (TNumFrames i = 0; i < numFrames; ++i) {
-            sum[i / numSumFrames].data[id] += data[i].data[id];
+            if (i % numSumFrames == 0)
+                sum[i / numSumFrames].data[id] = data[i].data[id];
+            else
+                sum[i / numSumFrames].data[id] += data[i].data[id];
         }
     }
 };
