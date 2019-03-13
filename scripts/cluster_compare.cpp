@@ -1,11 +1,11 @@
+#include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <fstream>
+#include <functional>
 #include <iostream>
 #include <memory>
-#include <cmath>
 #include <vector>
-#include <functional>
-#include <algorithm>
 
 constexpr std::size_t CLUSTER_SIZE = 3;
 constexpr std::size_t MAX_CLUSTER_NUM = 15000;
@@ -28,17 +28,17 @@ struct ClusterArray {
 };
 
 struct ClusterFrame {
-  explicit ClusterFrame(int32_t frameNumber) : frameNumber(frameNumber) {}
-  ClusterArray clusters;
-  int32_t frameNumber;
+    explicit ClusterFrame(int32_t frameNumber) : frameNumber(frameNumber) {}
+    ClusterArray clusters;
+    int32_t frameNumber;
 };
 
 std::vector<ClusterFrame> readClusters(const char* path)
 {
-  std::vector<ClusterFrame> frames;
+    std::vector<ClusterFrame> frames;
 
     std::cout << "Reading " << path << " ...\n";
-    
+
     std::ifstream clusterFile(path, std::ios::binary);
 
     std::size_t i = 0;
@@ -48,21 +48,21 @@ std::vector<ClusterFrame> readClusters(const char* path)
     while (clusterFile.good()) {
         // write cluster information
         int32_t frameNumber;
-        
+
         clusterFile.read(reinterpret_cast<char*>(&frameNumber),
                          sizeof(int32_t));
-        
-        if(lastFrameNumber != frameNumber) {
-          if(!frames.empty())
-            frames.rbegin()->clusters.used = i - 1;
-          i = 0;
-          frames.emplace_back(frameNumber);
-          clusterPtr = frames.rbegin()->clusters.clusters.get();
-          lastFrameNumber = frameNumber;
+
+        if (lastFrameNumber != frameNumber) {
+            if (!frames.empty())
+                frames.rbegin()->clusters.used = i - 1;
+            i = 0;
+            frames.emplace_back(frameNumber);
+            clusterPtr = frames.rbegin()->clusters.clusters.get();
+            lastFrameNumber = frameNumber;
         }
 
-        clusterPtr[i].frameNumber  = frameNumber & 0xFFFFFFFF;
-          
+        clusterPtr[i].frameNumber = frameNumber & 0xFFFFFFFF;
+
         clusterFile.read(reinterpret_cast<char*>(&clusterPtr[i].x),
                          sizeof(clusterPtr[i].x));
         clusterFile.read(reinterpret_cast<char*>(&clusterPtr[i].y),
@@ -80,57 +80,66 @@ std::vector<ClusterFrame> readClusters(const char* path)
         ++i;
         ++clusterCount;
 
-        if(i >= MAX_CLUSTER_NUM) {
-          std::cerr << "Cluster overflow (over " << MAX_CLUSTER_NUM << " clusters found)!\n";
-          exit(EXIT_FAILURE);
+        if (i >= MAX_CLUSTER_NUM) {
+            std::cerr << "Cluster overflow (over " << MAX_CLUSTER_NUM
+                      << " clusters found)!\n";
+            exit(EXIT_FAILURE);
         }
     }
 
-    if(0 == i)
-      std::cerr << "Warning: No clusters loaded\n";
-    
+    if (0 == i)
+        std::cerr << "Warning: No clusters loaded\n";
+
     clusterFile.close();
-    
+
     std::cout << "Read " << clusterCount - 1 << " clusters.\n";
-    
+
     return frames;
 }
 
-bool checkFrameNumbers(std::vector<ClusterFrame> &clusters) {
-  std::cout << "Checking frame order ...\n";
+bool checkFrameNumbers(std::vector<ClusterFrame>& clusters)
+{
+    std::cout << "Checking frame order ...\n";
 
-  for(unsigned int i = 1; i < clusters.size(); ++i) {
-    if(std::abs(clusters[i-1].frameNumber - clusters[i].frameNumber) > 1)
-      return false;
-  }
-  return true;
+    for (unsigned int i = 1; i < clusters.size(); ++i) {
+        if (std::abs(clusters[i - 1].frameNumber - clusters[i].frameNumber) > 1)
+            return false;
+    }
+    return true;
 }
 
-template<typename T, typename TCmp>
-std::tuple<std::size_t, std::size_t> getOffset(T it1, T it2, TCmp cmp) {
-  std::size_t offset1 = 0;
-  std::size_t offset2 = 0;
-  if(cmp(it1->frameNumber, it2->frameNumber)) {
-    while(cmp((++it1)->frameNumber, it2->frameNumber))
-      ++offset1;
-  } else {
-    while(cmp((++it2)->frameNumber, it1->frameNumber))
-      ++offset2;
-  }
+template <typename T, typename TCmp>
+std::tuple<std::size_t, std::size_t> getOffset(T it1, T it2, TCmp cmp)
+{
+    std::size_t offset1 = 0;
+    std::size_t offset2 = 0;
+    if (cmp(it1->frameNumber, it2->frameNumber)) {
+        while (cmp((++it1)->frameNumber, it2->frameNumber))
+            ++offset1;
+    }
+    else {
+        while (cmp((++it2)->frameNumber, it1->frameNumber))
+            ++offset2;
+    }
 
-  return std::make_tuple(offset1, offset2);
+    return std::make_tuple(offset1, offset2);
 }
 
-std::tuple<std::size_t, std::size_t, std::size_t, std::size_t> selectCommonFrames(const std::vector<ClusterFrame> &v1, const std::vector<ClusterFrame> &v2) {
-  const auto start = getOffset(v1.begin(), v2.begin(), std::less_equal<size_t>());
-  const auto end = getOffset(v1.begin(), v2.begin(), std::greater_equal<size_t>());
-  std::size_t begin1 = std::get<0>(start);
-  std::size_t end1 = std::get<0>(end);
-  std::size_t begin2 = std::get<1>(start);
-  std::size_t end2 = std::get<0>(end);
-  
-  
-  return std::make_tuple(begin1, end1, begin2, end2);
+std::tuple<std::size_t, std::size_t, std::size_t, std::size_t>
+selectCommonFrames(const std::vector<ClusterFrame>& v1,
+                   const std::vector<ClusterFrame>& v2)
+{
+    const auto start =
+        getOffset(v1.begin(), v2.begin(), std::less_equal<size_t>());
+    const auto end =
+        getOffset(v1.begin(), v2.begin(), std::greater_equal<size_t>());
+    std::size_t begin1 = std::get<0>(start);
+    std::size_t end1 = std::get<0>(end);
+    std::size_t begin2 = std::get<1>(start);
+    std::size_t end2 = std::get<0>(end);
+
+
+    return std::make_tuple(begin1, end1, begin2, end2);
 }
 
 int main(int argc, char* argv[])
@@ -146,11 +155,11 @@ int main(int argc, char* argv[])
     std::vector<ClusterFrame> reference = readClusters(reference_path);
 
     // check frame numbers
-    if(!checkFrameNumbers(detector))
-      std::cerr << "Error: detector clusters not in order!\n";
-    
-    if(!checkFrameNumbers(reference))
-      std::cerr << "Error: detector clusters not in order!\n";
+    if (!checkFrameNumbers(detector))
+        std::cerr << "Error: detector clusters not in order!\n";
+
+    if (!checkFrameNumbers(reference))
+        std::cerr << "Error: detector clusters not in order!\n";
 
     // extract offset information
     auto offsets = selectCommonFrames(detector, reference);
@@ -161,55 +170,65 @@ int main(int argc, char* argv[])
 
     std::size_t frameCount = reference_end - reference_begin;
     std::cout << "Processing " << frameCount << " common frames!\n";
-    
+
     // calculate matches
     std::size_t frameIndex = 0;
-    std::vector<std::size_t> exact_matches(frameCount), overlap_matches(frameCount), det_only(frameCount), ref_only(frameCount);
-    for(; detector_begin < detector_end && reference_begin < reference_end; ++detector_begin, ++reference_begin) {
-      const ClusterArray &referenceClusterArray = reference[reference_begin].clusters;
-      const size_t &reference_size = referenceClusterArray.used;
-      const Cluster *reference_clusters = referenceClusterArray.clusters.get();
-      const ClusterArray &detectorClusterArray = detector[detector_begin].clusters;
-      const size_t detector_size = detectorClusterArray.used;
-      const Cluster *detector_clusters = detectorClusterArray.clusters.get();
+    std::vector<std::size_t> exact_matches(frameCount),
+        overlap_matches(frameCount), det_only(frameCount), ref_only(frameCount);
+    for (; detector_begin < detector_end && reference_begin < reference_end;
+         ++detector_begin, ++reference_begin) {
+        const ClusterArray& referenceClusterArray =
+            reference[reference_begin].clusters;
+        const size_t& reference_size = referenceClusterArray.used;
+        const Cluster* reference_clusters =
+            referenceClusterArray.clusters.get();
+        const ClusterArray& detectorClusterArray =
+            detector[detector_begin].clusters;
+        const size_t detector_size = detectorClusterArray.used;
+        const Cluster* detector_clusters = detectorClusterArray.clusters.get();
 
-      std::vector<bool> detector_matched(detector_size);
-      std::fill(detector_matched.begin(), detector_matched.begin(), false);
-      std::vector<bool> reference_matched(reference_size);
-      std::fill(reference_matched.begin(), reference_matched.begin(), false);
-      
-      for(unsigned int det_idx = 0; det_idx < detector_size; ++det_idx) {
-        for(unsigned int ref_idx = 0; ref_idx < reference_size; ++ref_idx) {
-          const int16_t &ref_x = reference_clusters[ref_idx].x;
-          const int16_t &ref_y = reference_clusters[ref_idx].y;
-          const int16_t &det_x = detector_clusters[det_idx].x;
-          const int16_t &det_y = detector_clusters[det_idx].y;
-          if(ref_x == det_x && ref_y == det_y)
-            ++exact_matches[frameIndex];
-          if(std::pow(ref_x - det_x, 2) + std::pow(ref_y - det_y, 2) < 2) {
-            ++overlap_matches[frameIndex];
-            reference_matched[ref_idx] = true;
-            detector_matched[det_idx] = true;
-          }
+        std::vector<bool> detector_matched(detector_size);
+        std::fill(detector_matched.begin(), detector_matched.begin(), false);
+        std::vector<bool> reference_matched(reference_size);
+        std::fill(reference_matched.begin(), reference_matched.begin(), false);
+
+        for (unsigned int det_idx = 0; det_idx < detector_size; ++det_idx) {
+            for (unsigned int ref_idx = 0; ref_idx < reference_size;
+                 ++ref_idx) {
+                const int16_t& ref_x = reference_clusters[ref_idx].x;
+                const int16_t& ref_y = reference_clusters[ref_idx].y;
+                const int16_t& det_x = detector_clusters[det_idx].x;
+                const int16_t& det_y = detector_clusters[det_idx].y;
+                if (ref_x == det_x && ref_y == det_y)
+                    ++exact_matches[frameIndex];
+                if (std::pow(ref_x - det_x, 2) + std::pow(ref_y - det_y, 2) <
+                    2) {
+                    ++overlap_matches[frameIndex];
+                    reference_matched[ref_idx] = true;
+                    detector_matched[det_idx] = true;
+                }
+            }
         }
-      }
 
-      det_only[frameIndex] = std::count(detector_matched.begin(), detector_matched.end(), false);
-      ref_only[frameIndex] = std::count(reference_matched.begin(), reference_matched.end(), false);
-      
-      ++frameIndex;
+        det_only[frameIndex] =
+            std::count(detector_matched.begin(), detector_matched.end(), false);
+        ref_only[frameIndex] = std::count(
+            reference_matched.begin(), reference_matched.end(), false);
+
+        ++frameIndex;
     }
 
     std::ofstream stats("stats.txt");
-    if(!stats.good())
-      std::cerr << "Error: Couldn't write stats.txt file!\n";
+    if (!stats.good())
+        std::cerr << "Error: Couldn't write stats.txt file!\n";
 
-    for(unsigned int frame = 0; frame < frameCount && stats.good(); ++frame) {
-      stats << exact_matches[frame] << " " << overlap_matches[frame] << " " << det_only[frame] << " " << ref_only[frame] << "\n";
+    for (unsigned int frame = 0; frame < frameCount && stats.good(); ++frame) {
+        stats << exact_matches[frame] << " " << overlap_matches[frame] << " "
+              << det_only[frame] << " " << ref_only[frame] << "\n";
     }
 
     stats.flush();
     stats.close();
-    
+
     return EXIT_SUCCESS;
 }

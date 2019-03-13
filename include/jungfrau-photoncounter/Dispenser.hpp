@@ -5,6 +5,7 @@
 #include "deviceData.hpp"
 
 #include "kernel/Calibration.hpp"
+#include "kernel/CheckRms.hpp"
 #include "kernel/ClusterFinder.hpp"
 #include "kernel/Conversion.hpp"
 #include "kernel/DriftMap.hpp"
@@ -93,10 +94,12 @@ public:
      * Tries to upload all data packages requiered for the inital offset.
      * Only stops after all data packages are uploaded.
      * @param Maps-Struct with datamaps
+     * @param rmsThreshold An RMS threshold above which pixels should be masked.
+     * If this is 0, no pixels will be masked.
      */
     auto
-    uploadPedestaldata(FramePackage<DetectorData, TAlpaka, TDim, TSize> data)
-        -> void
+    uploadPedestaldata(FramePackage<DetectorData, TAlpaka, TDim, TSize> data,
+                       double rmsThreshold = 0) -> void
     {
         std::size_t offset = 0;
         DEBUG("uploading pedestaldata...");
@@ -115,6 +118,8 @@ public:
                 data.numFrames % DEV_FRAMES);
         }
 
+        if (rmsThreshold != 0)
+            maskRmsOver(rmsThreshold);
         distributeMaskMaps();
         distributeInitialPedestalMaps();
     }
@@ -177,7 +182,7 @@ public:
      * Downloads the current mask map.
      * @return mask map
      */
-    auto downloadMask() -> MaskMap
+    auto downloadMask() -> MaskMap*
     {
         DEBUG("downloading mask...");
 
@@ -187,12 +192,12 @@ public:
 
         // get the pedestal data from the device
         alpaka::mem::view::copy(
-            current_device.queue, &mask, current_device.mask, SINGLEMAP);
+            current_device.queue, mask, current_device.mask, SINGLEMAP);
 
         // wait for copy to finish
         alpaka::wait::wait(current_device.queue);
 
-        return mask;
+        return alpaka::mem::view::getPtrNative(mask);
     }
 
     /**
@@ -246,7 +251,8 @@ public:
 
     /**
      * Fall back to initial pedestal maps.
-     * @return drift map
+     * @param pedestalFallback Whether to fall back on initial pedestal values
+     * or not.
      */
     auto useInitialPedestals(bool pedestalFallback) -> void
     {
@@ -595,6 +601,27 @@ private:
         return numMaps;
     }
 
+    /**
+     * Masks all pixels over a certain RMS threshold.
+     * @param threshold RMS threshold.
+     */
+    auto maskRmsOver(double threshold) -> void
+    {
+        DEBUG("checking RMS (on device", nextFull, ")");
+
+        // create RMS check kernel object
+        CheckRmsKernel checkRmsKernel;
+        auto const checkRms(
+            alpaka::kernel::createTaskKernel<typename TAlpaka::Acc>(
+                getWorkDiv<TAlpaka>(),
+                checkRmsKernel,
+                alpaka::mem::view::getPtrNative(
+                    devices[nextFull].initialPedestal),
+                alpaka::mem::view::getPtrNative(devices[nextFull].mask),
+                threshold));
+
+        alpaka::queue::enqueue(devices[nextFull].queue, checkRms);
+    }
 
     /**
      * Distributes copies the mask map of the current accelerator to all others.
@@ -623,12 +650,12 @@ private:
         uint64_t source = (nextFull + devices.size() - 1) % devices.size();
         DEBUG("distribute initial pedestal maps (from", source, ")");
         for (uint64_t i = 0; i < devices.size(); ++i) {
-          // distribute initial pedestal map (containing statistics etc.)
+            // distribute initial pedestal map (containing statistics etc.)
             alpaka::mem::view::copy(devices[source].queue,
                                     devices[i].initialPedestal,
                                     devices[source].initialPedestal,
                                     SINGLEMAP);
-            
+
             // distribute pedestal map (with initial data)
             alpaka::mem::view::copy(devices[source].queue,
                                     devices[i].pedestal,

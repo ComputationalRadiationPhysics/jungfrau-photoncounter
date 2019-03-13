@@ -72,7 +72,7 @@ auto main(int argc, char* argv[]) -> int
     
     // upload and calculate pedestal data
     dispenser.uploadPedestaldata(pedestaldata);
-    
+
     // allocate space for output data
     FramePackage<EnergyMap, Accelerator, Dim, Size> energy_data(DEV_FRAMES);
     FramePackage<PhotonMap, Accelerator, Dim, Size> photon_data(DEV_FRAMES);
@@ -132,7 +132,7 @@ auto main(int argc, char* argv[]) -> int
     }
 
     pt.save();
-    
+
     auto sizes = dispenser.getMemSize();
     auto free_mem = dispenser.getFreeMem();
 

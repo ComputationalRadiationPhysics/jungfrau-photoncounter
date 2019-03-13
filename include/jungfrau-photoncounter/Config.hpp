@@ -23,6 +23,7 @@ constexpr std::size_t GAINMAPS = 3;
 constexpr float BEAMCONST = 6.2;
 constexpr float PHOTONCONST = (1. / 12.4);
 constexpr int CLUSTER_SIZE = 3;
+constexpr int C = 5;
 
 // derived settings
 constexpr std::size_t MAPSIZE = DIMX * DIMY;
@@ -64,6 +65,7 @@ struct InitPedestal {
     double oldS;
     double newS;
     double stddev;
+    double sumSquares;
 };
 
 // execution flags to select the various kernels
@@ -152,28 +154,28 @@ static Clock::time_point t;
 #include <iostream>
 
 // empty print to end recursion
-template<typename... TArgs>
-void printArgs() {
-  std::cout << std::endl;  
-}
+template <typename... TArgs> void printArgs() { std::cout << std::endl; }
 
 // print one or more argument
-template<typename TFirst, typename... TArgs>
-void printArgs(TFirst first, TArgs... args) {
-  std::cout << first << " ";
-  printArgs(args ...);
+template <typename TFirst, typename... TArgs>
+void printArgs(TFirst first, TArgs... args)
+{
+    std::cout << first << " ";
+    printArgs(args...);
 }
 
 // general debug print function
-template<typename... TArgs>
-void debugPrint(const char* file, unsigned int line, TArgs ... args) {
-  std::cout << __FILE__ << "[" << __LINE__ << "]:\n\t"
-               << (std::chrono::duration_cast<ms>((Clock::now() - t))).count()
-            << " ms\n\t";
-  printArgs(args ...);
+template <typename... TArgs>
+void debugPrint(const char* file, unsigned int line, TArgs... args)
+{
+    std::cout << __FILE__ << "[" << __LINE__ << "]:\n\t"
+              << (std::chrono::duration_cast<ms>((Clock::now() - t))).count()
+              << " ms\n\t";
+    printArgs(args...);
 }
 
-#define DEBUG(...) debugPrint(__FILE__, __LINE__, ##__VA_ARGS__);//                   \
+#define DEBUG(...)                                                             \
+    debugPrint(__FILE__, __LINE__, ##__VA_ARGS__); //                   \
   //(std::cout << __FILE__ << "[" << __LINE__ << "]:\n\t"               \
   //             << (std::chrono::duration_cast<ms>((Clock::now() - t))).count() \
   //             << " ms\n\t" << msg << std::endl) //"\n")

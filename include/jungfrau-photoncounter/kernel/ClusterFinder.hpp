@@ -29,7 +29,7 @@ struct ClusterFinderKernel {
                                   TNumFrames const numFrames,
                                   TCurrentFrame const currentFrame,
                                   bool pedestalFallback,
-                                  TNumStdDevs const c = 5) const -> void
+                                  TNumStdDevs const c = C) const -> void
     {
         auto const globalThreadIdx =
             alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc);
