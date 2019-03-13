@@ -22,6 +22,10 @@ struct SummationKernel {
 
         auto id = linearizedGlobalThreadIdx[0u];
 
+        // check range
+        if (id >= MAPSIZE)
+            return;
+        
         for (TNumFrames i = 0; i < numFrames; ++i) {
             if (i % numSumFrames == 0)
                 sum[i / numSumFrames].data[id] = data[i].data[id];

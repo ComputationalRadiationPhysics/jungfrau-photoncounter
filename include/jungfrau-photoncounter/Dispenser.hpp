@@ -41,6 +41,7 @@ public:
               alpaka::mem::buf::alloc<GainStageMap, TSize>(host, SINGLEMAP)),
           maxValueMaps(
               alpaka::mem::buf::alloc<EnergyMap, TSize>(host, DEV_FRAMES)),
+          pedestalFallback(false),
           init(false),
           ringbuffer(TAlpaka::STREAMS_PER_DEV *
                      alpaka::pltf::getDevCount<typename TAlpaka::PltfAcc>()),
@@ -241,6 +242,16 @@ public:
         alpaka::wait::wait(current_device.queue);
 
         return alpaka::mem::view::getPtrNative(gainStage);
+    }
+
+    /**
+     * Fall back to initial pedestal maps.
+     * @return drift map
+     */
+    auto useInitialPedestals(bool pedestalFallback) -> void
+    {
+        DEBUG("Using initial pedestal values:", init);
+        this->pedestalFallback = pedestalFallback;
     }
 
     /**
@@ -470,6 +481,7 @@ private:
     FramePackage<InitPedestalMap, TAlpaka, TDim, TSize> initPedestal;
 
     bool init;
+    bool pedestalFallback;
     Ringbuffer<DeviceData<TAlpaka, TDim, TSize>*> ringbuffer;
     std::vector<DeviceData<TAlpaka, TDim, TSize>> devices;
 
@@ -611,9 +623,16 @@ private:
         uint64_t source = (nextFull + devices.size() - 1) % devices.size();
         DEBUG("distribute initial pedestal maps (from", source, ")");
         for (uint64_t i = 0; i < devices.size(); ++i) {
+          // distribute initial pedestal map (containing statistics etc.)
             alpaka::mem::view::copy(devices[source].queue,
                                     devices[i].initialPedestal,
                                     devices[source].initialPedestal,
+                                    SINGLEMAP);
+            
+            // distribute pedestal map (with initial data)
+            alpaka::mem::view::copy(devices[source].queue,
+                                    devices[i].pedestal,
+                                    devices[source].pedestal,
                                     SINGLEMAP);
         }
         synchronize();
@@ -679,7 +698,8 @@ private:
                     alpaka::mem::view::getPtrNative(dev->gainStage),
                     alpaka::mem::view::getPtrNative(dev->energy),
                     dev->numMaps,
-                    local_mask));
+                    local_mask,
+                    pedestalFallback));
 
             DEBUG("enqueueing conversion kernel");
             alpaka::queue::enqueue(dev->queue, conversion);
@@ -700,7 +720,8 @@ private:
                     alpaka::mem::view::getPtrNative(dev->energy),
                     alpaka::mem::view::getPtrNative(dev->photon),
                     dev->numMaps,
-                    local_mask));
+                    local_mask,
+                    pedestalFallback));
 
             DEBUG("enqueueing photon kernel");
             alpaka::queue::enqueue(dev->queue, photonFinder);
@@ -728,7 +749,8 @@ private:
                         alpaka::mem::view::getPtrNative(dev->numClusters),
                         local_mask,
                         dev->numMaps,
-                        i));
+                        i,
+                        pedestalFallback));
 
                 alpaka::queue::enqueue(dev->queue, clusterFinder);
             }

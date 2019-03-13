@@ -7,10 +7,11 @@ struct DriftMapKernel {
               typename TInitPedestalMap,
               typename TPedestalMap,
               typename TDriftMap>
-    ALPAKA_FN_ACC auto operator()(TAcc const& acc,
-                                  TInitPedestalMap const* const initialPedestalMaps,
-                                  TPedestalMap const* const pedestalMaps,
-                                  TDriftMap *driftMaps) const -> void
+    ALPAKA_FN_ACC auto
+    operator()(TAcc const& acc,
+               TInitPedestalMap const* const initialPedestalMaps,
+               TPedestalMap const* const pedestalMaps,
+               TDriftMap* driftMaps) const -> void
     {
         auto const globalThreadIdx =
             alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc);
@@ -21,7 +22,12 @@ struct DriftMapKernel {
             alpaka::idx::mapIdx<1u>(globalThreadIdx, globalThreadExtent);
 
         auto id = linearizedGlobalThreadIdx[0u];
-        
-        driftMaps->data[id] = pedestalMaps[0][id] - initialPedestalMaps[0][id].mean;
+
+        // check range
+        if (id >= MAPSIZE)
+            return;
+
+        driftMaps->data[id] =
+            pedestalMaps[0][id] - initialPedestalMaps[0][id].mean;
     }
 };

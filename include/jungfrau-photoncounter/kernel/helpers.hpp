@@ -125,6 +125,7 @@ template <typename TAcc,
           typename TDetectorData,
           typename TGainMap,
           typename TPedestalMap,
+          typename TInitPedestalMap,
           typename TGainStageMap,
           typename TEnergyMap,
           typename TMaskMap,
@@ -134,10 +135,12 @@ processInput(TAcc const& acc,
              TDetectorData const& detectorData,
              TGainMap const* const gainMaps,
              TPedestalMap* const pedestalMaps,
+             TInitPedestalMap* const initPedestalMaps,
              TGainStageMap& gainStageMap,
              TEnergyMap& energyMap,
              TMaskMap* const mask,
-             TIndex const id) -> void
+             TIndex const id,
+             bool pedestalFallback) -> void
 {
     // use masks to check whether the channel is valid or masked out
     bool isValid = !mask ? 1 : mask->data[id];
@@ -154,7 +157,9 @@ processInput(TAcc const& acc,
         copyFrameHeader(detectorData, gainStageMap);
     }
 
-    const auto& pedestal = pedestalMaps[gainStage][id];
+    const auto& pedestal =
+        (pedestalFallback ? initPedestalMaps[gainStage][id].mean
+                          : pedestalMaps[gainStage][id]);
     const auto& gain = gainMaps[gainStage][id];
 
     // calculate energy of current channel

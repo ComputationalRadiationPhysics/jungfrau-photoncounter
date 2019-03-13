@@ -21,6 +21,10 @@ struct MaxValueCopyKernel {
 
         auto id = linearizedGlobalThreadIdx[0u];
 
+        // check range
+        if (id >= MAPSIZE)
+            return;
+        
         if(id < numFrames) {
           destination[id] = source[id].data[0];
         }

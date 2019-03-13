@@ -28,6 +28,7 @@ struct ClusterFinderKernel {
                                   TMask* const mask,
                                   TNumFrames const numFrames,
                                   TCurrentFrame const currentFrame,
+                                  bool pedestalFallback,
                                   TNumStdDevs const c = 5) const -> void
     {
         auto const globalThreadIdx =
@@ -39,6 +40,10 @@ struct ClusterFinderKernel {
             alpaka::idx::mapIdx<1u>(globalThreadIdx, globalThreadExtent);
 
         auto id = linearizedGlobalThreadIdx[0u];
+
+        // check range
+        if (id >= MAPSIZE)
+            return;
 
         constexpr auto n = CLUSTER_SIZE;
 
@@ -62,8 +67,10 @@ struct ClusterFinderKernel {
                 }
 
                 // check dark pixel condition
-                else if (-c * stddev <= energy && c * stddev >= energy) {
-                  updatePedestal(adc, MOVING_STAT_WINDOW_SIZE, pedestalMaps[gainStage][id]);
+                else if (-c * stddev <= energy && c * stddev >= energy && !pedestalFallback) {
+                    updatePedestal(adc,
+                                   MOVING_STAT_WINDOW_SIZE,
+                                   pedestalMaps[gainStage][id]);
                 }
             }
         }
@@ -73,9 +80,11 @@ struct ClusterFinderKernel {
                          detectorData[currentFrame],
                          gainMaps,
                          pedestalMaps,
+                         initPedestalMaps,
                          gainStageMaps[currentFrame],
                          energyMaps[currentFrame],
                          mask,
-                         id);
+                         id,
+                         pedestalFallback);
     }
 };

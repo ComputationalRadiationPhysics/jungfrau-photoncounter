@@ -25,6 +25,11 @@ struct CalibrationKernel {
             alpaka::idx::mapIdx<1u>(globalThreadIdx, globalThreadExtent);
 
         auto id = linearizedGlobalThreadIdx[0u];
+
+        // check range
+        if (id >= MAPSIZE)
+            return;
+
         const std::size_t FRAMESPERSTAGE[] = {
             FRAMESPERSTAGE_G0, FRAMESPERSTAGE_G1, FRAMESPERSTAGE_G2};
 
@@ -41,11 +46,6 @@ struct CalibrationKernel {
         for (TNumFrames i = 0; i < numFrames; ++i) {
             if (initPedestalMap[expectedGainStage][id].count ==
                 FRAMESPERSTAGE[expectedGainStage]) {
-
-                // copy readily calculated pedestal values into output pedestal
-                // map
-                pedestalMap[expectedGainStage][id] =
-                    initPedestalMap[expectedGainStage][id].mean;
 
                 ++expectedGainStage;
             }
@@ -65,6 +65,11 @@ struct CalibrationKernel {
                                MOVING_STAT_WINDOW_SIZE,
                                pedestalMap[expectedGainStage][id]);
             }
+
+            // copy readily calculated pedestal values into output
+            // pedestal map
+            pedestalMap[expectedGainStage][id] =
+                initPedestalMap[expectedGainStage][id].mean;
 
             // mark pixel invalid if expected gainstage does not match
             if (expectedGainStage != gainStage) {

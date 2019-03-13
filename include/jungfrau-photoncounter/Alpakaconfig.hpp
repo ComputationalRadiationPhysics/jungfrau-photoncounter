@@ -31,9 +31,13 @@ using Dim = alpaka::dim::DimInt<1u>;
 using Size = uint64_t;
 using WorkDiv = alpaka::workdiv::WorkDivMembers<Dim, Size>;
 
-template<typename TAccelerator>
-WorkDiv getWorkDiv() {
-  return WorkDiv(decltype(TAccelerator::blocksPerGrid)(TAccelerator::blocksPerGrid), decltype(TAccelerator::threadsPerBlock)(TAccelerator::threadsPerBlock), decltype(TAccelerator::elementsPerThread)(TAccelerator::elementsPerThread));
+template <typename TAccelerator> WorkDiv getWorkDiv()
+{
+    return WorkDiv(
+        decltype(TAccelerator::blocksPerGrid)(TAccelerator::blocksPerGrid),
+        decltype(TAccelerator::threadsPerBlock)(TAccelerator::threadsPerBlock),
+        decltype(TAccelerator::elementsPerThread)(
+            TAccelerator::elementsPerThread));
 }
 
 //#############################################################################
@@ -140,7 +144,7 @@ struct CpuSerial {
     using PltfAcc = alpaka::pltf::Pltf<DevAcc>;
     using Queue = alpaka::queue::QueueCpuSync;
     using Event = alpaka::event::Event<Queue>;
-  
+
     static constexpr std::size_t STREAMS_PER_DEV = 4;
 
     static constexpr Size elementsPerThread = 1u;
@@ -201,8 +205,8 @@ struct GpuCudaRt {
     static constexpr std::size_t STREAMS_PER_DEV = 1;
 
     static constexpr Size elementsPerThread = 1u;
-    static constexpr Size threadsPerBlock = DIMX;
-    static constexpr Size blocksPerGrid = DIMY;
+    static constexpr Size threadsPerBlock = 256;
+    static constexpr Size blocksPerGrid = (MAPSIZE + 255) / 256;
 };
 
 template <typename T, typename TBuf, typename... TArgs>

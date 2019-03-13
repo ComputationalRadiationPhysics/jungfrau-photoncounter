@@ -17,6 +17,11 @@ struct GainmapInversionKernel {
             alpaka::idx::mapIdx<1u>(globalThreadIdx, globalThreadExtent);
 
         auto id = linearizedGlobalThreadIdx[0u];
+        
+        // check range
+        if (id >= MAPSIZE)
+            return;
+        
         for (size_t i = 0; i < GAINMAPS; ++i) {
             gainmaps[i][id] = 1.0 / gainmaps[i][id];
         }

@@ -24,6 +24,7 @@ struct PhotonFinderKernel {
                                   TPhotonMap* const photonMaps,
                                   TNumFrames const numFrames,
                                   TMask* const mask,
+                                  bool pedestalFallback,
                                   TNumStdDevs const c = 5) const -> void
     {
         auto const globalThreadIdx =
@@ -36,22 +37,28 @@ struct PhotonFinderKernel {
 
         auto id = linearizedGlobalThreadIdx[0u];
 
+        // check range
+        if (id >= MAPSIZE)
+            return;
+
         for (TNumFrames i = 0; i < numFrames; ++i) {
             // generate energy maps and gain stage maps
-            processInput(acc, 
-                    detectorData[i], 
-                    gainMaps, 
-                    pedestalMaps, 
-                    gainStageMaps[i],
-                    energyMaps[i],
-                    mask,
-                    id);
-            
+            processInput(acc,
+                         detectorData[i],
+                         gainMaps,
+                         pedestalMaps,
+                         initPedestalMaps,
+                         gainStageMaps[i],
+                         energyMaps[i],
+                         mask,
+                         id,
+                         pedestalFallback);
+
             // read data from generated maps
             auto dataword = detectorData[i].data[id];
             auto adc = getAdc(dataword);
             const auto& gainStage = gainStageMaps[i].data[id];
-            
+
             // first thread copies frame header to output
             if (id == 0) {
                 copyFrameHeader(detectorData[i], photonMaps[i]);
@@ -67,8 +74,10 @@ struct PhotonFinderKernel {
             const auto& stddev = initPedestalMaps[gainStage][id].stddev;
 
             // check "dark pixel" condition
-            if (pedestal - c * stddev <= adc && pedestal + c * stddev >= adc) {
-              updatePedestal(adc, MOVING_STAT_WINDOW_SIZE, pedestalMaps[gainStage][id]);
+            if (pedestal - c * stddev <= adc && pedestal + c * stddev >= adc &&
+                !pedestalFallback) {
+                updatePedestal(
+                    adc, MOVING_STAT_WINDOW_SIZE, pedestalMaps[gainStage][id]);
             }
         }
     }

@@ -22,6 +22,7 @@ struct ConversionKernel {
                                   TEnergyMap* const energyMaps,
                                   TNumFrames const numFrames,
                                   TMask const* const mask,
+                                  bool pedestalFallback,
                                   TNumStdDevs const c = 5) const -> void
     {
         auto const globalThreadIdx =
@@ -34,27 +35,35 @@ struct ConversionKernel {
 
         auto id = linearizedGlobalThreadIdx[0u];
 
+        // check range
+        if (id >= MAPSIZE)
+            return;
+
         for (TNumFrames i = 0; i < numFrames; ++i) {
-            processInput(acc, 
-                         detectorData[i], 
-                         gainMaps, 
-                         pedestalMaps, 
+            processInput(acc,
+                         detectorData[i],
+                         gainMaps,
+                         pedestalMaps,
+                         initPedestalMaps,
                          gainStageMaps[i],
                          energyMaps[i],
                          mask,
-                         id);
-            
+                         id,
+                         pedestalFallback);
+
             // read data from generated maps
             auto dataword = detectorData[i].data[id];
             auto adc = getAdc(dataword);
             const auto& gainStage = gainStageMaps[i].data[id];
             const auto& pedestal = pedestalMaps[gainStage][id];
             const auto& stddev = initPedestalMaps[gainStage][id].stddev;
-            
+
             // check "dark pixel" condition
-            if (pedestal - c * stddev <= adc && pedestal + c * stddev >= adc) {
-              updatePedestal(adc, MOVING_STAT_WINDOW_SIZE, pedestalMaps[gainStage][id]);
-            }            
+            if (pedestal - c * stddev <= adc && pedestal + c * stddev >= adc &&
+                !pedestalFallback) {
+                updatePedestal(
+                    adc, MOVING_STAT_WINDOW_SIZE, pedestalMaps[gainStage][id]);
+            }
         }
     }
 };

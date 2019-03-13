@@ -69,7 +69,7 @@ auto main(int argc, char* argv[]) -> int
         maskPtr = mask.data;
 
     Dispenser<Accelerator, Dim, Size> dispenser(gain, maskPtr);
-
+    
     // upload and calculate pedestal data
     dispenser.uploadPedestaldata(pedestaldata);
     
@@ -101,7 +101,7 @@ auto main(int argc, char* argv[]) -> int
     PixelTracker<Accelerator> pt(argc, argv);
 
     ExecutionFlags ef;
-    ef.mode = 2; // photon and energy values are calculated
+    ef.mode = 2;
     ef.summation = 1;
     ef.masking = 1;
     ef.maxValue = 1;
@@ -115,9 +115,6 @@ auto main(int argc, char* argv[]) -> int
             auto ipdata = dispenser.downloadInitialPedestaldata();
             auto pdata = dispenser.downloadPedestaldata();
             pt.push_back(ipdata, pdata, data, offset - 1);
-
-            if (offset == 10000)
-                dispenser.flush();
 
             downloaded += currently_downloaded_frames;
             DEBUG(downloaded,
