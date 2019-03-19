@@ -46,7 +46,6 @@ struct CalibrationKernel {
         for (TNumFrames i = 0; i < numFrames; ++i) {
             if (initPedestalMap[expectedGainStage][id].count ==
                 FRAMESPERSTAGE[expectedGainStage]) {
-
                 ++expectedGainStage;
             }
 
