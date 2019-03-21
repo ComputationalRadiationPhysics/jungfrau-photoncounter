@@ -65,7 +65,6 @@ struct InitPedestal {
     double oldS;
     double newS;
     double stddev;
-    double sumSquares;
 };
 
 // execution flags to select the various kernels

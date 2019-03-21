@@ -37,12 +37,10 @@ initPedestal(const TAcc& acc, TAdcValue const adc, TInitPedestal& initPedestal)
     auto& oldS = initPedestal.oldS;
     auto& newS = initPedestal.newS;
     auto& stddev = initPedestal.stddev;
-    auto& sumSquares = initPedestal.sumSquares;
 
     ++count;
     if (count == 1) {
         mean = oldM = adc;
-        sumSquares = adc * adc;
         oldS = 0;
         stddev = 0;
     }
@@ -52,7 +50,6 @@ initPedestal(const TAcc& acc, TAdcValue const adc, TInitPedestal& initPedestal)
         oldM = mean;
         oldS = newS;
         stddev = alpaka::math::sqrt(acc, newS / (count - 1));
-        sumSquares += adc * adc;
     }
 }
 

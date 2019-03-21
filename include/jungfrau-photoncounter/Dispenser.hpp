@@ -5,7 +5,7 @@
 #include "deviceData.hpp"
 
 #include "kernel/Calibration.hpp"
-#include "kernel/CheckRms.hpp"
+#include "kernel/CheckStdDev.hpp"
 #include "kernel/ClusterFinder.hpp"
 #include "kernel/Conversion.hpp"
 #include "kernel/DriftMap.hpp"
@@ -94,12 +94,12 @@ public:
      * Tries to upload all data packages requiered for the inital offset.
      * Only stops after all data packages are uploaded.
      * @param Maps-Struct with datamaps
-     * @param rmsThreshold An RMS threshold above which pixels should be masked.
+     * @param stdDevThreshold An standard deviation threshold above which pixels should be masked.
      * If this is 0, no pixels will be masked.
      */
     auto
     uploadPedestaldata(FramePackage<DetectorData, TAlpaka, TDim, TSize> data,
-                       double rmsThreshold = 0) -> void
+                       double stdDevThreshold = 0) -> void
     {
         std::size_t offset = 0;
         DEBUG("uploading pedestaldata...");
@@ -118,8 +118,8 @@ public:
                 data.numFrames % DEV_FRAMES);
         }
 
-        if (rmsThreshold != 0)
-            maskRmsOver(rmsThreshold);
+        if (stdDevThreshold != 0)
+            maskStdDevOver(stdDevThreshold);
         distributeMaskMaps();
         distributeInitialPedestalMaps();
     }
@@ -602,25 +602,25 @@ private:
     }
 
     /**
-     * Masks all pixels over a certain RMS threshold.
-     * @param threshold RMS threshold.
+     * Masks all pixels over a certain standard deviation threshold.
+     * @param threshold standard deviation threshold.
      */
-    auto maskRmsOver(double threshold) -> void
+    auto maskStdDevOver(double threshold) -> void
     {
-        DEBUG("checking RMS (on device", nextFull, ")");
+        DEBUG("checking stddev (on device", nextFull, ")");
 
-        // create RMS check kernel object
-        CheckRmsKernel checkRmsKernel;
-        auto const checkRms(
+        // create stddev check kernel object
+        CheckStdDevKernel checkStdDevKernel;
+        auto const checkStdDev(
             alpaka::kernel::createTaskKernel<typename TAlpaka::Acc>(
                 getWorkDiv<TAlpaka>(),
-                checkRmsKernel,
+                checkStdDevKernel,
                 alpaka::mem::view::getPtrNative(
                     devices[nextFull].initialPedestal),
                 alpaka::mem::view::getPtrNative(devices[nextFull].mask),
                 threshold));
 
-        alpaka::queue::enqueue(devices[nextFull].queue, checkRms);
+        alpaka::queue::enqueue(devices[nextFull].queue, checkStdDev);
     }
 
     /**

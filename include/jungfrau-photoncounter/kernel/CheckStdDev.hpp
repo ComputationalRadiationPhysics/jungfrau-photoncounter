@@ -2,7 +2,7 @@
 #include "../Config.hpp"
 #include "helpers.hpp"
 
-struct CheckRmsKernel {
+struct CheckStdDevKernel {
     template <typename TAcc,
               typename TInitPedestalMap,
               typename TMaskMap,
@@ -27,7 +27,7 @@ struct CheckRmsKernel {
             return;
 
         // check if measured RMS exceeds threshold
-        if (initPedestalMap[0][id].sumSquares >
+        if (initPedestalMap[0][id].stddev >
             threshold * threshold * MOVING_STAT_WINDOW_SIZE)
             mask->data[id] = false;
     }
