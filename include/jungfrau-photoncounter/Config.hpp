@@ -62,8 +62,7 @@ struct InitPedestal {
     std::size_t count;
     double oldM;
     double mean;
-    double oldS;
-    double newS;
+    double sigma;
     double stddev;
 };
 
