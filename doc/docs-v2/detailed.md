@@ -1,9 +1,12 @@
 # Features
+
 ### Data Transformation
-- Energy Conversion
+- [Energy Conversion](#Energy-Conversion)
 - Photon Counting
+
 ### Data Selection
 - Pixel Masking
+
 ### Data Compression
 - Clustering
 - Frame Summation
@@ -19,6 +22,7 @@ The energy conversion algorithm transforms the raw output data of a detector mod
 - array of pedestal maps (one per gain stage)
 - number of frames to be processed
 - **optional:** pixel mask (2D array of boolean values: `true` = pixel is part of the calculation, `false` = pixel is ignored)
-#### Output
+
+#### Outputs
 - energy maps (array of 2D matrices containing calibrated energy values)
 - gain stage maps (array of 2D matrices containing the gain stage of each pixel in the current frame)
