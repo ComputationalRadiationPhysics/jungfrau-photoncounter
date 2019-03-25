@@ -32,11 +32,24 @@ The energy conversion algorithm transforms the raw output data of a detector mod
 - gain stage maps (array of 2D matrices containing the gain stage of each pixel in the current frame)
 
 #### Usage
-The algorithm is executed as an Alpaka-Kernel. Inputs are passed as pointers which must be accessible from the chosen Alpaka accelerator. Optional parameters accept `nullptr`. **TODO: code example**
+The algorithm is executed as an Alpaka kernel. Inputs are passed as pointers which must be accessible from the chosen Alpaka accelerator. Optional parameters accept `nullptr`. 
+
+**TODO: code example**
 
 # Gain Map Inversion
 The Energy Conversion algorithm requires reciprocal gain maps. If reciprocals are not immediately loaded, this kernel can be used to invert an array of gain maps to their reciprocals. This step is usually executed once in the program initialization phase when the Alpaka accelerators are provided with the required values for data processing.
 
 <p align="center">
-  <img alt="Figure: Gain Map Inversion" src="img/gain_map_inversion.svg" />
+  <img alt="Figure: Gain Map Inversion" src="img/gain_map_inversion.svg" width="500em"/>
 </p>
+
+#### Inputs
+- array of gain maps
+
+#### Outputs
+- array of reciprocal gain maps
+
+#### Usage
+The algorithm is executed as an Alpaka kernel. Inputs are passed as pointers which must be accessible from the chosen Alpaka accelerator. 
+
+**TODO: code example**
