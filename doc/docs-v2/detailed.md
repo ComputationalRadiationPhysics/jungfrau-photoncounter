@@ -15,7 +15,10 @@
 
 # Energy Conversion
 The energy conversion algorithm transforms the raw output data of a detector module into 2D matrices of calibrated energy values. This calculation step is a prerequisite for most use-cases, as most algorithms operate on energy maps. **Note:** This algorithm expects reciprocal gain maps. If needed, reciprocals can be calculated during the program initialization phase using the `GainMapInversion` kernel.
-![Figure: Energy Conversion](img/energy_conversion.svg)
+
+<p align="center">
+  <img alt="Figure: Energy Conversion" src="img/energy_conversion.svg" />
+</p>
 
 #### Inputs
 - array of detector module output data
@@ -33,4 +36,7 @@ The algorithm is executed as an Alpaka-Kernel. Inputs are passed as pointers whi
 
 # Gain Map Inversion
 The Energy Conversion algorithm requires reciprocal gain maps. If reciprocals are not immediately loaded, this kernel can be used to invert an array of gain maps to their reciprocals. This step is usually executed once in the program initialization phase when the Alpaka accelerators are provided with the required values for data processing.
-![Figure: Gain Map Inversion](img/gain_map_inversion.svg)
+
+<p align="center">
+  <img alt="Figure: Gain Map Inversion" src="img/gain_map_inversion.svg" />
+</p>
