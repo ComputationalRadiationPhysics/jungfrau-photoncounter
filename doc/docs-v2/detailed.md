@@ -1,9 +1,9 @@
 # Features
 
 ### Data Transformation
-- [Gain Map Inversion](#Gain-Map-Inversion)
 - [Energy Conversion](#Energy-Conversion)
-- Photon Counting
+- [Photon Finder](#Photon-Finder)
+- [Gain Map Inversion](#Gain-Map-Inversion)
 
 ### Data Selection
 - Pixel Masking
@@ -35,6 +35,9 @@ The energy conversion algorithm transforms the raw output data of a detector mod
 The algorithm is executed as an Alpaka kernel. Inputs are passed as pointers which must be accessible from the chosen Alpaka accelerator. Optional parameters accept `nullptr`. 
 
 **TODO: code example**
+
+# Photon Finder
+The Photon Finder algorithm converts raw output data of a detector module to photon maps, using pedestal maps and reciprocal gain maps. **Note:** If reciprocal gain maps are not available, they can be inverted using the [Gain Map Inversion](#Gain-Map-Inversion) kernel.
 
 # Gain Map Inversion
 The Energy Conversion algorithm requires reciprocal gain maps. If reciprocals are not immediately loaded, this kernel can be used to invert an array of gain maps to their reciprocals. This step is usually executed once in the program initialization phase when the Alpaka accelerators are provided with the required values for data processing.
