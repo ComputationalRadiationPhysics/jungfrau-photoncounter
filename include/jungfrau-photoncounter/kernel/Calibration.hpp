@@ -53,16 +53,21 @@ struct CalibrationKernel {
             auto adc = getAdc(dataword);
             uint8_t gainStage = getGainStage(dataword);
 
-            if (initPedestalMap[expectedGainStage][id].count <
-                MOVING_STAT_WINDOW_SIZE) {
-                initPedestal(acc, adc, initPedestalMap[gainStage][id]);
+            if (expectedGainStage == 0) {
+                // select moving window for gain stage 0
+                initPedestal(acc,
+                             adc,
+                             initPedestalMap[gainStage][id],
+                             MOVING_STAT_WINDOW_SIZE);
             }
             else {
-                // manually increment counter
-                ++initPedestalMap[expectedGainStage][id].count;
-                updatePedestal(adc,
-                               MOVING_STAT_WINDOW_SIZE,
-                               pedestalMap[expectedGainStage][id]);
+                // set moving window size for other pedestal stages to the
+                // number of images available which effectively disables the
+                // moving window
+                initPedestal(acc,
+                             adc,
+                             initPedestalMap[gainStage][id],
+                             FRAMESPERSTAGE[gainStage]);
             }
 
             // copy readily calculated pedestal values into output

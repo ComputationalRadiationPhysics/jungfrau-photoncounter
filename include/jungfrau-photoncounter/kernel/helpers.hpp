@@ -25,30 +25,39 @@ ALPAKA_FN_ACC ALPAKA_FN_INLINE auto copyFrameHeader(TInputMap const& src,
     dst.header = src.header;
 }
 
-template <typename TAcc, typename TAdcValue, typename TInitPedestal>
+template <typename TAcc, typename TAdcValue, typename TInitPedestal, typename TCountValue>
 ALPAKA_FN_ACC ALPAKA_FN_INLINE auto
-initPedestal(const TAcc& acc, TAdcValue const adc, TInitPedestal& initPedestal)
+initPedestal(const TAcc& acc, TAdcValue const adc, TInitPedestal& initPedestal, TCountValue windowSize)
     -> void
 {
     // online algorithm for variance by Welford
     auto& count = initPedestal.count;
     auto& mean = initPedestal.mean;
-    auto& oldM = initPedestal.oldM;
-    auto& sigma = initPedestal.sigma;
+    auto& m = initPedestal.m;
+    auto& m2 = initPedestal.m2;
     auto& stddev = initPedestal.stddev;
 
     ++count;
+    // init
     if (count == 1) {
-        mean = oldM = adc;
-        sigma = 0;
-        stddev = 0;
+        m = adc;
+        m2 = adc * adc;
     }
+    // add
+    else if (count <= windowSize) {
+        m += adc;
+        m2 += adc;
+    }
+    //push
     else {
-        mean = oldM + (adc - oldM) / count;
-        sigma += (adc - oldM) * (adc - mean);
-        oldM = mean;
-        stddev = alpaka::math::sqrt(acc, sigma / (count - 1));
+      m += adc - m / windowSize;
+      m2 += adc * adc - m2 / windowSize;
     }
+
+    // calculate mean and stddev
+    double currentWindowSize = (count > windowSize ? windowSize : count);
+    mean = m / currentWindowSize;
+    stddev = alpaka::math::sqrt(acc, m2 / currentWindowSize - mean * mean);
 }
 
 template <typename TAdcValue, typename TCountValue, typename TPedestal>

@@ -60,9 +60,9 @@ template <typename TData> struct Frame {
 // the struct for the initial pedestal data
 struct InitPedestal {
     std::size_t count;
-    double oldM;
     double mean;
-    double sigma;
+    uint64_t m;
+    uint64_t m2;
     double stddev;
 };
 
