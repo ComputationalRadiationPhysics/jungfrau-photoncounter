@@ -8,6 +8,8 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE include/${CMAKE_PROJECT
 target_include_directories(${CMAKE_PROJECT_NAME} INTERFACE include/)
 target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC alpaka)
 
+#add_subdirectory(${PROJECT_SOURCE_DIR}/bench/)
+
 alpaka_add_executable(photoncounter src/main.cpp)
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE include/)
 target_compile_options(photoncounter PUBLIC cxx_std_14)

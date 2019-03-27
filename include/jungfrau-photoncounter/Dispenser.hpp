@@ -21,27 +21,27 @@
 #include <iostream>
 #include <limits>
 
-template <typename TAlpaka, typename TDim, typename TSize> class Dispenser {
+template <typename TAlpaka> class Dispenser {
 public:
     /**
      * Dispenser constructor
      * @param Maps-Struct with initial gain
      */
     Dispenser(
-        FramePackage<GainMap, TAlpaka, TDim, TSize> gainMap,
+        FramePackage<GainMap, TAlpaka> gainMap,
         boost::optional<
             alpaka::mem::buf::
-                Buf<typename TAlpaka::DevHost, MaskMap, TDim, TSize>> mask)
+        Buf<typename TAlpaka::DevHost, MaskMap, Dim, Size>> mask)
         : host(alpaka::pltf::getDevByIdx<typename TAlpaka::PltfHost>(0u)),
           gain(gainMap),
           mask((
               mask ? *mask
-                   : alpaka::mem::buf::alloc<MaskMap, TSize>(host, SINGLEMAP))),
-          drift(alpaka::mem::buf::alloc<DriftMap, TSize>(host, SINGLEMAP)),
+                   : alpaka::mem::buf::alloc<MaskMap, Size>(host, SINGLEMAP))),
+          drift(alpaka::mem::buf::alloc<DriftMap, Size>(host, SINGLEMAP)),
           gainStage(
-              alpaka::mem::buf::alloc<GainStageMap, TSize>(host, SINGLEMAP)),
+              alpaka::mem::buf::alloc<GainStageMap, Size>(host, SINGLEMAP)),
           maxValueMaps(
-              alpaka::mem::buf::alloc<EnergyMap, TSize>(host, DEV_FRAMES)),
+              alpaka::mem::buf::alloc<EnergyMap, Size>(host, DEV_FRAMES)),
           pedestalFallback(false),
           init(false),
           ringbuffer(TAlpaka::STREAMS_PER_DEV *
@@ -86,7 +86,7 @@ public:
      */
     auto synchronize() -> void
     {
-        for (struct DeviceData<TAlpaka, TDim, TSize> dev : devices)
+        for (struct DeviceData<TAlpaka> dev : devices)
             alpaka::wait::wait(dev.queue);
     }
 
@@ -98,7 +98,7 @@ public:
      * If this is 0, no pixels will be masked.
      */
     auto
-    uploadPedestaldata(FramePackage<DetectorData, TAlpaka, TDim, TSize> data,
+    uploadPedestaldata(FramePackage<DetectorData, TAlpaka> data,
                        double stdDevThreshold = 0) -> void
     {
         std::size_t offset = 0;
@@ -129,7 +129,7 @@ public:
      * @return pedestal pedestal data
      */
     auto downloadPedestaldata()
-        -> FramePackage<PedestalMap, TAlpaka, TDim, TSize>
+        -> FramePackage<PedestalMap, TAlpaka>
     {
         // create handle for the device with the current version of the pedestal
         // maps
@@ -156,7 +156,7 @@ public:
      * @return pedestal pedestal data
      */
     auto downloadInitialPedestaldata()
-        -> FramePackage<InitPedestalMap, TAlpaka, TDim, TSize>
+        -> FramePackage<InitPedestalMap, TAlpaka>
     {
         // create handle for the device with the current version of the pedestal
         // maps
@@ -299,7 +299,7 @@ public:
      * @param Maps-struct with raw data, offset within the package
      * @return number of frames uploaded from the package
      */
-    auto uploadData(FramePackage<DetectorData, TAlpaka, TDim, TSize> data,
+    auto uploadData(FramePackage<DetectorData, TAlpaka> data,
                     std::size_t offset,
                     ExecutionFlags flags,
                     bool flushWhenFinished = true) -> std::size_t
@@ -337,14 +337,14 @@ public:
      * @return boolean indicating whether maps were downloaded or not
      */
     auto downloadData(
-        boost::optional<FramePackage<EnergyMap, TAlpaka, TDim, TSize>&> energy,
-        boost::optional<FramePackage<PhotonMap, TAlpaka, TDim, TSize>&> photon,
-        boost::optional<FramePackage<SumMap, TAlpaka, TDim, TSize>&> sum,
-        boost::optional<FramePackage<EnergyValue, TAlpaka, TDim, TSize>&>
+        boost::optional<FramePackage<EnergyMap, TAlpaka>&> energy,
+        boost::optional<FramePackage<PhotonMap, TAlpaka>&> photon,
+        boost::optional<FramePackage<SumMap, TAlpaka>&> sum,
+        boost::optional<FramePackage<EnergyValue, TAlpaka>&>
             maxValues,
-        boost::optional<ClusterArray<TAlpaka, TDim, TSize>&> clusters) -> size_t
+        boost::optional<ClusterArray<TAlpaka>&> clusters) -> size_t
     {
-        struct DeviceData<TAlpaka, TDim, TSize>* dev =
+        struct DeviceData<TAlpaka>* dev =
             &Dispenser::devices[nextFree];
 
 
@@ -422,12 +422,12 @@ public:
 
             // create a subview in the cluster buffer where the new data shuld
             // be downloaded to
-            auto const extentView(alpaka::vec::Vec<TDim, TSize>(
-                static_cast<TSize>(clustersToDownload)));
-            auto const offsetView(alpaka::vec::Vec<TDim, TSize>(
-                static_cast<TSize>(oldNumClusters)));
+            auto const extentView(alpaka::vec::Vec<Dim, Size>(
+                static_cast<Size>(clustersToDownload)));
+            auto const offsetView(alpaka::vec::Vec<Dim, Size>(
+                static_cast<Size>(oldNumClusters)));
             alpaka::mem::view::
-                ViewSubView<typename TAlpaka::DevHost, Cluster, TDim, TSize>
+              ViewSubView<typename TAlpaka::DevHost, Cluster, Dim, Size>
                     clusterView((*clusters).clusters, extentView, offsetView);
 
             // download actual clusters
@@ -474,22 +474,22 @@ public:
 
 private:
     typename TAlpaka::DevHost host;
-    FramePackage<GainMap, TAlpaka, TDim, TSize> gain;
-    alpaka::mem::buf::Buf<typename TAlpaka::DevHost, MaskMap, TDim, TSize> mask;
-    alpaka::mem::buf::Buf<typename TAlpaka::DevHost, DriftMap, TDim, TSize>
+    FramePackage<GainMap, TAlpaka> gain;
+    alpaka::mem::buf::Buf<typename TAlpaka::DevHost, MaskMap, Dim, Size> mask;
+    alpaka::mem::buf::Buf<typename TAlpaka::DevHost, DriftMap, Dim, Size>
         drift;
-    alpaka::mem::buf::Buf<typename TAlpaka::DevHost, GainStageMap, TDim, TSize>
+    alpaka::mem::buf::Buf<typename TAlpaka::DevHost, GainStageMap, Dim, Size>
         gainStage;
-    alpaka::mem::buf::Buf<typename TAlpaka::DevHost, EnergyMap, TDim, TSize>
+    alpaka::mem::buf::Buf<typename TAlpaka::DevHost, EnergyMap, Dim, Size>
         maxValueMaps;
 
-    FramePackage<PedestalMap, TAlpaka, TDim, TSize> pedestal;
-    FramePackage<InitPedestalMap, TAlpaka, TDim, TSize> initPedestal;
+    FramePackage<PedestalMap, TAlpaka> pedestal;
+    FramePackage<InitPedestalMap, TAlpaka> initPedestal;
 
     bool init;
     bool pedestalFallback;
-    Ringbuffer<DeviceData<TAlpaka, TDim, TSize>*> ringbuffer;
-    std::vector<DeviceData<TAlpaka, TDim, TSize>> devices;
+    Ringbuffer<DeviceData<TAlpaka>*> ringbuffer;
+    std::vector<DeviceData<TAlpaka>> devices;
 
     std::size_t nextFree, nextFull;
 
@@ -534,7 +534,7 @@ private:
     auto calcPedestaldata(TDetectorData* data, std::size_t numMaps)
         -> std::size_t
     {
-        DeviceData<TAlpaka, TDim, TSize>* dev;
+        DeviceData<TAlpaka>* dev;
         if (!ringbuffer.pop(dev))
             return 0;
 
@@ -548,8 +548,8 @@ private:
             dev->data,
             alpaka::mem::view::ViewPlainPtr<typename TAlpaka::DevHost,
                                             TDetectorData,
-                                            TDim,
-                                            TSize>(data, host, numMaps),
+                                            Dim,
+                                            Size>(data, host, numMaps),
             numMaps);
 
         // copy offset data from last initialized device
@@ -675,7 +675,7 @@ private:
                   std::size_t numMaps,
                   ExecutionFlags flags) -> std::size_t
     {
-        DeviceData<TAlpaka, TDim, TSize>* dev;
+        DeviceData<TAlpaka>* dev;
         if (!ringbuffer.pop(dev))
             return 0;
 
@@ -687,8 +687,8 @@ private:
             dev->data,
             alpaka::mem::view::ViewPlainPtr<typename TAlpaka::DevHost,
                                             DetectorData,
-                                            TDim,
-                                            TSize>(data, host, numMaps),
+                                            Dim,
+                                            Size>(data, host, numMaps),
             numMaps);
 
         // copy offset data from last device uploaded to

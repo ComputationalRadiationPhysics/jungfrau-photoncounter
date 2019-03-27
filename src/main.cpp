@@ -22,30 +22,30 @@ auto main(int argc, char* argv[]) -> int
     DEBUG("filecache created");
 
     // load maps
-    FramePackage<DetectorData, Accelerator, Dim, Size> pedestaldata(
-        fc->loadMaps<DetectorData, Accelerator, Dim, Size>(
+    FramePackage<DetectorData, Accelerator> pedestaldata(
+        fc->loadMaps<DetectorData, Accelerator>(
             //"../../data_pool/px_101016/allpede_250us_1243__B_000000.dat",
-            "../../moench_data/"
+            "../../../moench_data/"
             "1000_frames_pede_e17050_1_00018_00000.dat",
             true));
     DEBUG(pedestaldata.numFrames, "pedestaldata maps loaded");
 
-    FramePackage<DetectorData, Accelerator, Dim, Size> data(
-        fc->loadMaps<DetectorData, Accelerator, Dim, Size>(
+    FramePackage<DetectorData, Accelerator> data(
+        fc->loadMaps<DetectorData, Accelerator>(
             //"../../data_pool/px_101016/Insu_6_tr_1_45d_250us__B_000000.dat",
-            "../../moench_data/"
+            "../../../moench_data/"
             "e17050_1_00018_00000_image.dat",
             true));
     DEBUG(data.numFrames, "data maps loaded");
 
-    FramePackage<GainMap, Accelerator, Dim, Size> gain(
-        fc->loadMaps<GainMap, Accelerator, Dim, Size>(
-            "../../moench_data/moench_gain.bin"
+    FramePackage<GainMap, Accelerator> gain(
+        fc->loadMaps<GainMap, Accelerator>(
+            "../../../moench_data/moench_gain.bin"
             //"../../data_pool/px_101016/gainMaps_M022.bin"
             ));
     DEBUG(gain.numFrames, "gain maps loaded");
 
-    FramePackage<MaskMap, Accelerator, Dim, Size> mask(SINGLEMAP);
+    FramePackage<MaskMap, Accelerator> mask(SINGLEMAP);
     mask.numFrames = 0;
     delete (fc);
 
@@ -63,35 +63,35 @@ auto main(int argc, char* argv[]) -> int
 
     // create empty, optional input mask
     boost::optional<alpaka::mem::buf::
-                        Buf<typename Accelerator::DevHost, MaskMap, Dim, Size>>
+                    Buf<typename Accelerator::DevHost, MaskMap, Dim, Size>>
         maskPtr;
     if (mask.numFrames == SINGLEMAP)
         maskPtr = mask.data;
 
-    Dispenser<Accelerator, Dim, Size> dispenser(gain, maskPtr);
+    Dispenser<Accelerator> dispenser(gain, maskPtr);
     
     // upload and calculate pedestal data
     dispenser.uploadPedestaldata(pedestaldata);
 
     // allocate space for output data
-    FramePackage<EnergyMap, Accelerator, Dim, Size> energy_data(DEV_FRAMES);
-    FramePackage<PhotonMap, Accelerator, Dim, Size> photon_data(DEV_FRAMES);
-    FramePackage<SumMap, Accelerator, Dim, Size> sum_data(DEV_FRAMES /
+    FramePackage<EnergyMap, Accelerator> energy_data(DEV_FRAMES);
+    FramePackage<PhotonMap, Accelerator> photon_data(DEV_FRAMES);
+    FramePackage<SumMap, Accelerator> sum_data(DEV_FRAMES /
                                                           SUM_FRAMES);
-    ClusterArray<Accelerator, Dim, Size> clusters_data(30000 * 40000 / 50);
-    FramePackage<EnergyValue, Accelerator, Dim, Size> maxValues_data(
+    ClusterArray<Accelerator> clusters_data(30000 * 40000 / 50);
+    FramePackage<EnergyValue, Accelerator> maxValues_data(
         DEV_FRAMES);
 
-    boost::optional<FramePackage<EnergyMap, Accelerator, Dim, Size>&> energy =
+    boost::optional<FramePackage<EnergyMap, Accelerator>&> energy =
         energy_data;
-    boost::optional<FramePackage<PhotonMap, Accelerator, Dim, Size>&>
+    boost::optional<FramePackage<PhotonMap, Accelerator>&>
         photon; // = photon_data;
-    boost::optional<FramePackage<SumMap, Accelerator, Dim, Size>&> sum =
+    boost::optional<FramePackage<SumMap, Accelerator>&> sum =
         sum_data;
-    boost::optional<ClusterArray<Accelerator, Dim, Size>&> clusters =
+    boost::optional<ClusterArray<Accelerator>&> clusters =
         clusters_data;
 
-    boost::optional<FramePackage<EnergyValue, Accelerator, Dim, Size>&>
+    boost::optional<FramePackage<EnergyValue, Accelerator>&>
         maxValues = maxValues_data;
 
     std::size_t offset = 0;

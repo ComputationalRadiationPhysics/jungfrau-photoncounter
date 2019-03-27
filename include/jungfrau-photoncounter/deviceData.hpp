@@ -11,7 +11,7 @@ enum State { FREE, PROCESSING, READY };
  * devices. It's fully templated to use one of the structs provided
  * by Alpakaconfig.hpp.
  */
-template <typename TAlpaka, typename TDim, typename TSize> struct DeviceData {
+template <typename TAlpaka> struct DeviceData {
     std::size_t id;
     std::size_t numMaps;
     typename TAlpaka::DevHost host;
@@ -21,49 +21,49 @@ template <typename TAlpaka, typename TDim, typename TSize> struct DeviceData {
     State state;
 
     // device maps
-    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, DetectorData, TDim, TSize>
+    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, DetectorData, Dim, Size>
         data;
 
-    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, GainMap, TDim, TSize> gain;
+    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, GainMap, Dim, Size> gain;
 
     alpaka::mem::buf::
-        Buf<typename TAlpaka::DevAcc, InitPedestalMap, TDim, TSize>
+        Buf<typename TAlpaka::DevAcc, InitPedestalMap, Dim, Size>
             initialPedestal;
 
-    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, PedestalMap, TDim, TSize>
+    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, PedestalMap, Dim, Size>
         pedestal;
 
-    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, MaskMap, TDim, TSize> mask;
+    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, MaskMap, Dim, Size> mask;
 
-    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, DriftMap, TDim, TSize>
+    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, DriftMap, Dim, Size>
         drift;
 
-    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, GainStageMap, TDim, TSize>
+    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, GainStageMap, Dim, Size>
         gainStage;
 
-    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, GainStageMap, TDim, TSize>
+    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, GainStageMap, Dim, Size>
         gainStageOutput;
 
-    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, EnergyMap, TDim, TSize>
+    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, EnergyMap, Dim, Size>
         energy;
 
-    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, EnergyMap, TDim, TSize>
+    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, EnergyMap, Dim, Size>
         maxValueMaps;
 
-    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, EnergyValue, TDim, TSize>
+    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, EnergyValue, Dim, Size>
         maxValues;
 
-    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, PhotonMap, TDim, TSize>
+    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, PhotonMap, Dim, Size>
         photon;
 
-    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, SumMap, TDim, TSize>
+    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, SumMap, Dim, Size>
         sum;
 
-    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, Cluster, TDim, TSize>
+    alpaka::mem::buf::Buf<typename TAlpaka::DevAcc, Cluster, Dim, Size>
         cluster;
 
     alpaka::mem::buf::
-        Buf<typename TAlpaka::DevAcc, unsigned long long, TDim, TSize>
+        Buf<typename TAlpaka::DevAcc, unsigned long long, Dim, Size>
             numClusters;
 
     DeviceData(std::size_t id,
@@ -76,33 +76,33 @@ template <typename TAlpaka, typename TDim, typename TSize> struct DeviceData {
           queue(device),
           event(device),
           state(FREE),
-          data(alpaka::mem::buf::alloc<DetectorData, TSize>(device, numMaps)),
-          gain(alpaka::mem::buf::alloc<GainMap, TSize>(device, GAINMAPS)),
+          data(alpaka::mem::buf::alloc<DetectorData, Size>(device, numMaps)),
+          gain(alpaka::mem::buf::alloc<GainMap, Size>(device, GAINMAPS)),
           pedestal(
-              alpaka::mem::buf::alloc<PedestalMap, TSize>(device, PEDEMAPS)),
+              alpaka::mem::buf::alloc<PedestalMap, Size>(device, PEDEMAPS)),
           initialPedestal(
-              alpaka::mem::buf::alloc<InitPedestalMap, TSize>(device,
+              alpaka::mem::buf::alloc<InitPedestalMap, Size>(device,
                                                               PEDEMAPS)),
-          drift(alpaka::mem::buf::alloc<DriftMap, TSize>(device, numMaps)),
+          drift(alpaka::mem::buf::alloc<DriftMap, Size>(device, numMaps)),
           gainStage(
-              alpaka::mem::buf::alloc<GainStageMap, TSize>(device, numMaps)),
+              alpaka::mem::buf::alloc<GainStageMap, Size>(device, numMaps)),
           gainStageOutput(
-              alpaka::mem::buf::alloc<GainStageMap, TSize>(device, SINGLEMAP)),
+              alpaka::mem::buf::alloc<GainStageMap, Size>(device, SINGLEMAP)),
           maxValueMaps(
-              alpaka::mem::buf::alloc<EnergyMap, TSize>(device, numMaps)),
+              alpaka::mem::buf::alloc<EnergyMap, Size>(device, numMaps)),
           maxValues(
-              alpaka::mem::buf::alloc<EnergyValue, TSize>(device, numMaps)),
-          energy(alpaka::mem::buf::alloc<EnergyMap, TSize>(device, numMaps)),
-          mask(alpaka::mem::buf::alloc<MaskMap, TSize>(device, SINGLEMAP)),
-          photon(alpaka::mem::buf::alloc<PhotonMap, TSize>(device, numMaps)),
-          sum(alpaka::mem::buf::alloc<SumMap, TSize>(
+              alpaka::mem::buf::alloc<EnergyValue, Size>(device, numMaps)),
+          energy(alpaka::mem::buf::alloc<EnergyMap, Size>(device, numMaps)),
+          mask(alpaka::mem::buf::alloc<MaskMap, Size>(device, SINGLEMAP)),
+          photon(alpaka::mem::buf::alloc<PhotonMap, Size>(device, numMaps)),
+          sum(alpaka::mem::buf::alloc<SumMap, Size>(
               device,
               (numMaps + SUM_FRAMES - 1) / SUM_FRAMES)),
-          cluster(alpaka::mem::buf::alloc<Cluster, TSize>(device,
+          cluster(alpaka::mem::buf::alloc<Cluster, Size>(device,
                                                           MAX_CLUSTER_NUM *
                                                               numMaps)),
           numClusters(
-              alpaka::mem::buf::alloc<unsigned long long, TSize>(device,
+              alpaka::mem::buf::alloc<unsigned long long, Size>(device,
                                                                  SINGLEMAP))
     {
         // pin all buffer

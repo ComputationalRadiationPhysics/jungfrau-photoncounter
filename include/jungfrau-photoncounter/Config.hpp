@@ -7,6 +7,10 @@
 
 #include "CheapArray.hpp"
 
+// Defines types and size. 
+using Dim = alpaka::dim::DimInt<1u>;
+using Size = uint64_t;
+
 // general settings
 constexpr std::size_t FRAMESPERSTAGE_G0 = 1000;
 constexpr std::size_t FRAMESPERSTAGE_G1 = 0;
@@ -88,12 +92,12 @@ struct Cluster {
 };
 
 // a struct to hold multiple clusters (on host and device)
-template <typename TAlpaka, typename TDim, typename TSize> struct ClusterArray {
+template <typename TAlpaka> struct ClusterArray {
     std::size_t used;
     alpaka::mem::buf::
-        Buf<typename TAlpaka::DevHost, unsigned long long, TDim, TSize>
+        Buf<typename TAlpaka::DevHost, unsigned long long, Dim, Size>
             usedPinned;
-    alpaka::mem::buf::Buf<typename TAlpaka::DevHost, Cluster, TDim, TSize>
+    alpaka::mem::buf::Buf<typename TAlpaka::DevHost, Cluster, Dim, Size>
         clusters;
 
     ClusterArray(std::size_t maxClusterCount = MAX_CLUSTER_NUM * DEV_FRAMES,
@@ -101,10 +105,10 @@ template <typename TAlpaka, typename TDim, typename TSize> struct ClusterArray {
                      alpaka::pltf::getDevByIdx<typename TAlpaka::PltfHost>(0u))
         : used(0),
           usedPinned(
-              alpaka::mem::buf::alloc<unsigned long long, TSize>(host,
+              alpaka::mem::buf::alloc<unsigned long long, Size>(host,
                                                                  SINGLEMAP)),
           clusters(
-              alpaka::mem::buf::alloc<Cluster, TSize>(host, maxClusterCount))
+              alpaka::mem::buf::alloc<Cluster, Size>(host, maxClusterCount))
     {
         alpaka::mem::buf::prepareForAsyncCopy(usedPinned);
         alpaka::mem::buf::prepareForAsyncCopy(clusters);
@@ -114,16 +118,16 @@ template <typename TAlpaka, typename TDim, typename TSize> struct ClusterArray {
 };
 
 // a struct to hold multiple frames (on host and device)
-template <typename T, typename TAlpaka, typename TDim, typename TSize>
+template <typename T, typename TAlpaka>
 struct FramePackage {
     std::size_t numFrames;
-    alpaka::mem::buf::Buf<typename TAlpaka::DevHost, T, TDim, TSize> data;
+    alpaka::mem::buf::Buf<typename TAlpaka::DevHost, T, Dim, Size> data;
 
     FramePackage(std::size_t numFrames,
                  typename TAlpaka::DevHost host =
                      alpaka::pltf::getDevByIdx<typename TAlpaka::PltfHost>(0u))
         : numFrames(numFrames),
-          data(alpaka::mem::buf::alloc<T, TSize>(host, numFrames))
+          data(alpaka::mem::buf::alloc<T, Size>(host, numFrames))
     {
         alpaka::mem::buf::prepareForAsyncCopy(data);
     }

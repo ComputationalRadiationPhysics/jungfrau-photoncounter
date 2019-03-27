@@ -7,9 +7,9 @@
 
 #include "Config.hpp"
 
-template <typename TAlpaka, typename TDim, typename TSize>
+template <typename TAlpaka>
 void saveClusters(std::string path,
-                  ClusterArray<TAlpaka, TDim, TSize>& clusters)
+                  ClusterArray<TAlpaka>& clusters)
 {
 #if (NDEBUG)
     std::ofstream clusterFile;
@@ -58,9 +58,9 @@ void save_image(std::string path, TBuffer* data, std::size_t frame_number)
 #endif
 }
 
-template <typename TAlpaka, typename TDim, typename TSize>
+template <typename TAlpaka>
 void saveClusterArray(std::string path,
-                      std::vector<ClusterArray<TAlpaka, TDim, TSize>>& clusters)
+                      std::vector<ClusterArray<TAlpaka>>& clusters)
 {
 #if (NDEBUG)
     std::ofstream clusterFile;
@@ -102,9 +102,9 @@ void saveClusterArray(std::string path,
 #endif
 }
 
-template <typename TAlpaka, typename TDim, typename TSize>
+template <typename TAlpaka>
 void saveClustersBin(std::string path,
-                     ClusterArray<TAlpaka, TDim, TSize>& clusters)
+                     ClusterArray<TAlpaka>& clusters)
 {
 #if (NDEBUG)
     std::ofstream clusterFile(path.c_str(), std::ios::binary);
@@ -184,9 +184,9 @@ public:
     void addPixel(uint16_t x, uint16_t y) { addPixel({x, y}); }
 
     void push_back(
-        FramePackage<InitPedestalMap, Accelerator, Dim, Size> init_pedestals,
-        FramePackage<PedestalMap, Accelerator, Dim, Size> raw_pedestals,
-        FramePackage<DetectorData, Accelerator, Dim, Size> raw_input,
+        FramePackage<InitPedestalMap, Accelerator> init_pedestals,
+        FramePackage<PedestalMap, Accelerator> raw_pedestals,
+        FramePackage<DetectorData, Accelerator> raw_input,
         size_t offset)
     {
         for (int i = 0; i < input.size(); ++i) {

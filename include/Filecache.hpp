@@ -15,14 +15,14 @@ private:
 
 public:
     Filecache(std::size_t size);
-    template <typename TData, typename TAlpaka, typename TDim, typename TSize>
+    template <typename TData, typename TAlpaka>
     auto loadMaps(const std::string& path, bool header = false)
-        -> FramePackage<TData, TAlpaka, TDim, TSize>;
+        -> FramePackage<TData, TAlpaka>;
 };
 
-template <typename TData, typename TAlpaka, typename TDim, typename TSize>
+template <typename TData, typename TAlpaka>
 auto Filecache::loadMaps(const std::string& path, bool header)
-    -> FramePackage<TData, TAlpaka, TDim, TSize>
+    -> FramePackage<TData, TAlpaka>
 {
     // allocate space
     auto fileSize = getFileSize(path);
@@ -44,7 +44,7 @@ auto Filecache::loadMaps(const std::string& path, bool header)
     file.read(bufferPointer, fileSize);
     file.close();
 
-    FramePackage<TData, TAlpaka, TDim, TSize> maps(numFrames);
+    FramePackage<TData, TAlpaka> maps(numFrames);
 
     alpaka::mem::buf::prepareForAsyncCopy(maps.data);
 
@@ -58,7 +58,7 @@ auto Filecache::loadMaps(const std::string& path, bool header)
         streamBuf,
         maps.data,
         alpaka::mem::view::
-            ViewPlainPtr<typename TAlpaka::DevHost, TData, TDim, TSize>(
+            ViewPlainPtr<typename TAlpaka::DevHost, TData, Dim, Size>(
                 dataBuf,
                 alpaka::pltf::getDevByIdx<typename TAlpaka::PltfHost>(0u),
                 numFrames),

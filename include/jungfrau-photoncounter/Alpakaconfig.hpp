@@ -26,9 +26,7 @@
 #include "kernel/Iterator.hpp"
 #include <alpaka/alpaka.hpp>
 
-// Defines for dimensions and types.
-using Dim = alpaka::dim::DimInt<1u>;
-using Size = uint64_t;
+// Defines workdiv.
 using WorkDiv = alpaka::workdiv::WorkDivMembers<Dim, Size>;
 
 template <typename TAccelerator> WorkDiv getWorkDiv()
