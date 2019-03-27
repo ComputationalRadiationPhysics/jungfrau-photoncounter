@@ -2,6 +2,20 @@
 #include "../Config.hpp"
 #include <alpaka/alpaka.hpp>
 
+template <typename TAcc>
+ALPAKA_FN_ACC ALPAKA_FN_INLINE auto getLinearIdx(const TAcc& acc)
+    -> std::uint64_t
+{
+    auto const globalThreadIdx = alpakaGetGlobalThreadIdx(acc);
+    auto const globalThreadExtent = alpakaGetGlobalThreadExtent(acc);
+
+    auto const linearizedGlobalThreadIdx =
+        alpakaGetGlobalLinearizedGlobalThreadIdx(globalThreadIdx,
+                                                 globalThreadExtent);
+
+    return linearizedGlobalThreadIdx[0u];
+}
+
 template <typename TDataword>
 ALPAKA_FN_ACC ALPAKA_FN_INLINE auto getAdc(TDataword dataword) -> uint16_t
 {
@@ -25,10 +39,14 @@ ALPAKA_FN_ACC ALPAKA_FN_INLINE auto copyFrameHeader(TInputMap const& src,
     dst.header = src.header;
 }
 
-template <typename TAcc, typename TAdcValue, typename TInitPedestal, typename TCountValue>
-ALPAKA_FN_ACC ALPAKA_FN_INLINE auto
-initPedestal(const TAcc& acc, TAdcValue const adc, TInitPedestal& initPedestal, TCountValue windowSize)
-    -> void
+template <typename TAcc,
+          typename TAdcValue,
+          typename TInitPedestal,
+          typename TCountValue>
+ALPAKA_FN_ACC ALPAKA_FN_INLINE auto initPedestal(const TAcc& acc,
+                                                 TAdcValue const adc,
+                                                 TInitPedestal& initPedestal,
+                                                 TCountValue windowSize) -> void
 {
     // online algorithm for variance by Welford
     auto& count = initPedestal.count;
@@ -48,16 +66,16 @@ initPedestal(const TAcc& acc, TAdcValue const adc, TInitPedestal& initPedestal, 
         m += adc;
         m2 += adc;
     }
-    //push
+    // push
     else {
-      m += adc - m / windowSize;
-      m2 += adc * adc - m2 / windowSize;
+        m += adc - m / windowSize;
+        m2 += adc * adc - m2 / windowSize;
     }
 
     // calculate mean and stddev
     double currentWindowSize = (count > windowSize ? windowSize : count);
     mean = m / currentWindowSize;
-    stddev = alpaka::math::sqrt(acc, m2 / currentWindowSize - mean * mean);
+    stddev = alpakaSqrt(acc, m2 / currentWindowSize - mean * mean);
 }
 
 template <typename TAdcValue, typename TCountValue, typename TPedestal>
@@ -104,8 +122,7 @@ getClusterBuffer(TAcc const& acc,
                  TNumClusters* const numClusters) -> TClusterArray&
 {
     // get next free index of buffer atomically
-    auto i = alpaka::atomic::atomicOp<alpaka::atomic::op::Add>(
-        acc, numClusters, static_cast<TNumClusters>(1));
+    auto i = alpakaAtomicAdd(acc, numClusters, static_cast<TNumClusters>(1));
     return clusterArray[i];
 }
 

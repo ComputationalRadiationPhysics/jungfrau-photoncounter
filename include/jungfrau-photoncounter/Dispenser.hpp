@@ -27,47 +27,34 @@ public:
      * Dispenser constructor
      * @param Maps-Struct with initial gain
      */
-    Dispenser(
-        FramePackage<GainMap, TAlpaka> gainMap,
-        boost::optional<
-            alpaka::mem::buf::
-        Buf<typename TAlpaka::DevHost, MaskMap, Dim, Size>> mask)
-        : host(alpaka::pltf::getDevByIdx<typename TAlpaka::PltfHost>(0u)),
+    Dispenser(FramePackage<GainMap, TAlpaka> gainMap,
+              boost::optional<typename TAlpaka::HostBuf<MaskMap>> mask)
+        : host(alpakaGetHost<TAlpaka>()),
           gain(gainMap),
-          mask((
-              mask ? *mask
-                   : alpaka::mem::buf::alloc<MaskMap, Size>(host, SINGLEMAP))),
-          drift(alpaka::mem::buf::alloc<DriftMap, Size>(host, SINGLEMAP)),
-          gainStage(
-              alpaka::mem::buf::alloc<GainStageMap, Size>(host, SINGLEMAP)),
-          maxValueMaps(
-              alpaka::mem::buf::alloc<EnergyMap, Size>(host, DEV_FRAMES)),
+          mask((mask ? *mask : alpakaAlloc<MaskMap>(host, SINGLEMAP))),
+          drift(alpakaAlloc<DriftMap>(host, SINGLEMAP)),
+          gainStage(alpakaAlloc<GainStageMap>(host, SINGLEMAP)),
+          maxValueMaps(alpakaAlloc<EnergyMap>(host, DEV_FRAMES)),
           pedestalFallback(false),
           init(false),
-          ringbuffer(TAlpaka::STREAMS_PER_DEV *
-                     alpaka::pltf::getDevCount<typename TAlpaka::PltfAcc>()),
+          ringbuffer(TAlpaka::STREAMS_PER_DEV * alpakaGetDevCount<TAlpaka>()),
           pedestal(PEDEMAPS, host),
           initPedestal(PEDEMAPS, host),
           nextFull(0),
           nextFree(0)
     {
         std::vector<typename TAlpaka::DevAcc> allDevices(
-            alpaka::pltf::getDevs<typename TAlpaka::PltfAcc>());
+            alpakaGetDevs<TAlpaka>());
 
         initDevices(allDevices);
 
         // make room for live mask information
         if (!mask) {
-            alpaka::mem::view::set(devices[devices.size() - 1].queue,
-                                   devices[devices.size() - 1].mask,
-                                   1,
-                                   SINGLEMAP);
+            alpakaMemSet(devices[devices.size() - 1].queue,
+                         devices[devices.size() - 1].mask,
+                         1,
+                         SINGLEMAP);
         }
-
-        alpaka::mem::buf::prepareForAsyncCopy(this->mask);
-        alpaka::mem::buf::prepareForAsyncCopy(drift);
-        alpaka::mem::buf::prepareForAsyncCopy(gainStage);
-
         synchronize();
     }
 
@@ -87,35 +74,32 @@ public:
     auto synchronize() -> void
     {
         for (struct DeviceData<TAlpaka> dev : devices)
-            alpaka::wait::wait(dev.queue);
+            alpakaWait(dev.queue);
     }
 
     /**
      * Tries to upload all data packages requiered for the inital offset.
      * Only stops after all data packages are uploaded.
      * @param Maps-Struct with datamaps
-     * @param stdDevThreshold An standard deviation threshold above which pixels should be masked.
-     * If this is 0, no pixels will be masked.
+     * @param stdDevThreshold An standard deviation threshold above which pixels
+     * should be masked. If this is 0, no pixels will be masked.
      */
-    auto
-    uploadPedestaldata(FramePackage<DetectorData, TAlpaka> data,
-                       double stdDevThreshold = 0) -> void
+    auto uploadPedestaldata(FramePackage<DetectorData, TAlpaka> data,
+                            double stdDevThreshold = 0) -> void
     {
         std::size_t offset = 0;
         DEBUG("uploading pedestaldata...");
 
         // upload all frames cut into smaller packages
         while (offset <= data.numFrames - DEV_FRAMES) {
-            offset += calcPedestaldata(
-                alpaka::mem::view::getPtrNative(data.data) + offset,
-                DEV_FRAMES);
+            offset += calcPedestaldata(alpakaNativePtr(data.data) + offset,
+                                       DEV_FRAMES);
         }
 
         // upload remaining frames
         if (offset != data.numFrames) {
-            offset += calcPedestaldata(
-                alpaka::mem::view::getPtrNative(data.data) + offset,
-                data.numFrames % DEV_FRAMES);
+            offset += calcPedestaldata(alpakaNativePtr(data.data) + offset,
+                                       data.numFrames % DEV_FRAMES);
         }
 
         if (stdDevThreshold != 0)
@@ -128,8 +112,7 @@ public:
      * Downloads the pedestal data.
      * @return pedestal pedestal data
      */
-    auto downloadPedestaldata()
-        -> FramePackage<PedestalMap, TAlpaka>
+    auto downloadPedestaldata() -> FramePackage<PedestalMap, TAlpaka>
     {
         // create handle for the device with the current version of the pedestal
         // maps
@@ -138,13 +121,13 @@ public:
         DEBUG("downloading pedestaldata from device", nextFree);
 
         // get the pedestal data from the device
-        alpaka::mem::view::copy(current_device.queue,
-                                pedestal.data,
-                                current_device.pedestal,
-                                PEDEMAPS);
+        alpakaCopy(current_device.queue,
+                   pedestal.data,
+                   current_device.pedestal,
+                   PEDEMAPS);
 
         // wait for copy to finish
-        alpaka::wait::wait(current_device.queue);
+        alpakaWait(current_device.queue);
 
         pedestal.numFrames = PEDEMAPS;
 
@@ -155,8 +138,7 @@ public:
      * Downloads the initial pedestal data.
      * @return pedestal pedestal data
      */
-    auto downloadInitialPedestaldata()
-        -> FramePackage<InitPedestalMap, TAlpaka>
+    auto downloadInitialPedestaldata() -> FramePackage<InitPedestalMap, TAlpaka>
     {
         // create handle for the device with the current version of the pedestal
         // maps
@@ -165,13 +147,13 @@ public:
         DEBUG("downloading pedestaldata from device", nextFree);
 
         // get the pedestal data from the device
-        alpaka::mem::view::copy(current_device.queue,
-                                initPedestal.data,
-                                current_device.initialPedestal,
-                                PEDEMAPS);
+        alpakaCopy(current_device.queue,
+                   initPedestal.data,
+                   current_device.initialPedestal,
+                   PEDEMAPS);
 
         // wait for copy to finish
-        alpaka::wait::wait(current_device.queue);
+        alpakaWait(current_device.queue);
 
         initPedestal.numFrames = PEDEMAPS;
 
@@ -191,13 +173,12 @@ public:
         auto current_device = devices[nextFree];
 
         // get the pedestal data from the device
-        alpaka::mem::view::copy(
-            current_device.queue, mask, current_device.mask, SINGLEMAP);
+        alpakaCopy(current_device.queue, mask, current_device.mask, SINGLEMAP);
 
         // wait for copy to finish
-        alpaka::wait::wait(current_device.queue);
+        alpakaWait(current_device.queue);
 
-        return alpaka::mem::view::getPtrNative(mask);
+        return alpakaNativePtr(mask);
     }
 
     /**
@@ -226,27 +207,26 @@ public:
 
         // mask gain stage maps
         GainStageMaskingKernel gainStageMasking;
-        auto const gainStageMasker(
-            alpaka::kernel::createTaskKernel<typename TAlpaka::Acc>(
-                getWorkDiv<TAlpaka>(),
-                gainStageMasking,
-                alpaka::mem::view::getPtrNative(current_device.gainStage),
-                alpaka::mem::view::getPtrNative(current_device.gainStageOutput),
-                frame,
-                alpaka::mem::view::getPtrNative(current_device.mask)));
+        auto const gainStageMasker(alpakaCreateKernel<TAlpaka>(
+            getWorkDiv<TAlpaka>(),
+            gainStageMasking,
+            alpakaNativePtr(current_device.gainStage),
+            alpakaNativePtr(current_device.gainStageOutput),
+            frame,
+            alpakaNativePtr(current_device.mask)));
 
-        alpaka::queue::enqueue(current_device.queue, gainStageMasker);
+        alpakaEnqueueKernel(current_device.queue, gainStageMasker);
 
         // get the pedestal data from the device
-        alpaka::mem::view::copy(current_device.queue,
-                                gainStage,
-                                current_device.gainStageOutput,
-                                SINGLEMAP);
+        alpakaCopy(current_device.queue,
+                   gainStage,
+                   current_device.gainStageOutput,
+                   SINGLEMAP);
 
         // wait for copy to finish
-        alpaka::wait::wait(current_device.queue);
+        alpakaWait(current_device.queue);
 
-        return alpaka::mem::view::getPtrNative(gainStage);
+        return alpakaNativePtr(gainStage);
     }
 
     /**
@@ -274,24 +254,23 @@ public:
 
         // mask gain stage maps
         DriftMapKernel driftMapKernel;
-        auto const driftMap(
-            alpaka::kernel::createTaskKernel<typename TAlpaka::Acc>(
-                getWorkDiv<TAlpaka>(),
-                driftMapKernel,
-                alpaka::mem::view::getPtrNative(current_device.initialPedestal),
-                alpaka::mem::view::getPtrNative(current_device.pedestal),
-                alpaka::mem::view::getPtrNative(current_device.drift)));
+        auto const driftMap(alpakaCreateKernel<TAlpaka>(
+            getWorkDiv<TAlpaka>(),
+            driftMapKernel,
+            alpakaNativePtr(current_device.initialPedestal),
+            alpakaNativePtr(current_device.pedestal),
+            alpakaNativePtr(current_device.drift)));
 
-        alpaka::queue::enqueue(current_device.queue, driftMap);
+        alpakaEnqueueKernel(current_device.queue, driftMap);
 
         // get the pedestal data from the device
-        alpaka::mem::view::copy(
+        alpakaCopy(
             current_device.queue, drift, current_device.drift, SINGLEMAP);
 
         // wait for copy to finish
-        alpaka::wait::wait(current_device.queue);
+        alpakaWait(current_device.queue);
 
-        return alpaka::mem::view::getPtrNative(drift);
+        return alpakaNativePtr(drift);
     }
 
     /**
@@ -307,16 +286,13 @@ public:
         if (!ringbuffer.isEmpty()) {
             // try uploading one data package
             if (offset <= data.numFrames - DEV_FRAMES) {
-                offset += calcData(alpaka::mem::view::getPtrNative(data.data) +
-                                       offset,
-                                   DEV_FRAMES,
-                                   flags);
+                offset += calcData(
+                    alpakaNativePtr(data.data) + offset, DEV_FRAMES, flags);
                 DEBUG(offset, "/", data.numFrames, "frames uploaded");
             }
             // upload remaining frames
             else if (offset != data.numFrames) {
-                offset += calcData(alpaka::mem::view::getPtrNative(data.data) +
-                                       offset,
+                offset += calcData(alpakaNativePtr(data.data) + offset,
                                    data.numFrames % DEV_FRAMES,
                                    flags);
                 DEBUG(offset, "/", data.numFrames, "frames uploaded");
@@ -336,16 +312,14 @@ public:
      * @param pointer to empty struct for photon and sum maps and cluster data
      * @return boolean indicating whether maps were downloaded or not
      */
-    auto downloadData(
-        boost::optional<FramePackage<EnergyMap, TAlpaka>&> energy,
-        boost::optional<FramePackage<PhotonMap, TAlpaka>&> photon,
-        boost::optional<FramePackage<SumMap, TAlpaka>&> sum,
-        boost::optional<FramePackage<EnergyValue, TAlpaka>&>
-            maxValues,
-        boost::optional<ClusterArray<TAlpaka>&> clusters) -> size_t
+    auto
+    downloadData(boost::optional<FramePackage<EnergyMap, TAlpaka>&> energy,
+                 boost::optional<FramePackage<PhotonMap, TAlpaka>&> photon,
+                 boost::optional<FramePackage<SumMap, TAlpaka>&> sum,
+                 boost::optional<FramePackage<EnergyValue, TAlpaka>&> maxValues,
+                 boost::optional<ClusterArray<TAlpaka>&> clusters) -> size_t
     {
-        struct DeviceData<TAlpaka>* dev =
-            &Dispenser::devices[nextFree];
+        struct DeviceData<TAlpaka>* dev = &Dispenser::devices[nextFree];
 
 
         DEBUG(
@@ -369,23 +343,21 @@ public:
         if (energy) {
             DEBUG("downloading energy");
             (*energy).numFrames = dev->numMaps;
-            alpaka::mem::view::copy(
-                dev->queue, (*energy).data, dev->energy, dev->numMaps);
+            alpakaCopy(dev->queue, (*energy).data, dev->energy, dev->numMaps);
         }
 
         // download photon data if needed
         if (photon) {
             DEBUG("downloading photons");
             (*photon).numFrames = dev->numMaps;
-            alpaka::mem::view::copy(
-                dev->queue, (*photon).data, dev->photon, dev->numMaps);
+            alpakaCopy(dev->queue, (*photon).data, dev->photon, dev->numMaps);
         }
 
         // download summation frames if needed
         if (sum) {
             DEBUG("downloading sum");
             (*sum).numFrames = dev->numMaps / SUM_FRAMES;
-            alpaka::mem::view::copy(
+            alpakaCopy(
                 dev->queue, (*sum).data, dev->sum, (dev->numMaps / SUM_FRAMES));
         }
 
@@ -393,49 +365,44 @@ public:
         if (maxValues) {
             DEBUG("downloading max values");
             (*maxValues).numFrames = dev->numMaps;
-            alpaka::mem::view::copy(
+            alpakaCopy(
                 dev->queue, (*maxValues).data, dev->maxValues, DEV_FRAMES);
         }
 
         // download number of clusters if needed
         if (clusters) {
             DEBUG("downloading clusters");
-            alpaka::mem::view::copy(dev->queue,
-                                    (*clusters).usedPinned,
-                                    dev->numClusters,
-                                    SINGLEMAP);
+            alpakaCopy(dev->queue,
+                       (*clusters).usedPinned,
+                       dev->numClusters,
+                       SINGLEMAP);
 
             // wait for completion of copy operations
-            alpaka::wait::wait(dev->queue);
+            alpakaWait(dev->queue);
 
             // reserve space in the cluster array for the new data and save the
             // number of clusters to download temporarily
             auto oldNumClusters = (*clusters).used;
             auto clustersToDownload =
-                alpaka::mem::view::getPtrNative((*clusters).usedPinned)[0];
-            alpaka::mem::view::getPtrNative((*clusters).usedPinned)[0] +=
-                oldNumClusters;
-            (*clusters).used =
-                alpaka::mem::view::getPtrNative((*clusters).usedPinned)[0];
+                alpakaNativePtr((*clusters).usedPinned)[0];
+            alpakaNativePtr((*clusters).usedPinned)[0] += oldNumClusters;
+            (*clusters).used = alpakaNativePtr((*clusters).usedPinned)[0];
 
             DEBUG("clustersToDownload:", clustersToDownload);
 
             // create a subview in the cluster buffer where the new data shuld
             // be downloaded to
-            auto const extentView(alpaka::vec::Vec<Dim, Size>(
-                static_cast<Size>(clustersToDownload)));
-            auto const offsetView(alpaka::vec::Vec<Dim, Size>(
-                static_cast<Size>(oldNumClusters)));
-            alpaka::mem::view::
-              ViewSubView<typename TAlpaka::DevHost, Cluster, Dim, Size>
-                    clusterView((*clusters).clusters, extentView, offsetView);
+            auto const extentView(Vec(static_cast<Size>(clustersToDownload)));
+            auto const offsetView(Vec(static_cast<Size>(oldNumClusters)));
+            typename TAlpaka::HostView<Cluster> clusterView(
+                (*clusters).clusters, extentView, offsetView);
 
             // download actual clusters
-            alpaka::mem::view::copy(
+            alpakaCopy(
                 dev->queue, clusterView, dev->cluster, clustersToDownload);
         }
 
-        alpaka::wait::wait(dev->queue);
+        alpakaWait(dev->queue);
 
         dev->state = FREE;
         nextFree = (nextFree + 1) % devices.size();
@@ -452,7 +419,7 @@ public:
     {
         std::vector<std::size_t> sizes(devices.size());
         for (std::size_t i = 0; i < devices.size(); ++i) {
-            sizes[i] = alpaka::dev::getMemBytes(devices[i].device);
+            sizes[i] = alpakaGetMemBytes(devices[i].device);
         }
 
         return sizes;
@@ -466,7 +433,7 @@ public:
     {
         std::vector<std::size_t> sizes(devices.size());
         for (std::size_t i = 0; i < devices.size(); ++i) {
-            sizes[i] = alpaka::dev::getFreeMemBytes(devices[i].device);
+            sizes[i] = alpakaGetFreeMemBytes(devices[i].device);
         }
 
         return sizes;
@@ -475,13 +442,10 @@ public:
 private:
     typename TAlpaka::DevHost host;
     FramePackage<GainMap, TAlpaka> gain;
-    alpaka::mem::buf::Buf<typename TAlpaka::DevHost, MaskMap, Dim, Size> mask;
-    alpaka::mem::buf::Buf<typename TAlpaka::DevHost, DriftMap, Dim, Size>
-        drift;
-    alpaka::mem::buf::Buf<typename TAlpaka::DevHost, GainStageMap, Dim, Size>
-        gainStage;
-    alpaka::mem::buf::Buf<typename TAlpaka::DevHost, EnergyMap, Dim, Size>
-        maxValueMaps;
+    typename TAlpaka::HostBuf<MaskMap> mask;
+    typename TAlpaka::HostBuf<DriftMap> drift;
+    typename TAlpaka::HostBuf<GainStageMap> gainStage;
+    typename TAlpaka::HostBuf<EnergyMap> maxValueMaps;
 
     FramePackage<PedestalMap, TAlpaka> pedestal;
     FramePackage<InitPedestalMap, TAlpaka> initPedestal;
@@ -507,15 +471,14 @@ private:
             // initialize variables
             devices.emplace_back(num,
                                  allDevices[num / TAlpaka::STREAMS_PER_DEV]);
-            alpaka::mem::view::copy(
+            alpakaCopy(
                 devices[num].queue, devices[num].gain, gain.data, GAINMAPS);
             // compute reciprocals of gain maps
-            auto const gainmapInversion(
-                alpaka::kernel::createTaskKernel<typename TAlpaka::Acc>(
-                    getWorkDiv<TAlpaka>(),
-                    gainmapInversionKernel,
-                    alpaka::mem::view::getPtrNative(devices[num].gain)));
-            alpaka::queue::enqueue(devices[num].queue, gainmapInversion);
+            auto const gainmapInversion(alpakaCreateKernel<TAlpaka>(
+                getWorkDiv<TAlpaka>(),
+                gainmapInversionKernel,
+                alpakaNativePtr(devices[num].gain)));
+            alpakaEnqueueKernel(devices[num].queue, gainmapInversion);
 
             if (!ringbuffer.push(&devices[num])) {
                 fputs("FATAL ERROR (RingBuffer): Unexpected size!\n", stderr);
@@ -543,27 +506,23 @@ private:
         dev->state = PROCESSING;
         dev->numMaps = numMaps;
 
-        alpaka::mem::view::copy(
+        alpakaCopy(
             dev->queue,
             dev->data,
-            alpaka::mem::view::ViewPlainPtr<typename TAlpaka::DevHost,
-                                            TDetectorData,
-                                            Dim,
-                                            Size>(data, host, numMaps),
+            alpakaViewPlainPtrHost<TAlpaka, TDetectorData>(data, host, numMaps),
             numMaps);
 
         // copy offset data from last initialized device
         auto prevDevice = (nextFull + devices.size() - 1) % devices.size();
-        alpaka::wait::wait(devices[prevDevice].queue);
-        alpaka::mem::view::copy(
+        alpakaWait(devices[prevDevice].queue);
+        alpakaCopy(
             dev->queue, dev->pedestal, devices[prevDevice].pedestal, PEDEMAPS);
-        alpaka::mem::view::copy(dev->queue,
-                                dev->initialPedestal,
-                                devices[prevDevice].initialPedestal,
-                                PEDEMAPS);
+        alpakaCopy(dev->queue,
+                   dev->initialPedestal,
+                   devices[prevDevice].initialPedestal,
+                   PEDEMAPS);
 
-        alpaka::mem::view::copy(
-            dev->queue, dev->mask, devices[prevDevice].mask, SINGLEMAP);
+        alpakaCopy(dev->queue, dev->mask, devices[prevDevice].mask, SINGLEMAP);
 
         // increase nextFull and nextFree (because pedestal data isn't
         // downloaded like normal data)
@@ -571,25 +530,24 @@ private:
         nextFree = (nextFree + 1) % devices.size();
 
         if (!init) {
-            alpaka::mem::view::set(dev->queue, dev->pedestal, 0, SINGLEMAP);
-            alpaka::wait::wait(dev->queue);
+            alpakaMemSet(dev->queue, dev->pedestal, 0, SINGLEMAP);
+            alpakaWait(dev->queue);
             init = true;
         }
 
         CalibrationKernel calibrationKernel;
         auto const calibration(
-            alpaka::kernel::createTaskKernel<typename TAlpaka::Acc>(
-                getWorkDiv<TAlpaka>(),
-                calibrationKernel,
-                alpaka::mem::view::getPtrNative(dev->data),
-                alpaka::mem::view::getPtrNative(dev->initialPedestal),
-                alpaka::mem::view::getPtrNative(dev->pedestal),
-                alpaka::mem::view::getPtrNative(dev->mask),
-                dev->numMaps));
+            alpakaCreateKernel<TAlpaka>(getWorkDiv<TAlpaka>(),
+                                        calibrationKernel,
+                                        alpakaNativePtr(dev->data),
+                                        alpakaNativePtr(dev->initialPedestal),
+                                        alpakaNativePtr(dev->pedestal),
+                                        alpakaNativePtr(dev->mask),
+                                        dev->numMaps));
 
-        alpaka::queue::enqueue(dev->queue, calibration);
+        alpakaEnqueueKernel(dev->queue, calibration);
 
-        alpaka::wait::wait(dev->queue);
+        alpakaWait(dev->queue);
 
         dev->state = FREE;
 
@@ -611,16 +569,14 @@ private:
 
         // create stddev check kernel object
         CheckStdDevKernel checkStdDevKernel;
-        auto const checkStdDev(
-            alpaka::kernel::createTaskKernel<typename TAlpaka::Acc>(
-                getWorkDiv<TAlpaka>(),
-                checkStdDevKernel,
-                alpaka::mem::view::getPtrNative(
-                    devices[nextFull].initialPedestal),
-                alpaka::mem::view::getPtrNative(devices[nextFull].mask),
-                threshold));
+        auto const checkStdDev(alpakaCreateKernel<TAlpaka>(
+            getWorkDiv<TAlpaka>(),
+            checkStdDevKernel,
+            alpakaNativePtr(devices[nextFull].initialPedestal),
+            alpakaNativePtr(devices[nextFull].mask),
+            threshold));
 
-        alpaka::queue::enqueue(devices[nextFull].queue, checkStdDev);
+        alpakaEnqueueKernel(devices[nextFull].queue, checkStdDev);
     }
 
     /**
@@ -633,10 +589,10 @@ private:
         for (uint64_t i = 0; i < devices.size() - 1; ++i) {
             uint64_t destination =
                 (i + source + (i >= source ? 1 : 0)) % devices.size();
-            alpaka::mem::view::copy(devices[source].queue,
-                                    devices[destination].mask,
-                                    devices[source].mask,
-                                    SINGLEMAP);
+            alpakaCopy(devices[source].queue,
+                       devices[destination].mask,
+                       devices[source].mask,
+                       SINGLEMAP);
         }
         synchronize();
     }
@@ -651,16 +607,16 @@ private:
         DEBUG("distribute initial pedestal maps (from", source, ")");
         for (uint64_t i = 0; i < devices.size(); ++i) {
             // distribute initial pedestal map (containing statistics etc.)
-            alpaka::mem::view::copy(devices[source].queue,
-                                    devices[i].initialPedestal,
-                                    devices[source].initialPedestal,
-                                    SINGLEMAP);
+            alpakaCopy(devices[source].queue,
+                       devices[i].initialPedestal,
+                       devices[source].initialPedestal,
+                       SINGLEMAP);
 
             // distribute pedestal map (with initial data)
-            alpaka::mem::view::copy(devices[source].queue,
-                                    devices[i].pedestal,
-                                    devices[source].pedestal,
-                                    SINGLEMAP);
+            alpakaCopy(devices[source].queue,
+                       devices[i].pedestal,
+                       devices[source].pedestal,
+                       SINGLEMAP);
         }
         synchronize();
     }
@@ -682,76 +638,70 @@ private:
         dev->state = PROCESSING;
         dev->numMaps = numMaps;
 
-        alpaka::mem::view::copy(
+        alpakaCopy(
             dev->queue,
             dev->data,
-            alpaka::mem::view::ViewPlainPtr<typename TAlpaka::DevHost,
-                                            DetectorData,
-                                            Dim,
-                                            Size>(data, host, numMaps),
+            alpakaViewPlainPtrHost<TAlpaka, DetectorData>(data, host, numMaps),
             numMaps);
 
         // copy offset data from last device uploaded to
         auto prevDevice = (nextFull + devices.size() - 1) % devices.size();
-        alpaka::wait::wait(dev->queue, devices[prevDevice].event);
+        alpakaWait(dev->queue, devices[prevDevice].event);
         DEBUG("device", devices[prevDevice].id, "finished");
 
         devices[prevDevice].state = READY;
-        alpaka::mem::view::copy(
+        alpakaCopy(
             dev->queue, dev->pedestal, devices[prevDevice].pedestal, PEDEMAPS);
 
         nextFull = (nextFull + 1) % devices.size();
 
         // reset the number of clusters
-        alpaka::mem::view::set(dev->queue, dev->numClusters, 0, SINGLEMAP);
+        alpakaMemSet(dev->queue, dev->numClusters, 0, SINGLEMAP);
 
-        MaskMap* local_mask = flags.masking
-                                  ? alpaka::mem::view::getPtrNative(dev->mask)
-                                  : nullptr;
+        MaskMap* local_mask =
+            flags.masking ? alpakaNativePtr(dev->mask) : nullptr;
 
         // converting to energy
         // the photon and cluster extraction kernels already include energy
         // conversion
         if (flags.mode == 0) {
             ConversionKernel conversionKernel;
-            auto const conversion(
-                alpaka::kernel::createTaskKernel<typename TAlpaka::Acc>(
-                    getWorkDiv<TAlpaka>(),
-                    conversionKernel,
-                    alpaka::mem::view::getPtrNative(dev->data),
-                    alpaka::mem::view::getPtrNative(dev->gain),
-                    alpaka::mem::view::getPtrNative(dev->initialPedestal),
-                    alpaka::mem::view::getPtrNative(dev->pedestal),
-                    alpaka::mem::view::getPtrNative(dev->gainStage),
-                    alpaka::mem::view::getPtrNative(dev->energy),
-                    dev->numMaps,
-                    local_mask,
-                    pedestalFallback));
+            auto const conversion(alpakaCreateKernel<TAlpaka>(
+                getWorkDiv<TAlpaka>(),
+                conversionKernel,
+                alpakaNativePtr(dev->data),
+                alpakaNativePtr(dev->gain),
+                alpakaNativePtr(dev->initialPedestal),
+                alpakaNativePtr(dev->pedestal),
+                alpakaNativePtr(dev->gainStage),
+                alpakaNativePtr(dev->energy),
+                dev->numMaps,
+                local_mask,
+                pedestalFallback));
 
             DEBUG("enqueueing conversion kernel");
-            alpaka::queue::enqueue(dev->queue, conversion);
+            alpakaEnqueueKernel(dev->queue, conversion);
         }
 
         // converting to photons (and energy)
         if (flags.mode == 1) {
             PhotonFinderKernel photonFinderKernel;
-            auto const photonFinder(
-                alpaka::kernel::createTaskKernel<typename TAlpaka::Acc>(
-                    getWorkDiv<TAlpaka>(),
-                    photonFinderKernel,
-                    alpaka::mem::view::getPtrNative(dev->data),
-                    alpaka::mem::view::getPtrNative(dev->gain),
-                    alpaka::mem::view::getPtrNative(dev->initialPedestal),
-                    alpaka::mem::view::getPtrNative(dev->pedestal),
-                    alpaka::mem::view::getPtrNative(dev->gainStage),
-                    alpaka::mem::view::getPtrNative(dev->energy),
-                    alpaka::mem::view::getPtrNative(dev->photon),
-                    dev->numMaps,
-                    local_mask,
-                    pedestalFallback));
+            auto const photonFinder(alpakaCreateKernel<TAlpaka>(
+                getWorkDiv<TAlpaka>(),
+                photonFinderKernel,
+                alpakaNativePtr(dev->data),
+                alpakaNativePtr(dev->gain),
+                alpakaNativePtr(dev->initialPedestal),
+                alpakaNativePtr(dev->pedestal),
+                alpakaNativePtr(dev->gainStage),
+                alpakaNativePtr(dev->energy),
+                alpakaNativePtr(dev->photon),
+                dev->numMaps,
+                local_mask,
+                pedestalFallback));
 
             DEBUG("enqueueing photon kernel");
-            alpaka::queue::enqueue(dev->queue, photonFinder);
+            alpakaEnqueueKernel(dev->queue, photonFinder);
         };
 
         // clustering (and conversion to energy)
@@ -762,24 +712,23 @@ private:
                 // execute the clusterfinder with the pedestalupdate on every
                 // frame
                 ClusterFinderKernel clusterFinderKernel;
-                auto const clusterFinder(
-                    alpaka::kernel::createTaskKernel<typename TAlpaka::Acc>(
-                        getWorkDiv<TAlpaka>(),
-                        clusterFinderKernel,
-                        alpaka::mem::view::getPtrNative(dev->data),
-                        alpaka::mem::view::getPtrNative(dev->gain),
-                        alpaka::mem::view::getPtrNative(dev->initialPedestal),
-                        alpaka::mem::view::getPtrNative(dev->pedestal),
-                        alpaka::mem::view::getPtrNative(dev->gainStage),
-                        alpaka::mem::view::getPtrNative(dev->energy),
-                        alpaka::mem::view::getPtrNative(dev->cluster),
-                        alpaka::mem::view::getPtrNative(dev->numClusters),
-                        local_mask,
-                        dev->numMaps,
-                        i,
-                        pedestalFallback));
+                auto const clusterFinder(alpakaCreateKernel<TAlpaka>(
+                    getWorkDiv<TAlpaka>(),
+                    clusterFinderKernel,
+                    alpakaNativePtr(dev->data),
+                    alpakaNativePtr(dev->gain),
+                    alpakaNativePtr(dev->initialPedestal),
+                    alpakaNativePtr(dev->pedestal),
+                    alpakaNativePtr(dev->gainStage),
+                    alpakaNativePtr(dev->energy),
+                    alpakaNativePtr(dev->cluster),
+                    alpakaNativePtr(dev->numClusters),
+                    local_mask,
+                    dev->numMaps,
+                    i,
+                    pedestalFallback));
 
-                alpaka::queue::enqueue(dev->queue, clusterFinder);
+                alpakaEnqueueKernel(dev->queue, clusterFinder);
             }
         }
 
@@ -794,29 +743,26 @@ private:
                         TAlpaka::threadsPerBlock),
                     static_cast<Size>(1));
                 ReduceKernel<TAlpaka::threadsPerBlock, double> reduceKernelRun1;
-                auto const reduceRun1(
-                    alpaka::kernel::createTaskKernel<typename TAlpaka::Acc>(
-                        workdivRun1,
-                        reduceKernelRun1,
-                        &alpaka::mem::view::getPtrNative(dev->energy)[i],
-                        &alpaka::mem::view::getPtrNative(dev->maxValueMaps)[i],
-                        DIMX * DIMY));
+                auto const reduceRun1(alpakaCreateKernel<TAlpaka>(
+                    workdivRun1,
+                    reduceKernelRun1,
+                    &alpakaNativePtr(dev->energy)[i],
+                    &alpakaNativePtr(dev->maxValueMaps)[i],
+                    DIMX * DIMY));
 
                 WorkDiv workdivRun2{static_cast<Size>(1),
                                     decltype(TAlpaka::threadsPerBlock)(
                                         TAlpaka::threadsPerBlock),
                                     static_cast<Size>(1)};
                 ReduceKernel<TAlpaka::threadsPerBlock, double> reduceKernelRun2;
-                auto const reduceRun2(
-                    alpaka::kernel::createTaskKernel<typename TAlpaka::Acc>(
-                        workdivRun2,
-                        reduceKernelRun2,
-                        &alpaka::mem::view::getPtrNative(dev->maxValueMaps)[i],
-                        &alpaka::mem::view::getPtrNative(dev->maxValueMaps)[i],
-                        decltype(TAlpaka::blocksPerGrid)(
-                            TAlpaka::blocksPerGrid)));
-                alpaka::queue::enqueue(dev->queue, reduceRun1);
-                alpaka::queue::enqueue(dev->queue, reduceRun2);
+                auto const reduceRun2(alpakaCreateKernel<TAlpaka>(
+                    workdivRun2,
+                    reduceKernelRun2,
+                    &alpakaNativePtr(dev->maxValueMaps)[i],
+                    &alpakaNativePtr(dev->maxValueMaps)[i],
+                    decltype(TAlpaka::blocksPerGrid)(TAlpaka::blocksPerGrid)));
+                alpakaEnqueueKernel(dev->queue, reduceRun1);
+                alpakaEnqueueKernel(dev->queue, reduceRun2);
             }
 
             WorkDiv workdivMaxValueCopy{
@@ -827,15 +773,14 @@ private:
                 static_cast<Size>(1)};
             MaxValueCopyKernel maxValueCopyKernel;
             auto const maxValueCopy(
-                alpaka::kernel::createTaskKernel<typename TAlpaka::Acc>(
-                    workdivMaxValueCopy,
-                    maxValueCopyKernel,
-                    alpaka::mem::view::getPtrNative(dev->maxValueMaps),
-                    alpaka::mem::view::getPtrNative(dev->maxValues),
-                    numMaps));
+                alpakaCreateKernel<TAlpaka>(workdivMaxValueCopy,
+                                            maxValueCopyKernel,
+                                            alpakaNativePtr(dev->maxValueMaps),
+                                            alpakaNativePtr(dev->maxValues),
+                                            numMaps));
 
             DEBUG("enqueueing max value extraction kernel");
-            alpaka::queue::enqueue(dev->queue, maxValueCopy);
+            alpakaEnqueueKernel(dev->queue, maxValueCopy);
         }
 
         // summation
@@ -844,19 +789,18 @@ private:
 
             SummationKernel summationKernel;
             auto const summation(
-                alpaka::kernel::createTaskKernel<typename TAlpaka::Acc>(
-                    getWorkDiv<TAlpaka>(),
-                    summationKernel,
-                    alpaka::mem::view::getPtrNative(dev->energy),
-                    dev->numMaps,
-                    SUM_FRAMES,
-                    alpaka::mem::view::getPtrNative(dev->sum)));
+                alpakaCreateKernel<TAlpaka>(getWorkDiv<TAlpaka>(),
+                                            summationKernel,
+                                            alpakaNativePtr(dev->energy),
+                                            dev->numMaps,
+                                            SUM_FRAMES,
+                                            alpakaNativePtr(dev->sum)));
 
-            alpaka::queue::enqueue(dev->queue, summation);
+            alpakaEnqueueKernel(dev->queue, summation);
         };
 
         // the event is used to wait for pedestal data
-        alpaka::queue::enqueue(dev->queue, dev->event);
+        alpakaEnqueueKernel(dev->queue, dev->event);
 
         return numMaps;
     }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <alpaka/alpaka.hpp>
+#include "../AlpakaHelper.hpp"
 
 //#############################################################################
 //! An iterator base class.
@@ -146,9 +147,9 @@ public:
         : Iterator<T, TBuf>(
               data,
               static_cast<uint32_t>((n * linearizedIndex) / 
-                                    alpaka::math::min(acc, static_cast<uint64_t>(gridSize), n)),
+                                    alpakaMin(acc, static_cast<uint64_t>(gridSize), n)),
               static_cast<uint32_t>((n * (linearizedIndex + 1)) / 
-                  alpaka::math::min(acc, static_cast<uint64_t>(gridSize), n)))
+                  alpakaMin(acc, static_cast<uint64_t>(gridSize), n)))
     {
     }
 

@@ -45,22 +45,18 @@ auto Filecache::loadMaps(const std::string& path, bool header)
     file.close();
 
     FramePackage<TData, TAlpaka> maps(numFrames);
-
-    alpaka::mem::buf::prepareForAsyncCopy(maps.data);
-
-    alpaka::queue::QueueCpuSync streamBuf =
-        alpaka::pltf::getDevByIdx<typename TAlpaka::PltfHost>(0u);
+    
+    CpuSyncQueue streamBuf = alpakaGetHost<TAlpaka>();
 
     TData* dataBuf = reinterpret_cast<TData*>(bufferPointer);
 
     // copy data into alpaca memory
-    alpaka::mem::view::copy(
+    alpakaCopy(
         streamBuf,
         maps.data,
-        alpaka::mem::view::
-            ViewPlainPtr<typename TAlpaka::DevHost, TData, Dim, Size>(
+        alpakaViewPlainPtrHost<TAlpaka, TData>(
                 dataBuf,
-                alpaka::pltf::getDevByIdx<typename TAlpaka::PltfHost>(0u),
+                alpakaGetHost<TAlpaka>(),
                 numFrames),
         numFrames);
 

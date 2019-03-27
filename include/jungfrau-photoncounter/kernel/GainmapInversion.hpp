@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../Config.hpp"
+#include "helpers.hpp"
 
 struct GainmapInversionKernel {
     template <typename TAcc, typename TGain>
@@ -8,15 +9,7 @@ struct GainmapInversionKernel {
                                   TGain* const gainmaps) 
         const -> void
     {
-        auto const globalThreadIdx =
-            alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc);
-        auto const globalThreadExtent =
-            alpaka::workdiv::getWorkDiv<alpaka::Grid, alpaka::Threads>(acc);
-
-        auto const linearizedGlobalThreadIdx =
-            alpaka::idx::mapIdx<1u>(globalThreadIdx, globalThreadExtent);
-
-        auto id = linearizedGlobalThreadIdx[0u];
+        auto id = getLinearIdx(acc);
         
         // check range
         if (id >= MAPSIZE)

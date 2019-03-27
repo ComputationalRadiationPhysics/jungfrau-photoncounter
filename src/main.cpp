@@ -49,26 +49,20 @@ auto main(int argc, char* argv[]) -> int
     mask.numFrames = 0;
     delete (fc);
 
-    // print info
-#ifdef ALPAKA_ACC_GPU_CUDA_ENABLED
-    DEBUG(
-        "gpu count:",
-        (alpaka::pltf::getDevCount<alpaka::pltf::Pltf<
-             alpaka::dev::Dev<alpaka::acc::AccGpuCudaRt<alpaka::dim::DimInt<1u>,
-                                                        std::size_t>>>>()));
-#endif
-    DEBUG("cpu count:",
-          (alpaka::pltf::getDevCount<
-              alpaka::pltf::Pltf<typename Accelerator::Acc>>()));
-
     // create empty, optional input mask
-    boost::optional<alpaka::mem::buf::
-                    Buf<typename Accelerator::DevHost, MaskMap, Dim, Size>>
+    boost::optional<Accelerator::HostBuf<MaskMap>>
         maskPtr;
     if (mask.numFrames == SINGLEMAP)
         maskPtr = mask.data;
 
     Dispenser<Accelerator> dispenser(gain, maskPtr);
+
+    // print info
+#ifdef ALPAKA_ACC_GPU_CUDA_ENABLED
+    DEBUG(
+        "gpu count:",
+        dispenser.getMemSize().size());
+#endif
     
     // upload and calculate pedestal data
     dispenser.uploadPedestaldata(pedestaldata);

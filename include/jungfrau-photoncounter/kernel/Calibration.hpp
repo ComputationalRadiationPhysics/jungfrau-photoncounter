@@ -16,15 +16,7 @@ struct CalibrationKernel {
                                   TMaskMap* const mask,
                                   TNumFrames const numFrames) const -> void
     {
-        auto const globalThreadIdx =
-            alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc);
-        auto const globalThreadExtent =
-            alpaka::workdiv::getWorkDiv<alpaka::Grid, alpaka::Threads>(acc);
-
-        auto const linearizedGlobalThreadIdx =
-            alpaka::idx::mapIdx<1u>(globalThreadIdx, globalThreadExtent);
-
-        auto id = linearizedGlobalThreadIdx[0u];
+        auto id = getLinearIdx(acc);
 
         // check range
         if (id >= MAPSIZE)

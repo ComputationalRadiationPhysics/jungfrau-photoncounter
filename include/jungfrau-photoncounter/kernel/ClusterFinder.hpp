@@ -31,15 +31,7 @@ struct ClusterFinderKernel {
                                   bool pedestalFallback,
                                   TNumStdDevs const c = C) const -> void
     {
-        auto const globalThreadIdx =
-            alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc);
-        auto const globalThreadExtent =
-            alpaka::workdiv::getWorkDiv<alpaka::Grid, alpaka::Threads>(acc);
-
-        auto const linearizedGlobalThreadIdx =
-            alpaka::idx::mapIdx<1u>(globalThreadIdx, globalThreadExtent);
-
-        auto id = linearizedGlobalThreadIdx[0u];
+        auto id = getLinearIdx(acc);
 
         // check range
         if (id >= MAPSIZE)
@@ -67,7 +59,8 @@ struct ClusterFinderKernel {
                 }
 
                 // check dark pixel condition
-                else if (-c * stddev <= energy && c * stddev >= energy && !pedestalFallback) {
+                else if (-c * stddev <= energy && c * stddev >= energy &&
+                         !pedestalFallback) {
                     updatePedestal(adc,
                                    MOVING_STAT_WINDOW_SIZE,
                                    pedestalMaps[gainStage][id]);
