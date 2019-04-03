@@ -53,9 +53,11 @@ Heide Mei{\ss}ner}
 
 Increasing data rates during FEL experiments require dedicated detectors as well as advanced methods for fast data processing\\
 
-Jungfrau detector (\cite{jungfrau1}, \cite{jungfrau2}, \cite{jungfrau3}): pixel detector with gain switching scheme for large range of photon rates (single pixel to photon bunches)\\
+Jungfrau detector (\cite{jungfrau1}, \cite{jungfrau2}, \cite{jungfrau3}, \cite{Mozzanica_2016}): pixel detector with gain switching scheme for large range of photon rates (single pixel to photon bunches)\\
 
-online data conversion: calculate energy and number of photons from detector response for each pixel using continuously updated pedestal maps\\
+charge integrating, meaning that detector output must be corrected before the number of photons per pixel per frame is retrieved.\\
+
+online data conversion: calculate energy and number of photons from detector response for each pixel using continuously updated pedestal maps and gain maps calculated in dedicated lab-based calibration procedure~\cite{jungfrau2}\\
 
 Find clusters\\
 
@@ -89,7 +91,7 @@ In the following, we describe ....\\
 
 
 \subsection{Data processing algorithm (PSI)}
-conversion from detector data to energy and number of photons\\
+conversion from detector data to energy and number of photons including pixel mask, pedestal calculation, pedestal tracking, pedestal correction, gain correction, conversion to number of photons (in the case of monochromatic incident radiation)\\
 
  summation of frames\\
 
