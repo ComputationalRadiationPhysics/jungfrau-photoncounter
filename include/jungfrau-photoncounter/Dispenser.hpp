@@ -558,26 +558,11 @@ private:
         dev->state = PROCESSING;
         dev->numMaps = numMaps;
 
-
-        DEBUG("not fsd");
-
-
-
-        //DEBUG("size", dev->data.m_extentElements[0], dev->data.m_extentElements[1], dev->data.m_extentElements[2]);
-
-        std::cout << std::endl;
-
-        
-
         alpakaCopy(
             dev->queue,
             dev->data,
             alpakaViewPlainPtrHost<TAlpaka, TDetectorData>(data, host, numMaps),
             numMaps);
-
-
-        DEBUG("sfdsff");
-
 
         // copy offset data from last initialized device
         auto prevDevice = (nextFull + devices.size() - 1) % devices.size();
@@ -587,36 +572,20 @@ private:
                    devices[prevDevice].pedestal,
                    decltype(TConfig::PEDEMAPS)(TConfig::PEDEMAPS));
 
-
-        DEBUG("sfdsff 2");
-
-
         alpakaCopy(dev->queue,
                    dev->initialPedestal,
                    devices[prevDevice].initialPedestal,
                    decltype(TConfig::PEDEMAPS)(TConfig::PEDEMAPS));
-
-
-        DEBUG("sfdsff 3");
-
 
         alpakaCopy(dev->queue,
                    dev->mask,
                    devices[prevDevice].mask,
                    decltype(TConfig::SINGLEMAP)(TConfig::SINGLEMAP));
 
-
-        DEBUG("sfdsff 4");
-
-
         // increase nextFull and nextFree (because pedestal data isn't
         // downloaded like normal data)
         nextFull = (nextFull + 1) % devices.size();
         nextFree = (nextFree + 1) % devices.size();
-
-
-        DEBUG("sfdsff5");
-
 
         if (!init) {
             alpakaMemSet(dev->queue,
@@ -627,10 +596,6 @@ private:
             init = true;
         }
 
-
-        DEBUG("sfdsff 6");
-
-
         CalibrationKernel<TConfig> calibrationKernel{};
         auto const calibration(
             alpakaCreateKernel<TAlpaka>(getWorkDiv<TAlpaka>(),
@@ -640,10 +605,6 @@ private:
                                         alpakaNativePtr(dev->pedestal),
                                         alpakaNativePtr(dev->mask),
                                         dev->numMaps));
-
-
-        DEBUG("sfdsff7");
-
 
         alpakaEnqueueKernel(dev->queue, calibration);
 
