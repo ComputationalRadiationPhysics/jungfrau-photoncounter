@@ -1,7 +1,7 @@
 #pragma once
-#include "../Config.hpp"
 #include "helpers.hpp"
 
+template<typename Config>
 struct PhotonFinderKernel {
     template <typename TAcc,
               typename TDetectorData,
@@ -25,12 +25,12 @@ struct PhotonFinderKernel {
                                   TNumFrames const numFrames,
                                   TMask* const mask,
                                   bool pedestalFallback,
-                                  TNumStdDevs const c = C) const -> void
+                                  TNumStdDevs const c = Config::C) const -> void
     {
         auto id = getLinearIdx(acc);
         
         // check range
-        if (id >= MAPSIZE)
+        if (id >= Config::MAPSIZE)
             return;
 
         for (TNumFrames i = 0; i < numFrames; ++i) {
@@ -60,7 +60,7 @@ struct PhotonFinderKernel {
             auto& photonCount = photonMaps[i].data[id];
 
             // calculate photon count from calibrated energy
-            photonCount = (energy + BEAMCONST) * PHOTONCONST;
+            photonCount = (energy + Config::BEAMCONST) * Config::PHOTONCONST;
 
             const auto& pedestal = pedestalMaps[gainStage][id];
             const auto& stddev = initPedestalMaps[gainStage][id].stddev;
@@ -69,7 +69,7 @@ struct PhotonFinderKernel {
             if (pedestal - c * stddev <= adc && pedestal + c * stddev >= adc &&
                 !pedestalFallback) {
                 updatePedestal(
-                    adc, MOVING_STAT_WINDOW_SIZE, pedestalMaps[gainStage][id]);
+                    adc, Config::MOVING_STAT_WINDOW_SIZE, pedestalMaps[gainStage][id]);
             }
         }
     }

@@ -1,7 +1,7 @@
 #pragma once
-#include "../Config.hpp"
 #include "helpers.hpp"
 
+template<typename Config>
 struct ConversionKernel {
     template <typename TAcc,
               typename TDetectorData,
@@ -23,12 +23,12 @@ struct ConversionKernel {
                                   TNumFrames const numFrames,
                                   TMask const* const mask,
                                   bool pedestalFallback,
-                                  TNumStdDevs const c = C) const -> void
+                                  TNumStdDevs const c = Config::C) const -> void
     {
         auto id = getLinearIdx(acc);
 
         // check range
-        if (id >= MAPSIZE)
+        if (id >= Config::MAPSIZE)
             return;
 
         for (TNumFrames i = 0; i < numFrames; ++i) {
@@ -54,7 +54,7 @@ struct ConversionKernel {
             if (pedestal - c * stddev <= adc && pedestal + c * stddev >= adc &&
                 !pedestalFallback) {
                 updatePedestal(
-                    adc, MOVING_STAT_WINDOW_SIZE, pedestalMaps[gainStage][id]);
+                    adc, Config::MOVING_STAT_WINDOW_SIZE, pedestalMaps[gainStage][id]);
             }
         }
     }

@@ -1,7 +1,7 @@
 #pragma once
-#include "../Config.hpp"
 #include "helpers.hpp"
 
+template<typename Config>
 struct DriftMapKernel {
     template <typename TAcc,
               typename TInitPedestalMap,
@@ -16,7 +16,7 @@ struct DriftMapKernel {
         auto id = getLinearIdx(acc);
         
         // check range
-        if (id >= MAPSIZE)
+        if (id >= Config::MAPSIZE)
             return;
 
         driftMaps->data[id] =

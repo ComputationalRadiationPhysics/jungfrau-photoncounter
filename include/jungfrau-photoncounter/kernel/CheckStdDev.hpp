@@ -1,7 +1,7 @@
 #pragma once
-#include "../Config.hpp"
 #include "helpers.hpp"
 
+template<typename Config>
 struct CheckStdDevKernel {
     template <typename TAcc,
               typename TInitPedestalMap,
@@ -15,12 +15,12 @@ struct CheckStdDevKernel {
         auto id = getLinearIdx(acc);
         
         // check range
-        if (id >= MAPSIZE)
+        if (id >= Config::MAPSIZE)
             return;
 
         // check if measured RMS exceeds threshold
         if (initPedestalMap[0][id].stddev >
-            threshold * threshold * MOVING_STAT_WINDOW_SIZE)
+            threshold * threshold * Config::MOVING_STAT_WINDOW_SIZE)
             mask->data[id] = false;
     }
 };

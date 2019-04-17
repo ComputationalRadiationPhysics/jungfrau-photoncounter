@@ -1,7 +1,7 @@
 #pragma once
-
 #include <alpaka/alpaka.hpp>
 
+template<typename Config>
 struct MaxValueCopyKernel {
     ALPAKA_NO_HOST_ACC_WARNING
 
@@ -14,7 +14,7 @@ struct MaxValueCopyKernel {
         auto id = getLinearIdx(acc);
         
         // check range
-        if (id >= MAPSIZE)
+        if (id >= Config::MAPSIZE)
             return;
         
         if(id < numFrames) {

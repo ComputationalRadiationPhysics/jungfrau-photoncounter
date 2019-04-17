@@ -7,15 +7,15 @@
 
 #include "Config.hpp"
 
-template <typename TAlpaka>
-void saveClusters(std::string path,
-                  ClusterArray<TAlpaka>& clusters)
+template <typename TConfig, typename TAlpaka>
+void saveClusters(std::string path, typename TConfig::template ClusterArray<TAlpaka>& clusters)
 {
 #if (NDEBUG)
     std::ofstream clusterFile;
     clusterFile.open(path);
     clusterFile << clusters.used << "\n";
-    Cluster* clusterPtr = alpaka::mem::view::getPtrNative(clusters.clusters);
+    typename TConfig::Cluster* clusterPtr =
+        alpaka::mem::view::getPtrNative(clusters.clusters);
 
     DEBUG("writing", clusters.used, "clusters to", path);
 
@@ -27,10 +27,12 @@ void saveClusters(std::string path,
                     << "\n";
 
         // write cluster
-        for (uint8_t y = 0; y < CLUSTER_SIZE; ++y) {
+        for (uint8_t y = 0; y < TConfig::CLUSTER_SIZE; ++y) {
             clusterFile << "\t";
-            for (uint8_t x = 0; x < CLUSTER_SIZE; ++x) {
-                clusterFile << clusterPtr[i].data[x + y * CLUSTER_SIZE] << " ";
+            for (uint8_t x = 0; x < TConfig::CLUSTER_SIZE; ++x) {
+                clusterFile << clusterPtr[i]
+                                   .data[x + y * TConfig::CLUSTER_SIZE]
+                            << " ";
             }
 
             clusterFile << "\n";
@@ -41,15 +43,16 @@ void saveClusters(std::string path,
 #endif
 }
 
-template <typename TBuffer>
+template <typename TConfig, typename TBuffer>
 void save_image(std::string path, TBuffer* data, std::size_t frame_number)
 {
 #if (NDEBUG)
     std::ofstream img;
     img.open(path + ".txt");
-    for (std::size_t j = 0; j < DIMY; j++) {
-        for (std::size_t k = 0; k < DIMX; k++) {
-            double h = double(data[frame_number].data[(j * DIMY) + k]);
+    for (std::size_t j = 0; j < TConfig::DIMY; j++) {
+        for (std::size_t k = 0; k < TConfig::DIMX; k++) {
+            double h = double(
+                data[frame_number].data[(j * TConfig::DIMY) + k]);
             img << h << " ";
         }
         img << "\n";
@@ -58,9 +61,10 @@ void save_image(std::string path, TBuffer* data, std::size_t frame_number)
 #endif
 }
 
-template <typename TAlpaka>
-void saveClusterArray(std::string path,
-                      std::vector<ClusterArray<TAlpaka>>& clusters)
+template <typename TConfig, typename TAlpaka>
+void saveClusterArray(
+    std::string path,
+    std::vector<typename TConfig::template ClusterArray<TAlpaka>>& clusters)
 {
 #if (NDEBUG)
     std::ofstream clusterFile;
@@ -75,7 +79,7 @@ void saveClusterArray(std::string path,
     DEBUG("writing", numClusters, "clusters to", path);
 
     for (auto& clusterArray : clusters) {
-        Cluster* clusterPtr =
+        typename TConfig::Cluster* clusterPtr =
             alpaka::mem::view::getPtrNative(clusterArray.clusters);
 
         for (uint64_t i = 0; i < clusterArray.used; ++i) {
@@ -86,11 +90,13 @@ void saveClusterArray(std::string path,
                         << clusterPtr[i].y << "\n";
 
             // write cluster
-            for (uint8_t y = 0; y < CLUSTER_SIZE; ++y) {
+            for (uint8_t y = 0; y < TConfig::CLUSTER_SIZE; ++y) {
                 clusterFile << "\t";
-                for (uint8_t x = 0; x < CLUSTER_SIZE; ++x) {
-                    clusterFile << clusterPtr[i].data[x + y * CLUSTER_SIZE]
-                                << " ";
+                for (uint8_t x = 0; x < TConfig::CLUSTER_SIZE; ++x) {
+                    clusterFile
+                        << clusterPtr[i]
+                               .data[x + y * TConfig::CLUSTER_SIZE]
+                        << " ";
                 }
 
                 clusterFile << "\n";
@@ -102,13 +108,12 @@ void saveClusterArray(std::string path,
 #endif
 }
 
-template <typename TAlpaka>
-void saveClustersBin(std::string path,
-                     ClusterArray<TAlpaka>& clusters)
+template <typename TConfig, typename TAlpaka>
+void saveClustersBin(std::string path, typename TConfig::template ClusterArray<TAlpaka>& clusters)
 {
 #if (NDEBUG)
     std::ofstream clusterFile(path.c_str(), std::ios::binary);
-    Cluster* clusterPtr = alpaka::mem::view::getPtrNative(clusters.clusters);
+    typename TConfig::Cluster* clusterPtr = alpaka::mem::view::getPtrNative(clusters.clusters);
 
     DEBUG("writing", clusters.used, "clusters to", path);
 
@@ -123,12 +128,14 @@ void saveClustersBin(std::string path,
                           sizeof(clusterPtr[i].y));
 
         // write cluster
-        for (uint8_t y = 0; y < CLUSTER_SIZE; ++y) {
-            for (uint8_t x = 0; x < CLUSTER_SIZE; ++x) {
+        for (uint8_t y = 0; y < TConfig::CLUSTER_SIZE; ++y) {
+            for (uint8_t x = 0; x < TConfig::CLUSTER_SIZE; ++x) {
                 clusterFile.write(
                     reinterpret_cast<char*>(
-                        &clusterPtr[i].data[x + y * CLUSTER_SIZE]),
-                    sizeof(clusterPtr[i].data[x + y * CLUSTER_SIZE]));
+                        &clusterPtr[i]
+                             .data[x + y * TConfig::CLUSTER_SIZE]),
+                    sizeof(clusterPtr[i]
+                               .data[x + y * TConfig::CLUSTER_SIZE]));
             }
         }
     }
@@ -142,12 +149,12 @@ struct Point {
     uint16_t x, y;
 };
 
-template<typename Accelerator>
-class PixelTracker {
+template <typename TConfig, typename Accelerator> class PixelTracker {
 private:
     std::vector<Point> positions;
-    std::vector<std::vector<double>> input, pedestal[PEDEMAPS],
-        stddev[PEDEMAPS];
+    std::vector<std::vector<double>> input,
+        pedestal[TConfig::PEDEMAPS],
+        stddev[TConfig::PEDEMAPS];
 
 public:
     PixelTracker(int argc, char* argv[])
@@ -169,13 +176,14 @@ public:
     {
         positions.push_back(position);
 
-        if (position.x >= DIMX || position.y >= DIMY) {
+        if (position.x >= TConfig::DIMX ||
+            position.y >= TConfig::DIMY) {
             std::cerr << "Pixel out of range!" << std::endl;
             abort();
         }
 
         input.resize(input.size() + 1);
-        for (std::size_t p = 0; p < PEDEMAPS; ++p) {
+        for (std::size_t p = 0; p < TConfig::PEDEMAPS; ++p) {
             pedestal[p].resize(input.size() + 1);
             stddev[p].resize(input.size() + 1);
         }
@@ -183,35 +191,38 @@ public:
 
     void addPixel(uint16_t x, uint16_t y) { addPixel({x, y}); }
 
-    void push_back(
-        FramePackage<InitPedestalMap, Accelerator> init_pedestals,
-        FramePackage<PedestalMap, Accelerator> raw_pedestals,
-        FramePackage<DetectorData, Accelerator> raw_input,
-        size_t offset)
+    void push_back(typename TConfig::template FramePackage<typename TConfig::InitPedestalMap, Accelerator> init_pedestals,
+                   typename TConfig::template FramePackage<typename TConfig::PedestalMap, Accelerator> raw_pedestals,
+                   typename TConfig::template FramePackage<typename TConfig::DetectorData, Accelerator> raw_input,
+                   size_t offset)
     {
         for (int i = 0; i < input.size(); ++i) {
             input[i].push_back(
                 alpaka::mem::view::getPtrNative(raw_input.data)[offset]
-                    .data[positions[i].y * DIMX + positions[i].x]);
+                    .data[positions[i].y * TConfig::DIMX +
+                          positions[i].x]);
             DEBUG("input",
                   alpaka::mem::view::getPtrNative(raw_input.data)[offset]
-                      .data[positions[i].y * DIMX + positions[i].x]);
-            for (std::size_t p = 0; p < PEDEMAPS; ++p) {
+                      .data[positions[i].y * TConfig::DIMX +
+                            positions[i].x]);
+            for (std::size_t p = 0; p < TConfig::PEDEMAPS; ++p) {
                 pedestal[p][i].push_back(alpaka::mem::view::getPtrNative(
                     raw_pedestals
-                        .data)[p][positions[i].y * DIMX + positions[i].x]);
+                    .data)[p][positions[i].y * TConfig::DIMX + positions[i].x]);
                 DEBUG("pede[",
                       p,
                       "][",
                       i,
                       "]",
                       alpaka::mem::view::getPtrNative(
-                          raw_pedestals.data)[p][positions[i].y * DIMX +
+                          raw_pedestals.data)[p][positions[i].y *
+                                                     TConfig::DIMX +
                                                  positions[i].x]);
                 stddev[p][i].push_back(
                     alpaka::mem::view::getPtrNative(
                         init_pedestals
-                            .data)[p][positions[i].y * DIMX + positions[i].x]
+                            .data)[p][positions[i].y * TConfig::DIMX +
+                                      positions[i].x]
                         .stddev);
                 DEBUG("stddev[",
                       p,
@@ -219,8 +230,9 @@ public:
                       i,
                       "]",
                       alpaka::mem::view::getPtrNative(
-                          init_pedestals
-                              .data)[p][positions[i].y * DIMX + positions[i].x]
+                          init_pedestals.data)[p][positions[i].y *
+                                                      TConfig::DIMX +
+                                                  positions[i].x]
                           .stddev);
             }
         }
@@ -239,10 +251,10 @@ public:
                                      "_" + std::to_string(positions[i].y) +
                                      ".txt");
 
-            std::ofstream pedestal_file[PEDEMAPS];
-            std::ofstream stddev_file[PEDEMAPS];
+            std::ofstream pedestal_file[TConfig::PEDEMAPS];
+            std::ofstream stddev_file[TConfig::PEDEMAPS];
 
-            for (std::size_t p = 0; p < PEDEMAPS; ++p) {
+            for (std::size_t p = 0; p < TConfig::PEDEMAPS; ++p) {
                 pedestal_file[p].open("pedestal_" + std::to_string(p) + "_" +
                                       std::to_string(positions[i].x) + "_" +
                                       std::to_string(positions[i].y) + ".txt");
@@ -254,7 +266,7 @@ public:
 
             for (unsigned int j = 0; j < input[i].size(); ++j) {
                 input_file << input[i][j] << " ";
-                for (std::size_t p = 0; p < PEDEMAPS; ++p) {
+                for (std::size_t p = 0; p < TConfig::PEDEMAPS; ++p) {
                     pedestal_file[p] << pedestal[p][i][j] << " ";
                     stddev_file[p] << stddev[p][i][j] << " ";
                 }
@@ -263,7 +275,7 @@ public:
             input_file.flush();
             input_file.close();
 
-            for (std::size_t p = 0; p < PEDEMAPS; ++p) {
+            for (std::size_t p = 0; p < TConfig::PEDEMAPS; ++p) {
                 pedestal_file[p].flush();
                 pedestal_file[p].close();
                 stddev_file[p].flush();

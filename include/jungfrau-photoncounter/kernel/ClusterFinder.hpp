@@ -1,7 +1,7 @@
 #pragma once
-#include "../Config.hpp"
 #include "helpers.hpp"
 
+template<typename Config>
 struct ClusterFinderKernel {
     template <typename TAcc,
               typename TDetectorData,
@@ -29,15 +29,15 @@ struct ClusterFinderKernel {
                                   TNumFrames const numFrames,
                                   TCurrentFrame const currentFrame,
                                   bool pedestalFallback,
-                                  TNumStdDevs const c = C) const -> void
+                                  TNumStdDevs const c = Config::C) const -> void
     {
         auto id = getLinearIdx(acc);
 
         // check range
-        if (id >= MAPSIZE)
+        if (id >= Config::MAPSIZE)
             return;
 
-        constexpr auto n = CLUSTER_SIZE;
+        constexpr auto n = Config::CLUSTER_SIZE;
 
         if (currentFrame) {
             auto adc = getAdc(detectorData[currentFrame - 1].data[id]);
@@ -46,8 +46,8 @@ struct ClusterFinderKernel {
             decltype(id) max;
             const auto& energy = energyMaps[currentFrame - 1].data[id];
             const auto& stddev = initPedestalMaps[gainStage][id].stddev;
-            if (indexQualifiesAsClusterCenter(id)) {
-                findClusterSumAndMax(
+            if (indexQualifiesAsClusterCenter<Config>(id)) {
+              findClusterSumAndMax<Config>(
                     energyMaps[currentFrame - 1].data, id, sum, max);
 
                 // check cluster conditions
@@ -55,14 +55,14 @@ struct ClusterFinderKernel {
                     id == max) {
                     auto& cluster =
                         getClusterBuffer(acc, clusterArray, numClusters);
-                    copyCluster(energyMaps[currentFrame - 1], id, cluster);
+                    copyCluster<Config>(energyMaps[currentFrame - 1], id, cluster);
                 }
 
                 // check dark pixel condition
                 else if (-c * stddev <= energy && c * stddev >= energy &&
                          !pedestalFallback) {
                     updatePedestal(adc,
-                                   MOVING_STAT_WINDOW_SIZE,
+                                   Config::MOVING_STAT_WINDOW_SIZE,
                                    pedestalMaps[gainStage][id]);
                 }
             }

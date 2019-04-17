@@ -1,7 +1,7 @@
 #pragma once
-#include "../Config.hpp"
 #include "helpers.hpp"
 
+template<typename Config>
 struct GainStageMaskingKernel {
     template <typename TAcc,
               typename TGainStageMap,
@@ -16,13 +16,13 @@ struct GainStageMaskingKernel {
         auto id = getLinearIdx(acc);
         
         // check range
-        if (id >= MAPSIZE)
+        if (id >= Config::MAPSIZE)
             return;
         
         // use masks to check whether the channel is valid or masked out
         bool isValid = !mask ? 1 : mask->data[id];
 
         outputGainStageMaps->data[id] =
-            (isValid ? inputGainStageMaps[numFrame].data[id] : MASKED_VALUE);
+            (isValid ? inputGainStageMaps[numFrame].data[id] : Config::MASKED_VALUE);
     }
 };

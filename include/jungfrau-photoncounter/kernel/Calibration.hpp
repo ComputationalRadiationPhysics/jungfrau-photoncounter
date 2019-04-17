@@ -1,7 +1,7 @@
 #pragma once
-#include "../Config.hpp"
 #include "helpers.hpp"
 
+template<typename Config>
 struct CalibrationKernel {
     template <typename TAcc,
               typename TDetectorData,
@@ -16,15 +16,17 @@ struct CalibrationKernel {
                                   TMaskMap* const mask,
                                   TNumFrames const numFrames) const -> void
     {
+        constexpr auto PEDEMAPS = Config::PEDEMAPS;
+        
         auto id = getLinearIdx(acc);
 
         // check range
-        if (id >= MAPSIZE)
+        if (id >= Config::MAPSIZE)
             return;
 
         const std::size_t FRAMESPERSTAGE[] = {
-            FRAMESPERSTAGE_G0, FRAMESPERSTAGE_G1, FRAMESPERSTAGE_G2};
-
+            Config::FRAMESPERSTAGE_G0, Config::FRAMESPERSTAGE_G1, Config::FRAMESPERSTAGE_G2};
+        
         // find expected gain stage
         char expectedGainStage;
         for (int i = 0; i < PEDEMAPS; ++i) {
@@ -50,7 +52,7 @@ struct CalibrationKernel {
                 initPedestal(acc,
                              adc,
                              initPedestalMap[gainStage][id],
-                             MOVING_STAT_WINDOW_SIZE);
+                             Config::MOVING_STAT_WINDOW_SIZE);
             }
             else {
                 // set moving window size for other pedestal stages to the

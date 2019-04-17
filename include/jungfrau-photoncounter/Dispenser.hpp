@@ -21,25 +21,40 @@
 #include <iostream>
 #include <limits>
 
-template <typename TAlpaka> class Dispenser {
+template <typename TConfig, template <std::size_t> typename TAccelerator>
+class Dispenser {
 public:
+    // use types defined in the config struct
+    using TAlpaka = TAccelerator<TConfig::MAPSIZE>;
+    using MaskMap = typename TConfig::MaskMap;
+
     /**
      * Dispenser constructor
      * @param Maps-Struct with initial gain
      */
-    Dispenser(FramePackage<GainMap, TAlpaka> gainMap,
-              boost::optional<typename TAlpaka::HostBuf<MaskMap>> mask)
+    Dispenser(typename TConfig::template FramePackage<typename TConfig::GainMap,
+                                                      TAlpaka> gainMap,
+              boost::optional<typename TAlpaka::template HostBuf<MaskMap>> mask)
         : host(alpakaGetHost<TAlpaka>()),
           gain(gainMap),
-          mask((mask ? *mask : alpakaAlloc<MaskMap>(host, SINGLEMAP))),
-          drift(alpakaAlloc<DriftMap>(host, SINGLEMAP)),
-          gainStage(alpakaAlloc<GainStageMap>(host, SINGLEMAP)),
-          maxValueMaps(alpakaAlloc<EnergyMap>(host, DEV_FRAMES)),
+          mask((mask ? *mask
+                     : alpakaAlloc<typename TConfig::MaskMap>(
+                           host,
+                           decltype(TConfig::SINGLEMAP)(TConfig::SINGLEMAP)))),
+          drift(alpakaAlloc<typename TConfig::DriftMap>(
+              host,
+              decltype(TConfig::SINGLEMAP)(TConfig::SINGLEMAP))),
+          gainStage(alpakaAlloc<typename TConfig::GainStageMap>(
+              host,
+              decltype(TConfig::SINGLEMAP)(TConfig::SINGLEMAP))),
+          maxValueMaps(alpakaAlloc<typename TConfig::EnergyMap>(
+              host,
+              decltype(TConfig::DEV_FRAMES)(TConfig::DEV_FRAMES))),
           pedestalFallback(false),
           init(false),
           ringbuffer(TAlpaka::STREAMS_PER_DEV * alpakaGetDevCount<TAlpaka>()),
-          pedestal(PEDEMAPS, host),
-          initPedestal(PEDEMAPS, host),
+          pedestal(TConfig::PEDEMAPS, host),
+          initPedestal(TConfig::PEDEMAPS, host),
           nextFull(0),
           nextFree(0)
     {
@@ -53,7 +68,7 @@ public:
             alpakaMemSet(devices[devices.size() - 1].queue,
                          devices[devices.size() - 1].mask,
                          1,
-                         SINGLEMAP);
+                         decltype(TConfig::SINGLEMAP)(TConfig::SINGLEMAP));
         }
         synchronize();
     }
@@ -73,7 +88,7 @@ public:
      */
     auto synchronize() -> void
     {
-        for (struct DeviceData<TAlpaka> dev : devices)
+        for (struct DeviceData<TConfig, TAlpaka> dev : devices)
             alpakaWait(dev.queue);
     }
 
@@ -84,22 +99,24 @@ public:
      * @param stdDevThreshold An standard deviation threshold above which pixels
      * should be masked. If this is 0, no pixels will be masked.
      */
-    auto uploadPedestaldata(FramePackage<DetectorData, TAlpaka> data,
-                            double stdDevThreshold = 0) -> void
+    auto uploadPedestaldata(
+        typename TConfig::template FramePackage<typename TConfig::DetectorData,
+                                                TAlpaka> data,
+        double stdDevThreshold = 0) -> void
     {
         std::size_t offset = 0;
         DEBUG("uploading pedestaldata...");
 
         // upload all frames cut into smaller packages
-        while (offset <= data.numFrames - DEV_FRAMES) {
+        while (offset <= data.numFrames - TConfig::DEV_FRAMES) {
             offset += calcPedestaldata(alpakaNativePtr(data.data) + offset,
-                                       DEV_FRAMES);
+                                       TConfig::DEV_FRAMES);
         }
 
         // upload remaining frames
         if (offset != data.numFrames) {
             offset += calcPedestaldata(alpakaNativePtr(data.data) + offset,
-                                       data.numFrames % DEV_FRAMES);
+                                       data.numFrames % TConfig::DEV_FRAMES);
         }
 
         if (stdDevThreshold != 0)
@@ -112,7 +129,9 @@ public:
      * Downloads the pedestal data.
      * @return pedestal pedestal data
      */
-    auto downloadPedestaldata() -> FramePackage<PedestalMap, TAlpaka>
+    auto downloadPedestaldata() ->
+        typename TConfig::template FramePackage<typename TConfig::PedestalMap,
+                                                TAlpaka>
     {
         // create handle for the device with the current version of the pedestal
         // maps
@@ -124,12 +143,12 @@ public:
         alpakaCopy(current_device.queue,
                    pedestal.data,
                    current_device.pedestal,
-                   PEDEMAPS);
+                   decltype(TConfig::PEDEMAPS)(TConfig::PEDEMAPS));
 
         // wait for copy to finish
         alpakaWait(current_device.queue);
 
-        pedestal.numFrames = PEDEMAPS;
+        pedestal.numFrames = TConfig::PEDEMAPS;
 
         return pedestal;
     }
@@ -138,7 +157,8 @@ public:
      * Downloads the initial pedestal data.
      * @return pedestal pedestal data
      */
-    auto downloadInitialPedestaldata() -> FramePackage<InitPedestalMap, TAlpaka>
+    auto downloadInitialPedestaldata() -> typename TConfig::
+        template FramePackage<typename TConfig::InitPedestalMap, TAlpaka>
     {
         // create handle for the device with the current version of the pedestal
         // maps
@@ -150,12 +170,12 @@ public:
         alpakaCopy(current_device.queue,
                    initPedestal.data,
                    current_device.initialPedestal,
-                   PEDEMAPS);
+                   decltype(TConfig::PEDEMAPS)(TConfig::PEDEMAPS));
 
         // wait for copy to finish
         alpakaWait(current_device.queue);
 
-        initPedestal.numFrames = PEDEMAPS;
+        initPedestal.numFrames = TConfig::PEDEMAPS;
 
         return initPedestal;
     }
@@ -164,7 +184,7 @@ public:
      * Downloads the current mask map.
      * @return mask map
      */
-    auto downloadMask() -> MaskMap*
+    auto downloadMask() -> typename TConfig::MaskMap*
     {
         DEBUG("downloading mask...");
 
@@ -173,7 +193,10 @@ public:
         auto current_device = devices[nextFree];
 
         // get the pedestal data from the device
-        alpakaCopy(current_device.queue, mask, current_device.mask, SINGLEMAP);
+        alpakaCopy(current_device.queue,
+                   mask,
+                   current_device.mask,
+                   decltype(TConfig::SINGLEMAP)(TConfig::SINGLEMAP));
 
         // wait for copy to finish
         alpakaWait(current_device.queue);
@@ -197,7 +220,8 @@ public:
      * Downloads the current gain stage map.
      * @return gain stage map
      */
-    auto downloadGainStages(std::size_t frame = 0) -> GainStageMap*
+    auto downloadGainStages(std::size_t frame = 0) ->
+        typename TConfig::GainStageMap*
     {
         DEBUG("downloading gain stage map...");
 
@@ -206,7 +230,7 @@ public:
         auto current_device = devices[nextFree];
 
         // mask gain stage maps
-        GainStageMaskingKernel gainStageMasking;
+        GainStageMaskingKernel<TConfig> gainStageMasking;
         auto const gainStageMasker(alpakaCreateKernel<TAlpaka>(
             getWorkDiv<TAlpaka>(),
             gainStageMasking,
@@ -221,7 +245,7 @@ public:
         alpakaCopy(current_device.queue,
                    gainStage,
                    current_device.gainStageOutput,
-                   SINGLEMAP);
+                   decltype(TConfig::SINGLEMAP)(TConfig::SINGLEMAP));
 
         // wait for copy to finish
         alpakaWait(current_device.queue);
@@ -244,7 +268,7 @@ public:
      * Downloads the current drift map.
      * @return drift map
      */
-    auto downloadDriftMap() -> DriftMap*
+    auto downloadDriftMap() -> typename TConfig::DriftMap*
     {
         DEBUG("downloading drift map...");
 
@@ -253,7 +277,7 @@ public:
         auto current_device = devices[nextFree];
 
         // mask gain stage maps
-        DriftMapKernel driftMapKernel;
+        DriftMapKernel<TConfig> driftMapKernel;
         auto const driftMap(alpakaCreateKernel<TAlpaka>(
             getWorkDiv<TAlpaka>(),
             driftMapKernel,
@@ -264,8 +288,10 @@ public:
         alpakaEnqueueKernel(current_device.queue, driftMap);
 
         // get the pedestal data from the device
-        alpakaCopy(
-            current_device.queue, drift, current_device.drift, SINGLEMAP);
+        alpakaCopy(current_device.queue,
+                   drift,
+                   current_device.drift,
+                   decltype(TConfig::SINGLEMAP)(TConfig::SINGLEMAP));
 
         // wait for copy to finish
         alpakaWait(current_device.queue);
@@ -278,22 +304,25 @@ public:
      * @param Maps-struct with raw data, offset within the package
      * @return number of frames uploaded from the package
      */
-    auto uploadData(FramePackage<DetectorData, TAlpaka> data,
-                    std::size_t offset,
-                    ExecutionFlags flags,
-                    bool flushWhenFinished = true) -> std::size_t
+    auto uploadData(
+        typename TConfig::template FramePackage<typename TConfig::DetectorData,
+                                                TAlpaka> data,
+        std::size_t offset,
+        typename TConfig::ExecutionFlags flags,
+        bool flushWhenFinished = true) -> std::size_t
     {
         if (!ringbuffer.isEmpty()) {
             // try uploading one data package
-            if (offset <= data.numFrames - DEV_FRAMES) {
-                offset += calcData(
-                    alpakaNativePtr(data.data) + offset, DEV_FRAMES, flags);
+            if (offset <= data.numFrames - TConfig::DEV_FRAMES) {
+                offset += calcData(alpakaNativePtr(data.data) + offset,
+                                   TConfig::DEV_FRAMES,
+                                   flags);
                 DEBUG(offset, "/", data.numFrames, "frames uploaded");
             }
             // upload remaining frames
             else if (offset != data.numFrames) {
                 offset += calcData(alpakaNativePtr(data.data) + offset,
-                                   data.numFrames % DEV_FRAMES,
+                                   data.numFrames % TConfig::DEV_FRAMES,
                                    flags);
                 DEBUG(offset, "/", data.numFrames, "frames uploaded");
             }
@@ -312,14 +341,24 @@ public:
      * @param pointer to empty struct for photon and sum maps and cluster data
      * @return boolean indicating whether maps were downloaded or not
      */
-    auto
-    downloadData(boost::optional<FramePackage<EnergyMap, TAlpaka>&> energy,
-                 boost::optional<FramePackage<PhotonMap, TAlpaka>&> photon,
-                 boost::optional<FramePackage<SumMap, TAlpaka>&> sum,
-                 boost::optional<FramePackage<EnergyValue, TAlpaka>&> maxValues,
-                 boost::optional<ClusterArray<TAlpaka>&> clusters) -> size_t
+    auto downloadData(
+        boost::optional<
+            typename TConfig::template FramePackage<typename TConfig::EnergyMap,
+                                                    TAlpaka>&> energy,
+        boost::optional<
+            typename TConfig::template FramePackage<typename TConfig::PhotonMap,
+                                                    TAlpaka>&> photon,
+        boost::optional<
+            typename TConfig::template FramePackage<typename TConfig::SumMap,
+                                                    TAlpaka>&> sum,
+        boost::optional<typename TConfig::template FramePackage<
+            typename TConfig::EnergyValue,
+            TAlpaka>&> maxValues,
+        boost::optional<typename TConfig::template ClusterArray<TAlpaka>&>
+            clusters) -> size_t
     {
-        struct DeviceData<TAlpaka>* dev = &Dispenser::devices[nextFree];
+        struct DeviceData<TConfig, TAlpaka>* dev =
+            &Dispenser::devices[nextFree];
 
 
         DEBUG(
@@ -356,17 +395,21 @@ public:
         // download summation frames if needed
         if (sum) {
             DEBUG("downloading sum");
-            (*sum).numFrames = dev->numMaps / SUM_FRAMES;
-            alpakaCopy(
-                dev->queue, (*sum).data, dev->sum, (dev->numMaps / SUM_FRAMES));
+            (*sum).numFrames = dev->numMaps / TConfig::SUM_FRAMES;
+            alpakaCopy(dev->queue,
+                       (*sum).data,
+                       dev->sum,
+                       (dev->numMaps / TConfig::SUM_FRAMES));
         }
 
         // download maximum values if needed
         if (maxValues) {
             DEBUG("downloading max values");
             (*maxValues).numFrames = dev->numMaps;
-            alpakaCopy(
-                dev->queue, (*maxValues).data, dev->maxValues, DEV_FRAMES);
+            alpakaCopy(dev->queue,
+                       (*maxValues).data,
+                       dev->maxValues,
+                       decltype(TConfig::DEV_FRAMES)(TConfig::DEV_FRAMES));
         }
 
         // download number of clusters if needed
@@ -375,7 +418,7 @@ public:
             alpakaCopy(dev->queue,
                        (*clusters).usedPinned,
                        dev->numClusters,
-                       SINGLEMAP);
+                       decltype(TConfig::SINGLEMAP)(TConfig::SINGLEMAP));
 
             // wait for completion of copy operations
             alpakaWait(dev->queue);
@@ -394,8 +437,8 @@ public:
             // be downloaded to
             auto const extentView(Vec(static_cast<Size>(clustersToDownload)));
             auto const offsetView(Vec(static_cast<Size>(oldNumClusters)));
-            typename TAlpaka::HostView<Cluster> clusterView(
-                (*clusters).clusters, extentView, offsetView);
+            typename TAlpaka::template HostView<typename TConfig::Cluster>
+                clusterView((*clusters).clusters, extentView, offsetView);
 
             // download actual clusters
             alpakaCopy(
@@ -441,19 +484,26 @@ public:
 
 private:
     typename TAlpaka::DevHost host;
-    FramePackage<GainMap, TAlpaka> gain;
-    typename TAlpaka::HostBuf<MaskMap> mask;
-    typename TAlpaka::HostBuf<DriftMap> drift;
-    typename TAlpaka::HostBuf<GainStageMap> gainStage;
-    typename TAlpaka::HostBuf<EnergyMap> maxValueMaps;
+    typename TConfig::template FramePackage<typename TConfig::GainMap, TAlpaka>
+        gain;
+    typename TAlpaka::template HostBuf<typename TConfig::MaskMap> mask;
+    typename TAlpaka::template HostBuf<typename TConfig::DriftMap> drift;
+    typename TAlpaka::template HostBuf<typename TConfig::GainStageMap>
+        gainStage;
+    typename TAlpaka::template HostBuf<typename TConfig::EnergyMap>
+        maxValueMaps;
 
-    FramePackage<PedestalMap, TAlpaka> pedestal;
-    FramePackage<InitPedestalMap, TAlpaka> initPedestal;
+    typename TConfig::template FramePackage<typename TConfig::PedestalMap,
+                                            TAlpaka>
+        pedestal;
+    typename TConfig::template FramePackage<typename TConfig::InitPedestalMap,
+                                            TAlpaka>
+        initPedestal;
 
     bool init;
     bool pedestalFallback;
-    Ringbuffer<DeviceData<TAlpaka>*> ringbuffer;
-    std::vector<DeviceData<TAlpaka>> devices;
+    Ringbuffer<DeviceData<TConfig, TAlpaka>*> ringbuffer;
+    std::vector<DeviceData<TConfig, TAlpaka>> devices;
 
     std::size_t nextFree, nextFull;
 
@@ -463,7 +513,7 @@ private:
      */
     auto initDevices(std::vector<typename TAlpaka::DevAcc> allDevices) -> void
     {
-        const GainmapInversionKernel gainmapInversionKernel;
+        const GainmapInversionKernel<TConfig> gainmapInversionKernel{};
         devices.reserve(allDevices.size() * TAlpaka::STREAMS_PER_DEV);
         for (std::size_t num = 0;
              num < allDevices.size() * TAlpaka::STREAMS_PER_DEV;
@@ -471,8 +521,10 @@ private:
             // initialize variables
             devices.emplace_back(num,
                                  allDevices[num / TAlpaka::STREAMS_PER_DEV]);
-            alpakaCopy(
-                devices[num].queue, devices[num].gain, gain.data, GAINMAPS);
+            alpakaCopy(devices[num].queue,
+                       devices[num].gain,
+                       gain.data,
+                       decltype(TConfig::GAINMAPS)(TConfig::GAINMAPS));
             // compute reciprocals of gain maps
             auto const gainmapInversion(alpakaCreateKernel<TAlpaka>(
                 getWorkDiv<TAlpaka>(),
@@ -497,7 +549,7 @@ private:
     auto calcPedestaldata(TDetectorData* data, std::size_t numMaps)
         -> std::size_t
     {
-        DeviceData<TAlpaka>* dev;
+        DeviceData<TConfig, TAlpaka>* dev;
         if (!ringbuffer.pop(dev))
             return 0;
 
@@ -506,36 +558,80 @@ private:
         dev->state = PROCESSING;
         dev->numMaps = numMaps;
 
+
+        DEBUG("not fsd");
+
+
+
+        //DEBUG("size", dev->data.m_extentElements[0], dev->data.m_extentElements[1], dev->data.m_extentElements[2]);
+
+        std::cout << std::endl;
+
+        
+
         alpakaCopy(
             dev->queue,
             dev->data,
             alpakaViewPlainPtrHost<TAlpaka, TDetectorData>(data, host, numMaps),
             numMaps);
 
+
+        DEBUG("sfdsff");
+
+
         // copy offset data from last initialized device
         auto prevDevice = (nextFull + devices.size() - 1) % devices.size();
         alpakaWait(devices[prevDevice].queue);
-        alpakaCopy(
-            dev->queue, dev->pedestal, devices[prevDevice].pedestal, PEDEMAPS);
+        alpakaCopy(dev->queue,
+                   dev->pedestal,
+                   devices[prevDevice].pedestal,
+                   decltype(TConfig::PEDEMAPS)(TConfig::PEDEMAPS));
+
+
+        DEBUG("sfdsff 2");
+
+
         alpakaCopy(dev->queue,
                    dev->initialPedestal,
                    devices[prevDevice].initialPedestal,
-                   PEDEMAPS);
+                   decltype(TConfig::PEDEMAPS)(TConfig::PEDEMAPS));
 
-        alpakaCopy(dev->queue, dev->mask, devices[prevDevice].mask, SINGLEMAP);
+
+        DEBUG("sfdsff 3");
+
+
+        alpakaCopy(dev->queue,
+                   dev->mask,
+                   devices[prevDevice].mask,
+                   decltype(TConfig::SINGLEMAP)(TConfig::SINGLEMAP));
+
+
+        DEBUG("sfdsff 4");
+
 
         // increase nextFull and nextFree (because pedestal data isn't
         // downloaded like normal data)
         nextFull = (nextFull + 1) % devices.size();
         nextFree = (nextFree + 1) % devices.size();
 
+
+        DEBUG("sfdsff5");
+
+
         if (!init) {
-            alpakaMemSet(dev->queue, dev->pedestal, 0, SINGLEMAP);
+            alpakaMemSet(dev->queue,
+                         dev->pedestal,
+                         0,
+                         decltype(TConfig::SINGLEMAP)(TConfig::SINGLEMAP));
             alpakaWait(dev->queue);
             init = true;
         }
 
-        CalibrationKernel calibrationKernel;
+
+        DEBUG("sfdsff 6");
+
+
+        CalibrationKernel<TConfig> calibrationKernel{};
         auto const calibration(
             alpakaCreateKernel<TAlpaka>(getWorkDiv<TAlpaka>(),
                                         calibrationKernel,
@@ -544,6 +640,10 @@ private:
                                         alpakaNativePtr(dev->pedestal),
                                         alpakaNativePtr(dev->mask),
                                         dev->numMaps));
+
+
+        DEBUG("sfdsff7");
+
 
         alpakaEnqueueKernel(dev->queue, calibration);
 
@@ -568,7 +668,7 @@ private:
         DEBUG("checking stddev (on device", nextFull, ")");
 
         // create stddev check kernel object
-        CheckStdDevKernel checkStdDevKernel;
+        CheckStdDevKernel<TConfig> checkStdDevKernel{};
         auto const checkStdDev(alpakaCreateKernel<TAlpaka>(
             getWorkDiv<TAlpaka>(),
             checkStdDevKernel,
@@ -592,7 +692,7 @@ private:
             alpakaCopy(devices[source].queue,
                        devices[destination].mask,
                        devices[source].mask,
-                       SINGLEMAP);
+                       decltype(TConfig::SINGLEMAP)(TConfig::SINGLEMAP));
         }
         synchronize();
     }
@@ -610,13 +710,13 @@ private:
             alpakaCopy(devices[source].queue,
                        devices[i].initialPedestal,
                        devices[source].initialPedestal,
-                       SINGLEMAP);
+                       decltype(TConfig::SINGLEMAP)(TConfig::SINGLEMAP));
 
             // distribute pedestal map (with initial data)
             alpakaCopy(devices[source].queue,
                        devices[i].pedestal,
                        devices[source].pedestal,
-                       SINGLEMAP);
+                       decltype(TConfig::SINGLEMAP)(TConfig::SINGLEMAP));
         }
         synchronize();
     }
@@ -629,9 +729,9 @@ private:
     template <typename TDetectorData>
     auto calcData(TDetectorData* data,
                   std::size_t numMaps,
-                  ExecutionFlags flags) -> std::size_t
+                  typename TConfig::ExecutionFlags flags) -> std::size_t
     {
-        DeviceData<TAlpaka>* dev;
+        DeviceData<TConfig, TAlpaka>* dev;
         if (!ringbuffer.pop(dev))
             return 0;
 
@@ -641,7 +741,8 @@ private:
         alpakaCopy(
             dev->queue,
             dev->data,
-            alpakaViewPlainPtrHost<TAlpaka, DetectorData>(data, host, numMaps),
+            alpakaViewPlainPtrHost<TAlpaka, typename TConfig::DetectorData>(
+                data, host, numMaps),
             numMaps);
 
         // copy offset data from last device uploaded to
@@ -650,22 +751,27 @@ private:
         DEBUG("device", devices[prevDevice].id, "finished");
 
         devices[prevDevice].state = READY;
-        alpakaCopy(
-            dev->queue, dev->pedestal, devices[prevDevice].pedestal, PEDEMAPS);
+        alpakaCopy(dev->queue,
+                   dev->pedestal,
+                   devices[prevDevice].pedestal,
+                   decltype(TConfig::PEDEMAPS)(TConfig::PEDEMAPS));
 
         nextFull = (nextFull + 1) % devices.size();
 
         // reset the number of clusters
-        alpakaMemSet(dev->queue, dev->numClusters, 0, SINGLEMAP);
+        alpakaMemSet(dev->queue,
+                     dev->numClusters,
+                     0,
+                     decltype(TConfig::SINGLEMAP)(TConfig::SINGLEMAP));
 
-        MaskMap* local_mask =
+        typename TConfig::MaskMap* local_mask =
             flags.masking ? alpakaNativePtr(dev->mask) : nullptr;
 
         // converting to energy
         // the photon and cluster extraction kernels already include energy
         // conversion
         if (flags.mode == 0) {
-            ConversionKernel conversionKernel;
+            ConversionKernel<TConfig> conversionKernel{};
             auto const conversion(alpakaCreateKernel<TAlpaka>(
                 getWorkDiv<TAlpaka>(),
                 conversionKernel,
@@ -685,7 +791,7 @@ private:
 
         // converting to photons (and energy)
         if (flags.mode == 1) {
-            PhotonFinderKernel photonFinderKernel;
+            PhotonFinderKernel<TConfig> photonFinderKernel{};
             auto const photonFinder(alpakaCreateKernel<TAlpaka>(
                 getWorkDiv<TAlpaka>(),
                 photonFinderKernel,
@@ -711,7 +817,7 @@ private:
             for (uint32_t i = 0; i < numMaps + 1; ++i) {
                 // execute the clusterfinder with the pedestalupdate on every
                 // frame
-                ClusterFinderKernel clusterFinderKernel;
+                ClusterFinderKernel<TConfig> clusterFinderKernel{};
                 auto const clusterFinder(alpakaCreateKernel<TAlpaka>(
                     getWorkDiv<TAlpaka>(),
                     clusterFinderKernel,
@@ -748,7 +854,7 @@ private:
                     reduceKernelRun1,
                     &alpakaNativePtr(dev->energy)[i],
                     &alpakaNativePtr(dev->maxValueMaps)[i],
-                    DIMX * DIMY));
+                    TConfig::DIMX * TConfig::DIMY));
 
                 WorkDiv workdivRun2{static_cast<Size>(1),
                                     decltype(TAlpaka::threadsPerBlock)(
@@ -771,7 +877,7 @@ private:
                                                 TAlpaka::threadsPerBlock))),
                 decltype(TAlpaka::threadsPerBlock)(TAlpaka::threadsPerBlock),
                 static_cast<Size>(1)};
-            MaxValueCopyKernel maxValueCopyKernel;
+            MaxValueCopyKernel<TConfig> maxValueCopyKernel{};
             auto const maxValueCopy(
                 alpakaCreateKernel<TAlpaka>(workdivMaxValueCopy,
                                             maxValueCopyKernel,
@@ -787,14 +893,14 @@ private:
         if (flags.summation) {
             DEBUG("enqueueing summation kernel");
 
-            SummationKernel summationKernel;
-            auto const summation(
-                alpakaCreateKernel<TAlpaka>(getWorkDiv<TAlpaka>(),
-                                            summationKernel,
-                                            alpakaNativePtr(dev->energy),
-                                            dev->numMaps,
-                                            SUM_FRAMES,
-                                            alpakaNativePtr(dev->sum)));
+            SummationKernel<TConfig> summationKernel{};
+            auto const summation(alpakaCreateKernel<TAlpaka>(
+                getWorkDiv<TAlpaka>(),
+                summationKernel,
+                alpakaNativePtr(dev->energy),
+                dev->numMaps,
+                decltype(TConfig::SUM_FRAMES)(TConfig::SUM_FRAMES),
+                alpakaNativePtr(dev->sum)));
 
             alpakaEnqueueKernel(dev->queue, summation);
         };

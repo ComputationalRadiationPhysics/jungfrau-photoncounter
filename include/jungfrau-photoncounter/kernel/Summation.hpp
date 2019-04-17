@@ -1,5 +1,7 @@
-#include "../Config.hpp"
+#pragma once
+#include "AlpakaHelper.hpp"
 
+template<typename Config>
 struct SummationKernel {
     template <typename TAcc,
               typename TData,
@@ -15,7 +17,7 @@ struct SummationKernel {
         auto id = getLinearIdx(acc);
         
         // check range
-        if (id >= MAPSIZE)
+        if (id >= Config::MAPSIZE)
             return;
         
         for (TNumFrames i = 0; i < numFrames; ++i) {

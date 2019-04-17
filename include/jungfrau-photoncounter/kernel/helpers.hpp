@@ -86,16 +86,19 @@ ALPAKA_FN_ACC ALPAKA_FN_INLINE auto updatePedestal(TAdcValue const adc,
     pedestal += (adc - pedestal) / count;
 }
 
-template <typename TThreadIndex>
+template <typename TConfig, typename TThreadIndex>
 ALPAKA_FN_ACC ALPAKA_FN_INLINE auto
 indexQualifiesAsClusterCenter(TThreadIndex id) -> bool
 {
-    constexpr auto n = CLUSTER_SIZE;
-    return (id % DIMX >= n / 2 && id % DIMX <= DIMX - (n + 1) / 2 &&
-            id / DIMX >= n / 2 && id / DIMX <= DIMY - (n + 1) / 2);
+    // To future self: We checked this multiple times. This should be correct.
+    constexpr auto n = TConfig::CLUSTER_SIZE;
+    return (id % TConfig::DIMX >= n / 2 &&
+            id % TConfig::DIMX <= TConfig::DIMX - (n + 1) / 2 &&
+            id / TConfig::DIMX >= n / 2 &&
+            id / TConfig::DIMX <= TConfig::DIMY - (n + 1) / 2);
 }
 
-template <typename TMap, typename TThreadIndex, typename TSum>
+template <typename TConfig, typename TMap, typename TThreadIndex, typename TSum>
 ALPAKA_FN_ACC ALPAKA_FN_INLINE auto findClusterSumAndMax(TMap const& map,
                                                          TThreadIndex const id,
                                                          TSum& sum,
@@ -104,10 +107,10 @@ ALPAKA_FN_ACC ALPAKA_FN_INLINE auto findClusterSumAndMax(TMap const& map,
 {
     TThreadIndex it = 0;
     max = 0;
-    constexpr auto n = CLUSTER_SIZE;
+    constexpr int n = TConfig::CLUSTER_SIZE;
     for (int y = -n / 2; y < (n + 1) / 2; ++y) {
         for (int x = -n / 2; x < (n + 1) / 2; ++x) {
-            it = id + y * DIMX + x;
+            it = id + y * TConfig::DIMX + x;
             if (map[max] < map[it])
                 max = it;
             sum += map[it];
@@ -126,19 +129,22 @@ getClusterBuffer(TAcc const& acc,
     return clusterArray[i];
 }
 
-template <typename TMap, typename TThreadIndex, typename TCluster>
+template <typename TConfig,
+          typename TMap,
+          typename TThreadIndex,
+          typename TCluster>
 ALPAKA_FN_ACC ALPAKA_FN_INLINE auto
 copyCluster(TMap const& map, TThreadIndex const id, TCluster& cluster) -> void
 {
-    constexpr auto n = CLUSTER_SIZE;
+    constexpr int n = TConfig::CLUSTER_SIZE;
     TThreadIndex it;
     TThreadIndex i = 0;
-    cluster.x = id % DIMX;
-    cluster.y = id / DIMX;
+    cluster.x = id % TConfig::DIMX;
+    cluster.y = id / TConfig::DIMX;
     cluster.frameNumber = map.header.frameNumber;
     for (int y = -n / 2; y < (n + 1) / 2; ++y) {
         for (int x = -n / 2; x < (n + 1) / 2; ++x) {
-            it = id + y * DIMX + x;
+            it = id + y * TConfig::DIMX + x;
             auto tmp = map.data[it];
             cluster.data[i++] = tmp;
         }
