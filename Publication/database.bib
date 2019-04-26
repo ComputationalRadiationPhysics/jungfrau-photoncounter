@@ -1,4 +1,14 @@
 
+@article{Leonarski_2018,
+    doi = {10.1038/s41592-018-0143-7},
+    url = {https://doi.org/10.1038/s41592-018-0143-7},
+    year = 2018,
+    month = {oct},
+    journal = {Nature Methods},
+    title = {Fast and accurate data collection for macromolecular crystallography using the JUNGFRAU detector},
+    author = {Leonarski, Filip and Redford, Sophie and Mozzanica, Aldo and Lopez-Cuenca, Carlos and Panepucci, Ezequiel and Nass, Karol and Ozerov, Dmitry and Vera, Laura and  Olieric, Vincent and Buntschu, Dominik and Schneider, Roman and Tinti, Gemma and Froejdh, Erik and Diederichs, Kay and Bunk, Oliver and Schmitt, Bernd and Wang, Meitian}
+}
+
 @article{Mozzanica_2016,
 	doi = {10.1088/1748-0221/11/02/c02047},
 	url = {https://doi.org/10.1088%2F1748-0221%2F11%2F02%2Fc02047},
@@ -14,7 +24,7 @@
 	abstract = {The two-dimensional pixel detector JUNGFRAU is designed for high performance photon science applications at free electron lasers and synchrotron light sources. It is developed for the SwissFEL currently under construction at the Paul Scherrer Institut, Switzerland. The detector is a hybrid pixel detector with a charge integration readout ASIC characterized by single photon sensitivity and a low noise performance over a dynamic range of 104 12 keV photons.  Geometrically, a JUNGFRAU readout chip consists of 256×256 pixels of 75×75 μm2. The chips are bump bonded to 320 μm thick silicon sensors. Arrays of 2×4 chips are tiled to form modules of 4×8 cm2 area. Several multi-module systems with up to 16 Mpixels per system will be delivered to the two end stations at SwissFEL.  The JUNGFRAU full scale readout ASIC and module design are  presented along with characterization results of the first systems. Experiments from fluorescence X-ray, visible light illumination, and synchrotron irradiation are shown. The results include an electronic noise of  ∼50 electrons r.m.s., which enables single photon detection energies below 2 keV and a noise well below the Poisson statistical limit over the entire dynamic range. First imaging experiments are also shown.}
 }
 
-@article{jungfrau3,
+@article{JFoperation,
 	year = 2018,
 	month = {nov},
 	publisher = {{IOP} Publishing},
@@ -28,7 +38,7 @@
 }
 
 
-@article{jungfrau2,
+@article{JFcalibration,
 	year = 2018,
 	month = {jan},
 	publisher = {{IOP} Publishing},
@@ -41,7 +51,7 @@
 	abstract = {The JUNGFRAU detector is a charge integrating hybrid silicon pixel detector developed at the Paul Scherrer Institut for photon science applications, in particular for the upcoming free electron laser SwissFEL. With a high dynamic range, analogue readout, low noise and three automatically switching gains, JUNGFRAU promises excellent performance not only at XFELs but also at synchrotrons in areas such as protein crystallography, ptychography, pump-probe and time resolved measurements. To achieve its full potential, the detector must be calibrated on a pixel-by-pixel basis.  This contribution presents the current status of the JUNGFRAU calibration project, in which a variety of input charge sources are used to parametrise the energy response of the detector across four orders of magnitude of dynamic range. Building on preliminary studies, the first full calibration procedure of a JUNGFRAU 0.5 Mpixel module is described. The calibration is validated using alternative sources of charge deposition, including laboratory experiments and measurements at ESRF and LCLS. The findings from these measurements are presented. Calibrated modules have already been used in proof-of-principle style protein crystallography experiments at the SLS. A first look at selected results is shown. Aspects such as the conversion of charge to number of photons, treatment of multi-size pixels and the origin of non-linear response are also discussed.}
 }
 
-@article{jungfrau1,
+@article{JFapplications,
 author = {A. Mozzanica and M. Andrä and R. Barten and A. Bergamaschi and S. Chiriotti and M. Brückner and R. Dinapoli and E. Fröjdh and D. Greiffenberg and F. Leonarski and C. Lopez-Cuenca and D. Mezza and S. Redford and C. Ruder and B. Schmitt and X. Shi and D. Thattil and G. Tinti and S. Vetter and J. Zhang},
 title = {The JUNGFRAU Detector for Applications at Synchrotron Light Sources and XFELs},
 journal = {Synchrotron Radiation News},
@@ -78,5 +88,35 @@ address="Cham",
 pages="496--514",
 abstract="We present an analysis on optimizing performance of a single C++11 source code using the Alpaka hardware abstraction library. For this we use the general matrix multiplication (GEMM) algorithm in order to show that compilers can optimize Alpaka code effectively when tuning key parameters of the algorithm. We do not intend to rival existing, highly optimized DGEMM versions, but merely choose this example to prove that Alpaka allows for platform-specific tuning with a single source code. In addition we analyze the optimization potential available with vendor-specific compilers when confronted with the heavily templated abstractions of Alpaka. We specifically test the code for bleeding edge architectures such as Nvidia's Tesla P100, Intel's Knights Landing (KNL) and Haswell architecture as well as IBM's Power8 system. On some of these we are able to reach almost 50{\%} of the peak floating point operation performance using the aforementioned means. When adding compiler-specific we are able to reach 5on a P100 and over 1on a KNL system.",
 isbn="978-3-319-67630-2"
+}
+
+@Article{SwissFEL,
+AUTHOR = {Milne, Christopher J. and Schietinger, Thomas and Aiba, Masamitsu and Alarcon, Arturo and Alex, Jürgen and Anghel, Alexander and Arsov, Vladimir and Beard, Carl and Beaud, Paul and Bettoni, Simona and Bopp, Markus and Brands, Helge and Brönnimann, Manuel and Brunnenkant, Ingo and Calvi, Marco and Citterio, Alessandro and Craievich, Paolo and Csatari Divall, Marta and Dällenbach, Mark and D’Amico, Michael and Dax, Andreas and Deng, Yunpei and Dietrich, Alexander and Dinapoli, Roberto and Divall, Edwin and Dordevic, Sladana and Ebner, Simon and Erny, Christian and Fitze, Hansrudolf and Flechsig, Uwe and Follath, Rolf and Frei, Franziska and Gärtner, Florian and Ganter, Romain and Garvey, Terence and Geng, Zheqiao and Gorgisyan, Ishkhan and Gough, Christopher and Hauff, Andreas and Hauri, Christoph P. and Hiller, Nicole and Humar, Tadej and Hunziker, Stephan and Ingold, Gerhard and Ischebeck, Rasmus and Janousch, Markus and Juranić, Pavle and Jurcevic, Mario and Kaiser, Maik and Kalantari, Babak and Kalt, Roger and Keil, Boris and Kittel, Christoph and Knopp, Gregor and Koprek, Waldemar and Lemke, Henrik T. and Lippuner, Thomas and Llorente Sancho, Daniel and Löhl, Florian and Lopez-Cuenca, Carlos and Märki, Fabian and Marcellini, Fabio and Marinkovic, Goran and Martiel, Isabelle and Menzel, Ralf and Mozzanica, Aldo and Nass, Karol and Orlandi, Gian Luca and Ozkan Loch, Cigdem and Panepucci, Ezequiel and Paraliev, Martin and Patterson, Bruce and Pedrini, Bill and Pedrozzi, Marco and Pollet, Patrick and Pradervand, Claude and Prat, Eduard and Radi, Peter and Raguin, Jean-Yves and Redford, Sophie and Rehanek, Jens and Réhault, Julien and Reiche, Sven and Ringele, Matthias and Rittmann, Jochen and Rivkin, Leonid and Romann, Albert and Ruat, Marie and Ruder, Christian and Sala, Leonardo and Schebacher, Lionel and Schilcher, Thomas and Schlott, Volker and Schmidt, Thomas and Schmitt, Bernd and Shi, Xintian and Stadler, Markus and Stingelin, Lukas and Sturzenegger, Werner and Szlachetko, Jakub and Thattil, Dhanya and Treyer, Daniel M. and Trisorio, Alexandre and Tron, Wolfgang and Vetter, Seraphin and Vicario, Carlo and Voulot, Didier and Wang, Meitian and Zamofing, Thierry and Zellweger, Christof and Zennaro, Riccardo and Zimoch, Elke and Abela, Rafael and Patthey, Luc and Braun, Hans-Heinrich},
+TITLE = {SwissFEL: The Swiss X-ray Free Electron Laser},
+JOURNAL = {Applied Sciences},
+VOLUME = {7},
+YEAR = {2017},
+NUMBER = {7},
+ARTICLE-NUMBER = {720},
+URL = {http://www.mdpi.com/2076-3417/7/7/720},
+ISSN = {2076-3417},
+ABSTRACT = {The SwissFEL X-ray Free Electron Laser (XFEL) facility started construction at the Paul Scherrer Institute (Villigen, Switzerland) in 2013 and will be ready to accept its first users in 2018 on the Aramis hard X-ray branch. In the following sections we will summarize the various aspects of the project, including the design of the soft and hard X-ray branches of the accelerator, the results of SwissFEL performance simulations, details of the photon beamlines and experimental stations, and our first commissioning results.},
+DOI = {10.3390/app7070720}
+}
+
+@article{Cartier_2015,
+	doi = {10.1088/1748-0221/10/03/c03022},
+	url = {https://doi.org/10.1088%2F1748-0221%2F10%2F03%2Fc03022},
+	year = 2015,
+	month = {mar},
+	publisher = {{IOP} Publishing},
+	volume = {10},
+	number = {03},
+	pages = {C03022--C03022},
+	author = {S. Cartier and A. Bergamaschi and R. Dinapoli and D. Greiffenberg and I. Johnson and J.H. Jungmann-Smith and D. Mezza and A. Mozzanica and X. Shi and G. Tinti and B. Schmitt and M. Stampanoni},
+	title = {Study of the signal response of the {M{\"O}NCH} 25$\mu$m pitch hybrid pixel detector at different photon absorption depths},
+	journal = {Journal of Instrumentation},
+	abstract = {M{\"O}NCH is a 25 μm pitch hybrid silicon pixel detector with a charge integrating analog read-out front-end in each pixel.  The small pixel size brings new challenges in bump-bonding, power consumption and chip design. The M{\"O}NCH02 prototype ASIC, manufactured in UMC 110 nm technology with a field of view of 4×4 mm2 and 160×160 pixels, has been characterized in the single photon regime, i.e. with less than one photon acquired per frame on average on a 3×3 pixel cluster. The low noise and small pixel size allow spatial interpolation with high resolution.
+ Understanding charge sharing as a function of the photon absorption depth and sensor bias is a key for optimal processing of single photon data for high resolution imaging. To characterize the charge collection of the detector, the sensor was illuminated with a 20 keV photon beam in edge-on configuration at the SYRMEP beamline of Elettra. By slicing the beam by means of a 5 μm slit and scanning through the 320 μm silicon sensor depth, the charge collection is characterized as a function of the photon absorption depth for different sensor bias voltages.}
 }
 
