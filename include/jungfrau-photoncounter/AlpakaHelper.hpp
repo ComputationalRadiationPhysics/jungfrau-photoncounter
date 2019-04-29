@@ -32,14 +32,6 @@ static inline auto alpakaNativePtr(TArgs&&... args)
     return alpaka::mem::view::getPtrNative(std::forward<TArgs>(args)...);
 }
 
-// function to get first host device
-template <typename TAlpaka>
-static inline auto alpakaGetHost()
-    -> decltype(alpaka::pltf::getDevByIdx<typename TAlpaka::PltfHost>(0u))
-{
-    return alpaka::pltf::getDevByIdx<typename TAlpaka::PltfHost>(0u);
-}
-
 // rename alpaka copy
 template <typename... TArgs>
 static inline auto alpakaCopy(TArgs&&... args)
@@ -92,6 +84,14 @@ static inline auto alpakaViewPlainPtrHost(TArgs&&... args)
     return alpaka::mem::view::
         ViewPlainPtr<typename TAlpaka::DevHost, TData, Dim, Size>(
             std::forward<TArgs>(args)...);
+}
+
+// function to get first host device
+template <typename TAlpaka>
+static inline auto alpakaGetHost()
+    -> decltype(alpaka::pltf::getDevByIdx<typename TAlpaka::PltfHost>(0u))
+{
+    return alpaka::pltf::getDevByIdx<typename TAlpaka::PltfHost>(0u);
 }
 
 // rename alpaka get dev count

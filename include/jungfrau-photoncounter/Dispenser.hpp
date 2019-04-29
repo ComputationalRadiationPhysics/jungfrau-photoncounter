@@ -341,19 +341,15 @@ public:
      * @param pointer to empty struct for photon and sum maps and cluster data
      * @return boolean indicating whether maps were downloaded or not
      */
+    template <typename TFramePackageEnergyMap,
+              typename TFramePackagePhotonMap,
+              typename TFramePackageSumMap,
+              typename TFramePackageEnergyValue>
     auto downloadData(
-        boost::optional<
-            typename TConfig::template FramePackage<typename TConfig::EnergyMap,
-                                                    TAlpaka>&> energy,
-        boost::optional<
-            typename TConfig::template FramePackage<typename TConfig::PhotonMap,
-                                                    TAlpaka>&> photon,
-        boost::optional<
-            typename TConfig::template FramePackage<typename TConfig::SumMap,
-                                                    TAlpaka>&> sum,
-        boost::optional<typename TConfig::template FramePackage<
-            typename TConfig::EnergyValue,
-            TAlpaka>&> maxValues,
+        boost::optional<TFramePackageEnergyMap&> energy,
+        boost::optional<TFramePackagePhotonMap&> photon,
+        boost::optional<TFramePackageSumMap&> sum,
+        boost::optional<TFramePackageEnergyValue&> maxValues,
         boost::optional<typename TConfig::template ClusterArray<TAlpaka>&>
             clusters) -> size_t
     {

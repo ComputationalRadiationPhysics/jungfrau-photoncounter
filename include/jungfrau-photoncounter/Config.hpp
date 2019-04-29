@@ -26,7 +26,8 @@ struct DetectorConfig {
     static constexpr std::size_t DIMY = TDimY;
     static constexpr std::size_t SUM_FRAMES = TSumFrames;
     static constexpr std::size_t DEV_FRAMES = TDevFrames;
-    static constexpr std::size_t MOVING_STAT_WINDOW_SIZE = TMovingStatWindowSize;
+    static constexpr std::size_t MOVING_STAT_WINDOW_SIZE =
+        TMovingStatWindowSize;
     static constexpr std::size_t CLUSTER_SIZE = TClusterSize;
     static constexpr std::size_t C = TC;
 
@@ -108,10 +109,26 @@ struct DetectorConfig {
         ClusterArray(std::size_t maxClusterCount = MAX_CLUSTER_NUM * DEV_FRAMES,
                      typename TAlpaka::DevHost host = alpakaGetHost<TAlpaka>())
             : used(0),
-              usedPinned(alpakaAlloc<unsigned long long>(host, decltype(SINGLEMAP)(SINGLEMAP))),
+              usedPinned(alpakaAlloc<unsigned long long>(
+                  host,
+                  decltype(SINGLEMAP)(SINGLEMAP))),
               clusters(alpakaAlloc<Cluster>(host, maxClusterCount))
         {
             alpakaNativePtr(usedPinned)[0] = used;
+        }
+    };
+
+    // a struct to hold multiple frames (on host and device)
+    template <typename T, typename TAlpaka, typename TBufView>
+    struct FramePackageView {
+        std::size_t numFrames;
+        typename TAlpaka::template HostView<T> data;
+
+        FramePackageView(TBufView data,
+                         std::size_t offset,
+                         std::size_t numFrames)
+            : numFrames(numFrames), data(data, numFrames, offset)
+        {
         }
     };
 
@@ -124,6 +141,15 @@ struct DetectorConfig {
                      typename TAlpaka::DevHost host = alpakaGetHost<TAlpaka>())
             : numFrames(numFrames), data(alpakaAlloc<T>(host, numFrames))
         {
+        }
+
+        FramePackageView<T, TAlpaka, typename TAlpaka::template HostView<T>>
+        getView(std::size_t offset, std::size_t numFrames) const
+        {
+            return FramePackageView<T,
+                                    TAlpaka,
+                                    typename TAlpaka::template HostView>(
+                data, offset, numFrames);
         }
     };
 
