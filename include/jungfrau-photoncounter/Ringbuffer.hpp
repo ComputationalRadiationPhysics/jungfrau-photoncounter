@@ -12,7 +12,11 @@ public:
      * @param number of elements
      **/
     explicit Ringbuffer(std::size_t maxElements)
-        : data(new T[maxElements]), size(maxElements), head(0), tail(0), full(false)
+        : data(new T[maxElements]),
+          size(maxElements),
+          head(0),
+          tail(0),
+          full(false)
     {
     }
 
@@ -30,25 +34,35 @@ public:
     }
 
     /**
+     * Move constructor
+     **/
+    Ringbuffer(Ringbuffer&& other) = default;
+
+    /**
      * Assignment operator
      **/
     Ringbuffer& operator=(const Ringbuffer& other)
-	{
-		if(&other == this)
-			return *this;
-		size = other.size;
-		full = other.full;
-		head = other.head;
-		tail = other.tail;
+    {
+        if (&other == this)
+            return *this;
+        size = other.size;
+        full = other.full;
+        head = other.head;
+        tail = other.tail;
 
-		// delete old data and allocate space for the new data 
-		delete(data);
-		data = new T[other.size];
-		
-		memcpy(other.data, data, size * sizeof(T));
+        // delete old data and allocate space for the new data
+        delete (data);
+        data = new T[other.size];
+
+        memcpy(other.data, data, size * sizeof(T));
 
         return *this;
-	}
+    }
+
+    /**
+     * Move assignment
+     **/
+    Ringbuffer& operator=(Ringbuffer&& other) = default;
 
     /**
      * Returns max number of elements

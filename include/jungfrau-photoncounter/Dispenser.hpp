@@ -84,6 +84,16 @@ public:
     Dispenser& operator=(const Dispenser& other) = delete;
 
     /**
+     * move copy constructor
+     */
+    Dispenser(Dispenser&& other) = default;
+
+    /**
+     * move assign constructor
+     */
+    Dispenser& operator=(Dispenser&& other) = default;
+
+    /**
      * Synchronizes all streams with one function call.
      */
     auto synchronize() -> void
