@@ -1,0 +1,5 @@
+/** API versions */
+#define APIRECEIVER 0x180927
+#define APIEIGER 0x190207
+#define APIJUNGFRAU 0x190107
+#define APIGOTTHARD 0x190201
