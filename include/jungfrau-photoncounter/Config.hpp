@@ -82,7 +82,8 @@ struct DetectorConfig {
     // execution flags to select the various kernels
     struct ExecutionFlags {
         // 0 = only energy output, 1 = photon (and energy) output, 2 =
-        // clustering (and energy) output
+        // clustering (and energy) output, 3 = clustering and explicit energy
+        // output (used in benchmarks)
         uint8_t mode : 2;
         // 0 = off, 1 = on
         uint8_t summation : 1;
@@ -118,7 +119,7 @@ struct DetectorConfig {
         }
     };
 
-    // a struct to hold multiple frames (on host and device)
+    // a struct to hold a view of multiple frames (on host and device)
     template <typename T, typename TAlpaka, typename TBufView>
     struct FramePackageView {
         std::size_t numFrames;
@@ -129,6 +130,15 @@ struct DetectorConfig {
                          std::size_t numFrames)
             : numFrames(numFrames), data(data, numFrames, offset)
         {
+        }
+
+        FramePackageView<T, TAlpaka, typename TAlpaka::template HostView<T>>
+        getView(std::size_t offset, std::size_t numFrames)
+        {
+            return FramePackageView<T,
+                                    TAlpaka,
+                                    typename TAlpaka::template HostView<T>>(
+                data, offset, numFrames);
         }
     };
 
@@ -144,11 +154,11 @@ struct DetectorConfig {
         }
 
         FramePackageView<T, TAlpaka, typename TAlpaka::template HostView<T>>
-        getView(std::size_t offset, std::size_t numFrames) const
+        getView(std::size_t offset, std::size_t numFrames)
         {
             return FramePackageView<T,
                                     TAlpaka,
-                                    typename TAlpaka::template HostView>(
+                                    typename TAlpaka::template HostView<T>>(
                 data, offset, numFrames);
         }
     };
@@ -166,6 +176,9 @@ struct DetectorConfig {
     using GainMap = CheapArray<double, DIMX * DIMY>;
     using PedestalMap = CheapArray<double, DIMX * DIMY>;
     using InitPedestalMap = CheapArray<InitPedestal, DIMX * DIMY>;
+    template <typename T, typename TAlpaka>
+    using FramePackageView_t =
+        FramePackageView<T, TAlpaka, typename TAlpaka::template HostView<T>>;
 };
 
 // debug statements

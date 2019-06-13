@@ -86,6 +86,14 @@ static inline auto alpakaViewPlainPtrHost(TArgs&&... args)
             std::forward<TArgs>(args)...);
 }
 
+// function to get accelerator device by ID
+template <typename TAlpaka>
+static inline auto alpakaGetDevByIdx(std::size_t idx)
+    -> decltype(alpaka::pltf::getDevByIdx<typename TAlpaka::PltfAcc>(idx))
+{
+    return alpaka::pltf::getDevByIdx<typename TAlpaka::PltfAcc>(idx);
+}
+
 // function to get first host device
 template <typename TAlpaka>
 static inline auto alpakaGetHost()

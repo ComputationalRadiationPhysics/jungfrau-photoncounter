@@ -1,6 +1,7 @@
 #pragma once
 
 #include <alpaka/alpaka.hpp>
+#include <memory>
 
 #include "Config.hpp"
 
@@ -15,7 +16,7 @@ template <typename Config, typename TAlpaka> struct DeviceData {
 
     std::size_t id;
     std::size_t numMaps;
-    typename TAlpaka::DevAcc device;
+    typename TAlpaka::DevAcc *device;
     typename TAlpaka::Queue queue;
     typename TAlpaka::Event event;
     State state;
@@ -39,61 +40,61 @@ template <typename Config, typename TAlpaka> struct DeviceData {
     typename TAlpaka::template AccBuf<typename Config::Cluster> cluster;
     typename TAlpaka::template AccBuf<unsigned long long> numClusters;
 
-    DeviceData(std::size_t id, typename TAlpaka::DevAcc device)
+  DeviceData(typename TAlpaka::DevAcc * devPtr, std::size_t deviceId)
         : id(id),
           numMaps(0),
-          device(device),
-          queue(device),
-          event(device),
+          device(devPtr),
+          queue(*device),
+          event(*device),
           state(FREE),
           data(alpakaAlloc<typename Config::DetectorData>(
-              device,
+              *device,
               decltype(Config::GAINMAPS)(Config::DEV_FRAMES))),
           gain(alpakaAlloc<typename Config::GainMap>(
-              device,
+              *device,
               decltype(Config::GAINMAPS)(Config::GAINMAPS))),
           pedestal(alpakaAlloc<typename Config::PedestalMap>(
-              device,
+              *device,
               decltype(Config::PEDEMAPS)(Config::PEDEMAPS))),
           initialPedestal(alpakaAlloc<typename Config::InitPedestalMap>(
-              device,
+              *device,
               decltype(Config::PEDEMAPS)(Config::PEDEMAPS))),
           drift(alpakaAlloc<typename Config::DriftMap>(
-              device,
+              *device,
               decltype(Config::GAINMAPS)(Config::DEV_FRAMES))),
           gainStage(alpakaAlloc<typename Config::GainStageMap>(
-              device,
+              *device,
               decltype(Config::GAINMAPS)(Config::DEV_FRAMES))),
           gainStageOutput(alpakaAlloc<typename Config::GainStageMap>(
-              device,
+              *device,
               decltype(Config::SINGLEMAP)(Config::SINGLEMAP))),
           maxValueMaps(alpakaAlloc<typename Config::EnergyMap>(
-              device,
+              *device,
               decltype(Config::GAINMAPS)(Config::DEV_FRAMES))),
           maxValues(alpakaAlloc<typename Config::EnergyValue>(
-              device,
+              *device,
               decltype(Config::GAINMAPS)(Config::DEV_FRAMES))),
           energy(alpakaAlloc<typename Config::EnergyMap>(
-              device,
+              *device,
               decltype(Config::GAINMAPS)(Config::DEV_FRAMES))),
           mask(alpakaAlloc<typename Config::MaskMap>(
-              device,
+              *device,
               decltype(Config::SINGLEMAP)(Config::SINGLEMAP))),
           photon(alpakaAlloc<typename Config::PhotonMap>(
-              device,
+              *device,
               decltype(Config::GAINMAPS)(Config::DEV_FRAMES))),
           sum(alpakaAlloc<typename Config::SumMap>(
-              device,
+              *device,
               ((decltype(Config::GAINMAPS)(Config::DEV_FRAMES) +
                 Config::SUM_FRAMES) -
                1) /
                   Config::SUM_FRAMES)),
           cluster(alpakaAlloc<typename Config::Cluster>(
-              device,
+              *device,
               decltype(Config::MAX_CLUSTER_NUM)(Config::MAX_CLUSTER_NUM) *
                   decltype(Config::GAINMAPS)(Config::DEV_FRAMES))),
           numClusters(alpakaAlloc<unsigned long long>(
-              device,
+              *device,
               decltype(Config::SINGLEMAP)(Config::SINGLEMAP)))
     {
         // set cluster counter to 0

@@ -35,33 +35,30 @@ public:
     Dispenser(typename TConfig::template FramePackage<typename TConfig::GainMap,
                                                       TAlpaka> gainMap,
               boost::optional<typename TAlpaka::template HostBuf<MaskMap>> mask)
-        : host(alpakaGetHost<TAlpaka>()),
-          gain(gainMap),
+        : gain(gainMap),
           mask((mask ? *mask
                      : alpakaAlloc<typename TConfig::MaskMap>(
-                           host,
+                           alpakaGetHost<TAlpaka>(),
                            decltype(TConfig::SINGLEMAP)(TConfig::SINGLEMAP)))),
           drift(alpakaAlloc<typename TConfig::DriftMap>(
-              host,
+              alpakaGetHost<TAlpaka>(),
               decltype(TConfig::SINGLEMAP)(TConfig::SINGLEMAP))),
           gainStage(alpakaAlloc<typename TConfig::GainStageMap>(
-              host,
+              alpakaGetHost<TAlpaka>(),
               decltype(TConfig::SINGLEMAP)(TConfig::SINGLEMAP))),
           maxValueMaps(alpakaAlloc<typename TConfig::EnergyMap>(
-              host,
+              alpakaGetHost<TAlpaka>(),
               decltype(TConfig::DEV_FRAMES)(TConfig::DEV_FRAMES))),
           pedestalFallback(false),
           init(false),
           ringbuffer(TAlpaka::STREAMS_PER_DEV * alpakaGetDevCount<TAlpaka>()),
-          pedestal(TConfig::PEDEMAPS, host),
-          initPedestal(TConfig::PEDEMAPS, host),
+          pedestal(TConfig::PEDEMAPS, alpakaGetHost<TAlpaka>()),
+          initPedestal(TConfig::PEDEMAPS, alpakaGetHost<TAlpaka>()),
           nextFull(0),
-          nextFree(0)
+          nextFree(0),
+          deviceContainer(alpakaGetDevs<TAlpaka>())
     {
-        std::vector<typename TAlpaka::DevAcc> allDevices(
-            alpakaGetDevs<TAlpaka>());
-
-        initDevices(allDevices);
+        initDevices();
 
         // make room for live mask information
         if (!mask) {
@@ -98,7 +95,7 @@ public:
      */
     auto synchronize() -> void
     {
-        for (struct DeviceData<TConfig, TAlpaka> dev : devices)
+        for (struct DeviceData<TConfig, TAlpaka>& dev : devices)
             alpakaWait(dev.queue);
     }
 
@@ -356,11 +353,11 @@ public:
               typename TFramePackageSumMap,
               typename TFramePackageEnergyValue>
     auto downloadData(
-        boost::optional<TFramePackageEnergyMap&> energy,
-        boost::optional<TFramePackagePhotonMap&> photon,
-        boost::optional<TFramePackageSumMap&> sum,
-        boost::optional<TFramePackageEnergyValue&> maxValues,
-        boost::optional<typename TConfig::template ClusterArray<TAlpaka>&>
+        boost::optional<TFramePackageEnergyMap> energy,
+        boost::optional<TFramePackagePhotonMap> photon,
+        boost::optional<TFramePackageSumMap> sum,
+        boost::optional<TFramePackageEnergyValue> maxValues,
+        boost::optional<typename TConfig::template ClusterArray<TAlpaka>>
             clusters) -> size_t
     {
         struct DeviceData<TConfig, TAlpaka>* dev =
@@ -468,7 +465,7 @@ public:
     {
         std::vector<std::size_t> sizes(devices.size());
         for (std::size_t i = 0; i < devices.size(); ++i) {
-            sizes[i] = alpakaGetMemBytes(devices[i].device);
+            sizes[i] = alpakaGetMemBytes(*devices[i].device);
         }
 
         return sizes;
@@ -482,14 +479,13 @@ public:
     {
         std::vector<std::size_t> sizes(devices.size());
         for (std::size_t i = 0; i < devices.size(); ++i) {
-            sizes[i] = alpakaGetFreeMemBytes(devices[i].device);
+            sizes[i] = alpakaGetFreeMemBytes(*devices[i].device);
         }
 
         return sizes;
     }
 
 private:
-    typename TAlpaka::DevHost host;
     typename TConfig::template FramePackage<typename TConfig::GainMap, TAlpaka>
         gain;
     typename TAlpaka::template HostBuf<typename TConfig::MaskMap> mask;
@@ -506,6 +502,8 @@ private:
                                             TAlpaka>
         initPedestal;
 
+  std::vector<typename TAlpaka::DevAcc> deviceContainer;
+
     bool init;
     bool pedestalFallback;
     Ringbuffer<DeviceData<TConfig, TAlpaka>*> ringbuffer;
@@ -517,16 +515,15 @@ private:
      * Initializes all devices. Uploads gain data and creates buffer.
      * @param vector with devices to be initialized
      */
-    auto initDevices(std::vector<typename TAlpaka::DevAcc> allDevices) -> void
+    auto initDevices() -> void
     {
         const GainmapInversionKernel<TConfig> gainmapInversionKernel{};
-        devices.reserve(allDevices.size() * TAlpaka::STREAMS_PER_DEV);
-        for (std::size_t num = 0;
-             num < allDevices.size() * TAlpaka::STREAMS_PER_DEV;
+        std::size_t deviceCount = alpakaGetDevCount<TAlpaka>();
+        devices.reserve(deviceCount * TAlpaka::STREAMS_PER_DEV);
+        for (std::size_t num = 0; num < deviceCount * TAlpaka::STREAMS_PER_DEV;
              ++num) {
             // initialize variables
-            devices.emplace_back(num,
-                                 allDevices[num / TAlpaka::STREAMS_PER_DEV]);
+            devices.emplace_back(&deviceContainer[num], num / TAlpaka::STREAMS_PER_DEV);
             alpakaCopy(devices[num].queue,
                        devices[num].gain,
                        gain.data,
@@ -564,11 +561,11 @@ private:
         dev->state = PROCESSING;
         dev->numMaps = numMaps;
 
-        alpakaCopy(
-            dev->queue,
-            dev->data,
-            alpakaViewPlainPtrHost<TAlpaka, TDetectorData>(data, host, numMaps),
-            numMaps);
+        alpakaCopy(dev->queue,
+                   dev->data,
+                   alpakaViewPlainPtrHost<TAlpaka, TDetectorData>(
+                       data, alpakaGetHost<TAlpaka>(), numMaps),
+                   numMaps);
 
         // copy offset data from last initialized device
         auto prevDevice = (nextFull + devices.size() - 1) % devices.size();
@@ -709,7 +706,7 @@ private:
             dev->queue,
             dev->data,
             alpakaViewPlainPtrHost<TAlpaka, typename TConfig::DetectorData>(
-                data, host, numMaps),
+                data, alpakaGetHost<TAlpaka>(), numMaps),
             numMaps);
 
         // copy offset data from last device uploaded to
@@ -734,10 +731,10 @@ private:
         typename TConfig::MaskMap* local_mask =
             flags.masking ? alpakaNativePtr(dev->mask) : nullptr;
 
-        // converting to energy
-        // the photon and cluster extraction kernels already include energy
-        // conversion
         if (flags.mode == 0) {
+            // converting to energy
+            // the photon and cluster extraction kernels already include energy
+            // conversion
             ConversionKernel<TConfig> conversionKernel{};
             auto const conversion(alpakaCreateKernel<TAlpaka>(
                 getWorkDiv<TAlpaka>(),
@@ -755,9 +752,8 @@ private:
             DEBUG("enqueueing conversion kernel");
             alpakaEnqueueKernel(dev->queue, conversion);
         }
-
-        // converting to photons (and energy)
-        if (flags.mode == 1) {
+        else if (flags.mode == 1) {
+            // converting to photons (and energy)
             PhotonFinderKernel<TConfig> photonFinderKernel{};
             auto const photonFinder(alpakaCreateKernel<TAlpaka>(
                 getWorkDiv<TAlpaka>(),
@@ -775,10 +771,9 @@ private:
 
             DEBUG("enqueueing photon kernel");
             alpakaEnqueueKernel(dev->queue, photonFinder);
-        };
-
-        // clustering (and conversion to energy)
-        if (flags.mode == 2) {
+        }
+        else {
+            // clustering (and conversion to energy)
             DEBUG("enqueueing clustering kernel");
 
             for (uint32_t i = 0; i < numMaps + 1; ++i) {
