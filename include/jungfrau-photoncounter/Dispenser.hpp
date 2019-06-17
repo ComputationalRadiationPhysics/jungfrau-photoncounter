@@ -16,8 +16,10 @@
 #include "kernel/Reduction.hpp"
 #include "kernel/Summation.hpp"
 
+#define BOOST_OPTIONAL_USE_OLD_DEFINITION_OF_NONE
 #include <boost/optional.hpp>
 
+#include <future>
 #include <iostream>
 #include <limits>
 
@@ -95,6 +97,8 @@ public:
      */
     auto synchronize() -> void
     {
+        DEBUG("synchronizing devices ...");
+
         for (struct DeviceData<TConfig, TAlpaka>& dev : devices)
             alpakaWait(dev.queue);
     }
@@ -321,26 +325,33 @@ public:
         if (!ringbuffer.isEmpty()) {
             // try uploading one data package
             if (offset <= data.numFrames - TConfig::DEV_FRAMES) {
-                offset += calcData(alpakaNativePtr(data.data) + offset,
-                                   TConfig::DEV_FRAMES,
-                                   flags);
+                auto result = calcData(alpakaNativePtr(data.data) + offset,
+                                       TConfig::DEV_FRAMES,
+                                       flags);
+                offset += std::get<0>(result);
                 DEBUG(offset, "/", data.numFrames, "frames uploaded");
+
+                return std::make_tuple(offset, std::get<1>(result));
             }
             // upload remaining frames
             else if (offset != data.numFrames) {
-                offset += calcData(alpakaNativePtr(data.data) + offset,
-                                   data.numFrames % TConfig::DEV_FRAMES,
-                                   flags);
+                auto result = calcData(alpakaNativePtr(data.data) + offset,
+                                       data.numFrames % TConfig::DEV_FRAMES,
+                                       flags);
                 DEBUG(offset, "/", data.numFrames, "frames uploaded");
+                offset += std::get<0>(result);
+                return std::make_tuple(offset, std::get<1>(result));
             }
             // force wait for one device to finish since there's no new data and
             // the user wants the data flushed
             else if (flushWhenFinished) {
+                DEBUG("flushing ...");
+
                 flush();
             }
         }
 
-        return offset;
+        return std::make_tuple(offset, std::async([]() { return true; }));
     }
 
     /**
@@ -358,7 +369,7 @@ public:
         boost::optional<TFramePackageSumMap> sum,
         boost::optional<TFramePackageEnergyValue> maxValues,
         boost::optional<typename TConfig::template ClusterArray<TAlpaka>>
-            clusters) -> size_t
+            clusters) -> std::tuple<size_t, std::future<bool>>
     {
         struct DeviceData<TConfig, TAlpaka>* dev =
             &Dispenser::devices[nextFree];
@@ -379,7 +390,7 @@ public:
         // to keep frames in order only download if the longest running device
         // has finished
         if (dev->state != READY)
-            return 0;
+            return std::make_tuple(0, std::async([]() { return true; }));
 
         // download energy if needed
         if (energy) {
@@ -448,13 +459,16 @@ public:
                 dev->queue, clusterView, dev->cluster, clustersToDownload);
         }
 
-        alpakaWait(dev->queue);
-
         dev->state = FREE;
         nextFree = (nextFree + 1) % devices.size();
         ringbuffer.push(dev);
 
-        return dev->numMaps;
+        auto wait = [](decltype(dev) dev) {
+            alpakaWait(dev->queue);
+            return true;
+        };
+
+        return std::make_tuple(dev->numMaps, std::async(wait, dev));
     }
 
     /**
@@ -502,7 +516,7 @@ private:
                                             TAlpaka>
         initPedestal;
 
-  std::vector<typename TAlpaka::DevAcc> deviceContainer;
+    std::vector<typename TAlpaka::DevAcc> deviceContainer;
 
     bool init;
     bool pedestalFallback;
@@ -520,14 +534,17 @@ private:
         const GainmapInversionKernel<TConfig> gainmapInversionKernel{};
         std::size_t deviceCount = alpakaGetDevCount<TAlpaka>();
         devices.reserve(deviceCount * TAlpaka::STREAMS_PER_DEV);
+
         for (std::size_t num = 0; num < deviceCount * TAlpaka::STREAMS_PER_DEV;
              ++num) {
             // initialize variables
-            devices.emplace_back(&deviceContainer[num], num / TAlpaka::STREAMS_PER_DEV);
+            devices.emplace_back(
+                num, &deviceContainer[num / TAlpaka::STREAMS_PER_DEV]);
             alpakaCopy(devices[num].queue,
                        devices[num].gain,
                        gain.data,
                        decltype(TConfig::GAINMAPS)(TConfig::GAINMAPS));
+
             // compute reciprocals of gain maps
             auto const gainmapInversion(alpakaCreateKernel<TAlpaka>(
                 getWorkDiv<TAlpaka>(),
@@ -693,11 +710,12 @@ private:
     template <typename TDetectorData>
     auto calcData(TDetectorData* data,
                   std::size_t numMaps,
-                  typename TConfig::ExecutionFlags flags) -> std::size_t
+                  typename TConfig::ExecutionFlags flags)
+    //-> std::tuple<std::size_t, std::async<bool>>
     {
         DeviceData<TConfig, TAlpaka>* dev;
         if (!ringbuffer.pop(dev))
-            return 0;
+            return std::make_tuple(0, std::async([]() { return true; }));
 
         dev->state = PROCESSING;
         dev->numMaps = numMaps;
@@ -870,6 +888,11 @@ private:
         // the event is used to wait for pedestal data
         alpakaEnqueueKernel(dev->queue, dev->event);
 
-        return numMaps;
+        auto wait = [](decltype(dev) dev) {
+            alpakaWait(dev->queue);
+            return true;
+        };
+
+        return std::make_tuple(numMaps, std::async(wait, dev));
     }
 };

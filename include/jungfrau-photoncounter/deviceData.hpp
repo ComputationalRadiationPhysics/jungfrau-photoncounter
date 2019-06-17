@@ -40,7 +40,7 @@ template <typename Config, typename TAlpaka> struct DeviceData {
     typename TAlpaka::template AccBuf<typename Config::Cluster> cluster;
     typename TAlpaka::template AccBuf<unsigned long long> numClusters;
 
-  DeviceData(typename TAlpaka::DevAcc * devPtr, std::size_t deviceId)
+  DeviceData(std::size_t id, typename TAlpaka::DevAcc * devPtr)
         : id(id),
           numMaps(0),
           device(devPtr),

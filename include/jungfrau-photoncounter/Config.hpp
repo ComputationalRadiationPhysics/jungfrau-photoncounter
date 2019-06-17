@@ -216,5 +216,5 @@ void debugPrint(const char* file, unsigned int line, TArgs... args)
 #endif
 
 using JungfrauConfig =
-    DetectorConfig<1000, 1000, 999, 1024, 512, 10, 300, 100, 3, 5>;
+    DetectorConfig<1000, 1000, 999, 1024, 512, 10, 100, 100, 3, 5>;
 using MoenchConfig = DetectorConfig<1000, 0, 0, 400, 400, 10, 300, 100, 3, 5>;

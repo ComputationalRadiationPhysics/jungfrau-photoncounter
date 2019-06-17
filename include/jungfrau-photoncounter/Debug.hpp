@@ -52,7 +52,7 @@ void save_image(std::string path, TBuffer* data, std::size_t frame_number)
     for (std::size_t j = 0; j < TConfig::DIMY; j++) {
         for (std::size_t k = 0; k < TConfig::DIMX; k++) {
             double h = double(
-                data[frame_number].data[(j * TConfig::DIMY) + k]);
+                data[frame_number].data[(j * TConfig::DIMX) + k]);
             img << h << " ";
         }
         img << "\n";
