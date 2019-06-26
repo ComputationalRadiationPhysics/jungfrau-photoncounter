@@ -8,6 +8,7 @@
 #include "AlpakaHelper.hpp"
 #include "CheapArray.hpp"
 
+// a struct to hold all detector specific configuration variables
 template <std::size_t TFramesPerStageG0,
           std::size_t TFramesPerStageG1,
           std::size_t TFramesPerStageG2,
@@ -70,7 +71,7 @@ struct DetectorConfig {
         TData data[DIMX * DIMY];
     };
 
-    // the struct for the initial pedestal data
+i    // the struct for the initial pedestal data
     struct InitPedestal {
         std::size_t count;
         double mean;
@@ -215,6 +216,7 @@ void debugPrint(const char* file, unsigned int line, TArgs... args)
 #define DEBUG(...)
 #endif
 
+// predefine detector configurations
 using JungfrauConfig =
     DetectorConfig<1000, 1000, 999, 1024, 512, 10, 100, 100, 3, 5>;
 using MoenchConfig = DetectorConfig<1000, 0, 0, 400, 400, 10, 300, 100, 3, 5>;

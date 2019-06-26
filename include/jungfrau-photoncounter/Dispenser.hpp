@@ -130,8 +130,11 @@ public:
                                        data.numFrames % TConfig::DEV_FRAMES);
         }
 
+        // masked values over a certain threshold if this feature is enabled
         if (stdDevThreshold != 0)
             maskStdDevOver(stdDevThreshold);
+
+        // distribute the generated mask map and the initially generated pedestal map from the current device to all others
         distributeMaskMaps();
         distributeInitialPedestalMaps();
     }
@@ -375,21 +378,9 @@ public:
         typename TConfig::template ClusterArray<TAlpaka>*
             clusters) -> std::tuple<size_t, std::future<bool>>
     {
+      // get the oldest finished device
         struct DeviceData<TConfig, TAlpaka>* dev =
             &Dispenser::devices[nextFree];
-
-
-        DEBUG(
-            "downloading from device", nextFree, "(nextFull is", nextFull, ")");
-        std::string s = "";
-        for (const auto& d : devices) {
-            s += (d.state == READY ? "READY" : "");
-            s += (d.state == FREE ? "FREE" : "");
-            s += (d.state == PROCESSING ? "PROCESSING" : "");
-            s += " ";
-        }
-        DEBUG("Current state: ", s);
-
 
         // to keep frames in order only download if the longest running device
         // has finished
@@ -471,15 +462,18 @@ public:
                        dev->queue, clusterView, dev->cluster, clustersToDownload);
         }
 
+        // free the device
         dev->state = FREE;
         nextFree = (nextFree + 1) % devices.size();
         ringbuffer.push(dev);
 
+        // create a future, that waits for the copying to be finished
         auto wait = [](decltype(dev) dev) {
             alpakaWait(dev->queue);
             return true;
         };
 
+        // return the number of downloaded frames and the future
         return std::make_tuple(dev->numMaps,
                                std::async(std::launch::async, wait, dev));
     }
@@ -582,15 +576,18 @@ private:
     auto calcPedestaldata(TDetectorData* data, std::size_t numMaps)
         -> std::size_t
     {
+      // get the next free device from the ringbuffer
         DeviceData<TConfig, TAlpaka>* dev;
         if (!ringbuffer.pop(dev))
             return 0;
 
         DEBUG("calculate pedestal data on device", dev->id);
 
+        // set the state to processing
         dev->state = PROCESSING;
         dev->numMaps = numMaps;
 
+        // upload the data to the device
         alpakaCopy(dev->queue,
                    dev->data,
                    alpakaViewPlainPtrHost<TAlpaka, TDetectorData>(
@@ -629,6 +626,7 @@ private:
             init = true;
         }
 
+        // execute the calibration kernel
         CalibrationKernel<TConfig> calibrationKernel{};
         auto const calibration(
             alpakaCreateKernel<TAlpaka>(getWorkDiv<TAlpaka>(),
@@ -726,14 +724,17 @@ private:
                   typename TConfig::ExecutionFlags flags)
         -> std::tuple<std::size_t, std::future<bool>>
     {
+      // get the next free device from the ringbuffer
         DeviceData<TConfig, TAlpaka>* dev;
         if (!ringbuffer.pop(dev))
             return std::make_tuple(
                 0, std::async(std::launch::async, []() { return true; }));
 
+        // set the state to processing
         dev->state = PROCESSING;
         dev->numMaps = numMaps;
 
+        // upload the data to the device
         alpakaCopy(
             dev->queue,
             dev->data,

@@ -11,11 +11,9 @@
  * see Alpakaconfig.hpp for all available
  */
 template <std::size_t MAPSIZE>
-using Accelerator = GpuCudaRt<MAPSIZE>;//CpuSerial<MAPSIZE>;//GpuCudaRt<MAPSIZE>;//GpuCudaRt<MAPSIZE>; // CpuSerial;
-using Config = MoenchConfig;
+using Accelerator = GpuCudaRt<MAPSIZE>;
+using Config = JungfrauConfig;
 using ConcreteAcc = Accelerator<Config::MAPSIZE>;
-
-//template<> constexpr std::size_t Config::PEDEMAPS;
 
 auto main(int argc, char* argv[]) -> int
 {
@@ -29,25 +27,24 @@ auto main(int argc, char* argv[]) -> int
     // load maps
     typename Config::FramePackage<typename Config::DetectorData, ConcreteAcc>
         pedestaldata(fc->loadMaps<typename Config::DetectorData, ConcreteAcc>(
-            //"../../data_pool/px_101016/allpede_250us_1243__B_000000.dat",
-            "../../../moench_data/"
-            "1000_frames_pede_e17050_1_00018_00000.dat",
+            "../../data_pool/px_101016/allpede_250us_1243__B_000000.dat",
+            //"../../../moench_data/"
+            //"1000_frames_pede_e17050_1_00018_00000.dat",
             true));
     DEBUG(pedestaldata.numFrames, "pedestaldata maps loaded");
 
     typename Config::FramePackage<typename Config::DetectorData, ConcreteAcc>
         data(fc->loadMaps<typename Config::DetectorData, ConcreteAcc>(
-            //"../../data_pool/px_101016/Insu_6_tr_1_45d_250us__B_000000.dat",
-            "../../../moench_data/"
-            "e17050_1_00018_00000_image.dat",
+            "../../data_pool/px_101016/Insu_6_tr_1_45d_250us__B_000000.dat",
+            //"../../../moench_data/"
+            //"e17050_1_00018_00000_image.dat",
             true));
     DEBUG(data.numFrames, "data maps loaded");
 
     typename Config::FramePackage<typename Config::GainMap, ConcreteAcc> gain(
         fc->loadMaps<typename Config::GainMap, ConcreteAcc>(
-            "../../../moench_data/moench_gain.bin"
-            //"../../data_pool/px_101016/gainMaps_M022.bin"
-            ));
+            //"../../../moench_data/moench_gain.bin"
+            "../../data_pool/px_101016/gainMaps_M022.bin"));
     DEBUG(gain.numFrames, "gain maps loaded");
 
     typename Config::FramePackage<typename Config::MaskMap, ConcreteAcc> mask(
@@ -60,6 +57,7 @@ auto main(int argc, char* argv[]) -> int
     if (mask.numFrames == Config::SINGLEMAP)
         maskPtr = mask.data;
 
+    // initialize the dispenser
     Dispenser<Config, Accelerator> dispenser(gain, maskPtr);
 
     // print info
@@ -91,19 +89,30 @@ auto main(int argc, char* argv[]) -> int
     boost::optional<
         typename Config::FramePackage<typename Config::SumMap, ConcreteAcc>&>
         sum = sum_data;
-    boost::optional<typename Config::ClusterArray<ConcreteAcc>&> clusters =
-        clusters_data;
+    typename Config::ClusterArray<ConcreteAcc>* clusters = &clusters_data;
 
     boost::optional<typename Config::FramePackage<typename Config::EnergyValue,
                                                   ConcreteAcc>&>
         maxValues = maxValues_data;
 
+    // create variables to track the progress
     std::size_t offset = 0;
     std::size_t downloaded = 0;
     std::size_t currently_downloaded_frames = 0;
 
-    PixelTracker<Config, ConcreteAcc> pt(argc, argv);
+    // create vectors to hold the number of downloaded / uploaded frames and a
+    // future The future is a variable, which is not "ready", when it is
+    // returned from a function. Internally, this contains a set of instructions
+    // to calculate the result. So if a future is accessed, the program waits
+    // until the variable is processed. We use the future to signalize that an
+    // upload or download operation is done. The internal value, which is then
+    // returned, doesn't hold any deeper meaning. Once a future goes out pf
+    // scope, it waits for its variable to be calculated. To delay this to the
+    // end of the program, we create a vector of futures and store them there.
+    std::vector<std::tuple<std::size_t, std::future<bool>>> uploadFutures;
+    std::vector<std::tuple<std::size_t, std::future<bool>>> downloadFutures;
 
+    // set execution flags
     typename Config::ExecutionFlags ef;
     ef.mode = 2;
     ef.summation = 1;
@@ -112,14 +121,19 @@ auto main(int argc, char* argv[]) -> int
 
     // process data maps
     while (downloaded < data.numFrames) {
-        offset = dispenser.uploadData(data, offset, ef);
-        if (currently_downloaded_frames = dispenser.downloadData(
-                energy, photon, sum, maxValues, clusters)) {
+      // save the upload future
+        uploadFutures.emplace_back(dispenser.uploadData(data, offset, ef));
 
-            auto ipdata = dispenser.downloadInitialPedestaldata();
-            auto pdata = dispenser.downloadPedestaldata();
-            pt.push_back(ipdata, pdata, data, offset - 1);
+        // get the number of frames that have been uploaded and add them to the offset
+        offset = std::get<0>(*uploadFutures.rbegin());
 
+        // save the download future
+        downloadFutures.emplace_back(
+            dispenser.downloadData(energy, photon, sum, maxValues, clusters));
+
+        // update the number of downloaded frames, if any frames where downloaded 
+        if (currently_downloaded_frames =
+                std::get<0>(*downloadFutures.rbegin())) {
             downloaded += currently_downloaded_frames;
             DEBUG(downloaded,
                   "/",
@@ -130,16 +144,15 @@ auto main(int argc, char* argv[]) -> int
         }
     }
 
+    // save clusters (currently only used for debugging)
     if (clusters) {
         saveClusters<Config, ConcreteAcc>("clusters.txt", *clusters);
         saveClustersBin<Config, ConcreteAcc>("clusters.bin", *clusters);
     }
 
-    pt.save();
-
+    // print out GPU memory usage
     auto sizes = dispenser.getMemSize();
     auto free_mem = dispenser.getFreeMem();
-
     for (std::size_t i = 0; i < sizes.size(); ++i)
         DEBUG("Device #",
               i,

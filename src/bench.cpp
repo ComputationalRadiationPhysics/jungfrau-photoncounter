@@ -258,7 +258,6 @@ auto bench(
     std::size_t currently_downloaded_frames = 0;
     std::vector<std::tuple<std::size_t, std::future<bool>>> uploadFutures;
     std::vector<std::tuple<std::size_t, std::future<bool>>> downloadFutures;
-
     
     typename Config::template ClusterArray<ConcreteAcc>*
       clusters = benchmarkingConfig.clusters;
@@ -304,15 +303,7 @@ auto bench(
                   benchmarkingConfig.data.numFrames,
                   "downloaded;",
                   offset,
-                  "uploaded");
-
-            
-        if (clusters) {
-
-
-
-          DEBUG("downloaded clusters 2:", alpakaNativePtr((*clusters).usedPinned)[0]);//(*(clusters)).used);
-        }
+                  "uploaded");x
         }
     }
 
