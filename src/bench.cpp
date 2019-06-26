@@ -261,11 +261,21 @@ auto bench(
     std::size_t offset = 0;
     std::size_t downloaded = 0;
     std::size_t currently_downloaded_frames = 0;
+    std::vector<std::tuple<std::size_t, std::future<bool>>> uploadFutures;
+    std::vector<std::tuple<std::size_t, std::future<bool>>> downloadFutures;
 
+    
+    boost::optional<typename Config::template ClusterArray<ConcreteAcc>>
+      clusters;
+
+    if (benchmarkingConfig.clusters)
+      clusters = *(benchmarkingConfig.clusters);
+    
     // process data maps
     while (downloaded < benchmarkingConfig.data.numFrames) {
-        offset = std::get<0>(dispenser.uploadData(
+        uploadFutures.emplace_back(dispenser.uploadData(
             benchmarkingConfig.data, offset, benchmarkingConfig.ef));
+        offset = std::get<0>(*uploadFutures.rbegin());
 
         auto energy([&]() -> boost::optional<EnergyPackageView> {
             if (benchmarkingConfig.energy)
@@ -291,14 +301,24 @@ auto bench(
                     downloaded, Config::DEV_FRAMES);
             return boost::none;
         }());
-        boost::optional<typename Config::template ClusterArray<ConcreteAcc>>
-            clusters;
 
-        if (benchmarkingConfig.clusters)
-            clusters = *(benchmarkingConfig.clusters);
 
-        if (currently_downloaded_frames = std::get<0>(dispenser.downloadData(
-                energy, photons, sum, maxValues, clusters))) {
+        
+        if (clusters) {
+
+
+
+            DEBUG("downloaded clusters:", (*(clusters)).used);
+        }
+
+
+
+
+        
+        downloadFutures.emplace_back(
+            dispenser.downloadData(energy, photons, sum, maxValues, clusters));
+        if (currently_downloaded_frames =
+                std::get<0>(*downloadFutures.rbegin())) {
             downloaded += currently_downloaded_frames;
             DEBUG(downloaded,
                   "/",
@@ -306,6 +326,14 @@ auto bench(
                   "downloaded;",
                   offset,
                   "uploaded");
+
+            
+        if (clusters) {
+
+
+
+          DEBUG("downloaded clusters 2:", alpakaNativePtr((*clusters).usedPinned)[0]);//(*(clusters)).used);
+        }
         }
     }
 
@@ -316,29 +344,43 @@ auto bench(
  * only change this line to change the backend
  * see Alpakaconfig.hpp for all available
  */
+
 template <std::size_t MAPSIZE>
-using Accelerator = CpuSerial<MAPSIZE>;//GpuCudaRt<MAPSIZE>; // CpuOmp2Blocks< // GpuCudaRt<
+using Accelerator = GpuCudaRt<MAPSIZE>; // CpuOmp2Blocks< // GpuCudaRt<
 // MAPSIZE>; // CpuSerial<MAPSIZE>;//GpuCudaRt<MAPSIZE>;//GpuCudaRt<MAPSIZE>;
 // // CpuSerial;
-using Config = JungfrauConfig; // MoenchConfig;
+
+#define MOENCH
+
+#ifdef MOENCH
+using Config = MoenchConfig;
+std::string pedestalPath =
+    "../../../../moench_data/1000_frames_pede_e17050_1_00018_00000.dat";
+std::string gainPath = "../../../../moench_data/moench_gain.bin";
+std::string dataPath = "../../../../moench_data/e17050_1_00018_00000_image.dat";
+#else
+using Config = JungfrauConfig;
+std::string pedestalPath =
+    "../../data_pool/px_101016/allpede_250us_1243__B_000000.dat";
+std::string gainPath = "../../data_pool/px_101016/gainMaps_M022.bin";
+std::string dataPath =
+    "../../data_pool/px_101016/Insu_6_tr_1_45d_250us__B_000000.dat";
+#endif
+
 using ConcreteAcc = Accelerator<Config::MAPSIZE>;
 
 auto main(int argc, char* argv[]) -> int
 {
-    typename Config::ExecutionFlags flags = {1, 0, 1, 0};
-    std::string pedestalPath =
-        //"../../../../moench_data/1000_frames_pede_e17050_1_00018_00000.dat";
-        "../../data_pool/px_101016/allpede_250us_1243__B_000000.dat";
-    std::string gainPath = //"../../../../moench_data/moench_gain.bin";
-        "../../data_pool/px_101016/gainMaps_M022.bin";
-    std::string
-        dataPath = //"../../../../moench_data/e17050_1_00018_00000_image.dat";
-        "../../data_pool/px_101016/Insu_6_tr_1_45d_250us__B_000000.dat";
+    typename Config::ExecutionFlags flags = {2, 0, 1, 0};
+    // std::string pedestalPath = Paths::pedestalPath;
+    // std::string gainPath = Paths::gainPath;
+    // std::string dataPath = Paths::dataPath;
 
     auto benchmarkingInput =
         SetUp<Config, ConcreteAcc>(flags, pedestalPath, gainPath, dataPath);
     auto dispenser = calibrate<Config, Accelerator>(benchmarkingInput);
     bench<Config, Accelerator>(dispenser, benchmarkingInput);
+
 
     // debugging:
     for (std::size_t i = 0; i < 5; ++i) {
@@ -350,12 +392,11 @@ auto main(int argc, char* argv[]) -> int
                                alpakaNativePtr(benchmarkingInput.energy->data),
                                i);
     }
-
-
     if (benchmarkingInput.clusters) {
         saveClusters<Config>("clusters.txt", *benchmarkingInput.clusters);
         saveClustersBin<Config>("clusters.bin", *benchmarkingInput.clusters);
     }
+
 
     auto sizes = dispenser.getMemSize();
     auto free_mem = dispenser.getFreeMem();

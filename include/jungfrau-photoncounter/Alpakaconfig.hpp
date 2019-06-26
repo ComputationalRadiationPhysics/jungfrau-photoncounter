@@ -27,7 +27,7 @@
 
 // Defines workdiv.
 using WorkDiv = alpaka::workdiv::WorkDivMembers<Dim, Size>;
-using CpuSyncQueue = alpaka::queue::QueueCpuSync;
+using CpuSyncQueue = alpaka::queue::QueueCpuBlocking;
 
 template <typename TAccelerator> WorkDiv getWorkDiv()
 {
@@ -97,7 +97,7 @@ template <typename THost, typename TAcc, typename TQueue> struct AccTraits {
 template <std::size_t MAPSIZE> struct CpuOmp2Blocks {
     using Host = alpaka::acc::AccCpuOmp2Blocks<Dim, Size>;
     using Acc = alpaka::acc::AccCpuOmp2Blocks<Dim, Size>;
-    using Queue = alpaka::queue::QueueCpuSync;
+    using Queue = alpaka::queue::QueueCpuBlocking;
     using DevHost = alpaka::dev::Dev<Host>;
     using DevAcc = alpaka::dev::Dev<Acc>;
     using PltfHost = alpaka::pltf::Pltf<DevHost>;
@@ -132,7 +132,7 @@ struct GetIterator<T, TBuf, alpaka::acc::AccCpuOmp2Blocks<TArgs...>> {
 template <std::size_t MAPSIZE> struct CpuOmp4 {
     using Host = alpaka::acc::AccCpuSerial<Dim, Size>;
     using Acc = alpaka::acc::AccCpuOmp4<Dim, Size>;
-    using Queue = alpaka::queue::QueueCpuSync;
+    using Queue = alpaka::queue::QueueCpuBlocking;
     using DevHost = alpaka::dev::Dev<Host>;
     using DevAcc = alpaka::dev::Dev<Acc>;
     using PltfHost = alpaka::pltf::Pltf<DevHost>;
@@ -166,7 +166,7 @@ struct GetIterator<T, TBuf, alpaka::acc::AccCpuOmp4<TArgs...>> {
 template <std::size_t MAPSIZE> struct CpuSerial {
     using Host = alpaka::acc::AccCpuSerial<Dim, Size>;
     using Acc = alpaka::acc::AccCpuSerial<Dim, Size>;
-    using Queue = alpaka::queue::QueueCpuSync;
+    using Queue = alpaka::queue::QueueCpuBlocking;
     using DevHost = alpaka::dev::Dev<Host>;
     using DevAcc = alpaka::dev::Dev<Acc>;
     using PltfHost = alpaka::pltf::Pltf<DevHost>;
@@ -199,7 +199,7 @@ struct GetIterator<T, TBuf, alpaka::acc::AccCpuSerial<TArgs...>> {
 template <std::size_t MAPSIZE> struct CpuThreads {
     using Host = alpaka::acc::AccCpuThreads<Dim, Size>;
     using Acc = alpaka::acc::AccCpuThreads<Dim, Size>;
-    using Queue = alpaka::queue::QueueCpuSync;
+    using Queue = alpaka::queue::QueueCpuBlocking;
     using DevHost = alpaka::dev::Dev<Host>;
     using DevAcc = alpaka::dev::Dev<Acc>;
     using PltfHost = alpaka::pltf::Pltf<DevHost>;
@@ -233,7 +233,7 @@ struct GetIterator<T, TBuf, alpaka::acc::AccCpuThreads<TArgs...>> {
 template <std::size_t MAPSIZE> struct GpuCudaRt {
     using Host = alpaka::acc::AccCpuSerial<Dim, Size>;
     using Acc = alpaka::acc::AccGpuCudaRt<Dim, Size>;
-    using Queue = alpaka::queue::QueueCudaRtAsync;
+    using Queue = alpaka::queue::QueueCudaRtNonBlocking;
     using DevHost = alpaka::dev::Dev<Host>;
     using DevAcc = alpaka::dev::Dev<Acc>;
     using PltfHost = alpaka::pltf::Pltf<DevHost>;

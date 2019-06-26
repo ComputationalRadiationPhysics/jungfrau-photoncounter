@@ -320,7 +320,8 @@ public:
                                                 TAlpaka> data,
         std::size_t offset,
         typename TConfig::ExecutionFlags flags,
-        bool flushWhenFinished = true) -> std::size_t
+        bool flushWhenFinished = true)
+        -> std::tuple<std::size_t, std::future<bool>>
     {
         if (!ringbuffer.isEmpty()) {
             // try uploading one data package
@@ -331,7 +332,8 @@ public:
                 offset += std::get<0>(result);
                 DEBUG(offset, "/", data.numFrames, "frames uploaded");
 
-                return std::make_tuple(offset, std::get<1>(result));
+                return std::make_tuple(std::move(offset),
+                                       std::move(std::get<1>(result)));
             }
             // upload remaining frames
             else if (offset != data.numFrames) {
@@ -340,7 +342,8 @@ public:
                                        flags);
                 DEBUG(offset, "/", data.numFrames, "frames uploaded");
                 offset += std::get<0>(result);
-                return std::make_tuple(offset, std::get<1>(result));
+                return std::make_tuple(std::move(offset),
+                                       std::move(std::get<1>(result)));
             }
             // force wait for one device to finish since there's no new data and
             // the user wants the data flushed
@@ -351,7 +354,8 @@ public:
             }
         }
 
-        return std::make_tuple(offset, std::async([]() { return true; }));
+        return std::make_tuple(
+            offset, std::async(std::launch::async, []() { return true; }));
     }
 
     /**
@@ -390,7 +394,8 @@ public:
         // to keep frames in order only download if the longest running device
         // has finished
         if (dev->state != READY)
-            return std::make_tuple(0, std::async([]() { return true; }));
+            return std::make_tuple(
+                0, std::async(std::launch::async, []() { return true; }));
 
         // download energy if needed
         if (energy) {
@@ -428,6 +433,7 @@ public:
 
         // download number of clusters if needed
         if (clusters) {
+            // download number of found clusters
             DEBUG("downloading clusters");
             alpakaCopy(dev->queue,
                        (*clusters).usedPinned,
@@ -440,12 +446,18 @@ public:
             // reserve space in the cluster array for the new data and save the
             // number of clusters to download temporarily
             auto oldNumClusters = (*clusters).used;
+
+
+            DEBUG("total current clusters:", oldNumClusters);
+
+
             auto clustersToDownload =
                 alpakaNativePtr((*clusters).usedPinned)[0];
             alpakaNativePtr((*clusters).usedPinned)[0] += oldNumClusters;
             (*clusters).used = alpakaNativePtr((*clusters).usedPinned)[0];
 
-            DEBUG("clustersToDownload:", clustersToDownload);
+            DEBUG("Downloading", clustersToDownload, "clusters. ");
+            DEBUG("Total downloaded clusters:", (*clusters).used);
 
             // create a subview in the cluster buffer where the new data shuld
             // be downloaded to
@@ -468,7 +480,8 @@ public:
             return true;
         };
 
-        return std::make_tuple(dev->numMaps, std::async(wait, dev));
+        return std::make_tuple(dev->numMaps,
+                               std::async(std::launch::async, wait, dev));
     }
 
     /**
@@ -711,11 +724,12 @@ private:
     auto calcData(TDetectorData* data,
                   std::size_t numMaps,
                   typename TConfig::ExecutionFlags flags)
-    //-> std::tuple<std::size_t, std::async<bool>>
+        -> std::tuple<std::size_t, std::future<bool>>
     {
         DeviceData<TConfig, TAlpaka>* dev;
         if (!ringbuffer.pop(dev))
-            return std::make_tuple(0, std::async([]() { return true; }));
+            return std::make_tuple(
+                0, std::async(std::launch::async, []() { return true; }));
 
         dev->state = PROCESSING;
         dev->numMaps = numMaps;
@@ -739,12 +753,6 @@ private:
                    decltype(TConfig::PEDEMAPS)(TConfig::PEDEMAPS));
 
         nextFull = (nextFull + 1) % devices.size();
-
-        // reset the number of clusters
-        alpakaMemSet(dev->queue,
-                     dev->numClusters,
-                     0,
-                     decltype(TConfig::SINGLEMAP)(TConfig::SINGLEMAP));
 
         typename TConfig::MaskMap* local_mask =
             flags.masking ? alpakaNativePtr(dev->mask) : nullptr;
@@ -793,6 +801,12 @@ private:
         else {
             // clustering (and conversion to energy)
             DEBUG("enqueueing clustering kernel");
+
+            // reset the number of clusters
+            alpakaMemSet(dev->queue,
+                         dev->numClusters,
+                         0,
+                         decltype(TConfig::SINGLEMAP)(TConfig::SINGLEMAP));
 
             for (uint32_t i = 0; i < numMaps + 1; ++i) {
                 // execute the clusterfinder with the pedestalupdate on every
@@ -893,6 +907,7 @@ private:
             return true;
         };
 
-        return std::make_tuple(numMaps, std::async(wait, dev));
+        return std::make_tuple(numMaps,
+                               std::async(std::launch::async, wait, dev));
     }
 };
