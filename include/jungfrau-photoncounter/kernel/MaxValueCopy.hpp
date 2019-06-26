@@ -1,7 +1,7 @@
 #pragma once
-
 #include <alpaka/alpaka.hpp>
 
+template<typename Config>
 struct MaxValueCopyKernel {
     ALPAKA_NO_HOST_ACC_WARNING
 
@@ -11,16 +11,12 @@ struct MaxValueCopyKernel {
                                   TEnergyValue* destination,
                                   TNumFrames const& numFrames) const -> void
     {
-        auto const globalThreadIdx =
-            alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc);
-        auto const globalThreadExtent =
-            alpaka::workdiv::getWorkDiv<alpaka::Grid, alpaka::Threads>(acc);
-
-        auto const linearizedGlobalThreadIdx =
-            alpaka::idx::mapIdx<1u>(globalThreadIdx, globalThreadExtent);
-
-        auto id = linearizedGlobalThreadIdx[0u];
-
+        auto id = getLinearIdx(acc);
+        
+        // check range
+        if (id >= Config::MAPSIZE)
+            return;
+        
         if(id < numFrames) {
           destination[id] = source[id].data[0];
         }

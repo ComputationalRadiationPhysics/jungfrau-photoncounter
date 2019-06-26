@@ -2,6 +2,20 @@
 #include "../Config.hpp"
 #include <alpaka/alpaka.hpp>
 
+template <typename TAcc>
+ALPAKA_FN_ACC ALPAKA_FN_INLINE auto getLinearIdx(const TAcc& acc)
+    -> std::uint64_t
+{
+    auto const globalThreadIdx = alpakaGetGlobalThreadIdx(acc);
+    auto const globalThreadExtent = alpakaGetGlobalThreadExtent(acc);
+
+    auto const linearizedGlobalThreadIdx =
+        alpakaGetGlobalLinearizedGlobalThreadIdx(globalThreadIdx,
+                                                 globalThreadExtent);
+
+    return linearizedGlobalThreadIdx[0u];
+}
+
 template <typename TDataword>
 ALPAKA_FN_ACC ALPAKA_FN_INLINE auto getAdc(TDataword dataword) -> uint16_t
 {
@@ -25,60 +39,66 @@ ALPAKA_FN_ACC ALPAKA_FN_INLINE auto copyFrameHeader(TInputMap const& src,
     dst.header = src.header;
 }
 
-template <typename TAcc, typename TAdcValue, typename TPedestal>
+template <typename TAcc,
+          typename TAdcValue,
+          typename TInitPedestal,
+          typename TCountValue>
 ALPAKA_FN_ACC ALPAKA_FN_INLINE auto initPedestal(const TAcc& acc,
-                                                   TAdcValue const adc,
-                                                   TPedestal& pedestal) -> void
+                                                 TAdcValue const adc,
+                                                 TInitPedestal& initPedestal,
+                                                 TCountValue windowSize) -> void
 {
     // online algorithm for variance by Welford
-    auto& count = pedestal.count;
-    auto& mean = pedestal.mean;
-    auto& oldM = pedestal.oldM;
-    auto& oldS = pedestal.oldS;
-    auto& newS = pedestal.newS;
-    auto& variance = pedestal.variance; // sample variance
-    auto& stddev = pedestal.stddev;
+    auto& count = initPedestal.count;
+    auto& mean = initPedestal.mean;
+    auto& m = initPedestal.m;
+    auto& m2 = initPedestal.m2;
+    auto& stddev = initPedestal.stddev;
 
     ++count;
+    // init
     if (count == 1) {
-        mean = oldM = adc;
-        oldS = 0;
-        variance = 0;
-        stddev = 0;
+        m = adc;
+        m2 = adc * adc;
     }
+    // add
+    else if (count <= windowSize) {
+        m += adc;
+        m2 += adc;
+    }
+    // push
     else {
-        mean = oldM + (adc - oldM) / count;
-        newS = oldS + (adc - oldM) * (adc - mean);
-        oldM = mean;
-        oldS = newS;
-        variance = newS / (count - 1);
-        stddev = alpaka::math::sqrt(acc, variance);
+        m += adc - m / windowSize;
+        m2 += adc * adc - m2 / windowSize;
     }
+
+    // calculate mean and stddev
+    double currentWindowSize = (count > windowSize ? windowSize : count);
+    mean = m / currentWindowSize;
+    stddev = alpakaSqrt(acc, m2 / currentWindowSize - mean * mean);
 }
 
-template <typename TAcc, typename TAdcValue, typename TPedestal>
-ALPAKA_FN_ACC ALPAKA_FN_INLINE auto updatePedestal(const TAcc& acc,
-                                                   TAdcValue const adc,
+template <typename TAdcValue, typename TCountValue, typename TPedestal>
+ALPAKA_FN_ACC ALPAKA_FN_INLINE auto updatePedestal(TAdcValue const adc,
+                                                   TCountValue const count,
                                                    TPedestal& pedestal) -> void
 {
-    auto& count = pedestal.count;
-    auto& mean = pedestal.mean;
-    auto& oldM = pedestal.oldM;
-
-    ++count;
-    mean = oldM + (adc - oldM) / count;
+    pedestal += (adc - pedestal) / count;
 }
 
-template <typename TThreadIndex>
+template <typename TConfig, typename TThreadIndex>
 ALPAKA_FN_ACC ALPAKA_FN_INLINE auto
 indexQualifiesAsClusterCenter(TThreadIndex id) -> bool
 {
-    constexpr auto n = CLUSTER_SIZE;
-    return (id % DIMX >= n / 2 && id % DIMX <= DIMX - (n + 1) / 2 &&
-            id / DIMX >= n / 2 && id / DIMX <= DIMY - (n + 1) / 2);
+    // To future self: We checked this multiple times. This should be correct.
+    constexpr auto n = TConfig::CLUSTER_SIZE;
+    return (id % TConfig::DIMX >= n / 2 &&
+            id % TConfig::DIMX <= TConfig::DIMX - (n + 1) / 2 &&
+            id / TConfig::DIMX >= n / 2 &&
+            id / TConfig::DIMX <= TConfig::DIMY - (n + 1) / 2);
 }
 
-template <typename TMap, typename TThreadIndex, typename TSum>
+template <typename TConfig, typename TMap, typename TThreadIndex, typename TSum>
 ALPAKA_FN_ACC ALPAKA_FN_INLINE auto findClusterSumAndMax(TMap const& map,
                                                          TThreadIndex const id,
                                                          TSum& sum,
@@ -87,10 +107,10 @@ ALPAKA_FN_ACC ALPAKA_FN_INLINE auto findClusterSumAndMax(TMap const& map,
 {
     TThreadIndex it = 0;
     max = 0;
-    constexpr auto n = CLUSTER_SIZE;
+    constexpr int n = TConfig::CLUSTER_SIZE;
     for (int y = -n / 2; y < (n + 1) / 2; ++y) {
         for (int x = -n / 2; x < (n + 1) / 2; ++x) {
-            it = id + y * DIMX + x;
+            it = id + y * TConfig::DIMX + x;
             if (map[max] < map[it])
                 max = it;
             sum += map[it];
@@ -105,24 +125,26 @@ getClusterBuffer(TAcc const& acc,
                  TNumClusters* const numClusters) -> TClusterArray&
 {
     // get next free index of buffer atomically
-    auto i =
-    alpaka::atomic::atomicOp<alpaka::atomic::op::Add>(acc, numClusters, static_cast<TNumClusters>(1));
+    auto i = alpakaAtomicAdd(acc, numClusters, static_cast<TNumClusters>(1));
     return clusterArray[i];
 }
 
-template <typename TMap, typename TThreadIndex, typename TCluster>
+template <typename TConfig,
+          typename TMap,
+          typename TThreadIndex,
+          typename TCluster>
 ALPAKA_FN_ACC ALPAKA_FN_INLINE auto
 copyCluster(TMap const& map, TThreadIndex const id, TCluster& cluster) -> void
 {
-    constexpr auto n = CLUSTER_SIZE;
+    constexpr int n = TConfig::CLUSTER_SIZE;
     TThreadIndex it;
     TThreadIndex i = 0;
-    cluster.x = id % DIMX;
-    cluster.y = id / DIMX;
+    cluster.x = id % TConfig::DIMX;
+    cluster.y = id / TConfig::DIMX;
     cluster.frameNumber = map.header.frameNumber;
     for (int y = -n / 2; y < (n + 1) / 2; ++y) {
         for (int x = -n / 2; x < (n + 1) / 2; ++x) {
-            it = id + y * DIMX + x;
+            it = id + y * TConfig::DIMX + x;
             auto tmp = map.data[it];
             cluster.data[i++] = tmp;
         }
@@ -133,6 +155,7 @@ template <typename TAcc,
           typename TDetectorData,
           typename TGainMap,
           typename TPedestalMap,
+          typename TInitPedestalMap,
           typename TGainStageMap,
           typename TEnergyMap,
           typename TMaskMap,
@@ -142,13 +165,15 @@ processInput(TAcc const& acc,
              TDetectorData const& detectorData,
              TGainMap const* const gainMaps,
              TPedestalMap* const pedestalMaps,
+             TInitPedestalMap* const initPedestalMaps,
              TGainStageMap& gainStageMap,
              TEnergyMap& energyMap,
              TMaskMap* const mask,
-             TIndex const id) -> void
+             TIndex const id,
+             bool pedestalFallback) -> void
 {
     // use masks to check whether the channel is valid or masked out
-  bool isValid = !mask ? 1 : mask->data[id];
+    bool isValid = !mask ? 1 : mask->data[id];
 
     auto dataword = detectorData.data[id];
     auto adc = getAdc(dataword);
@@ -162,7 +187,9 @@ processInput(TAcc const& acc,
         copyFrameHeader(detectorData, gainStageMap);
     }
 
-    const auto& pedestal = pedestalMaps[gainStage][id].mean;
+    const auto& pedestal =
+        (pedestalFallback ? initPedestalMaps[gainStage][id].mean
+                          : pedestalMaps[gainStage][id]);
     const auto& gain = gainMaps[gainStage][id];
 
     // calculate energy of current channel

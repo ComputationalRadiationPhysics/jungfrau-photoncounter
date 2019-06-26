@@ -1,11 +1,12 @@
 #pragma once
-#include "../Config.hpp"
 #include "helpers.hpp"
 
+template<typename Config>
 struct ClusterFinderKernel {
     template <typename TAcc,
               typename TDetectorData,
               typename TGainMap,
+              typename TInitPedestalMap,
               typename TPedestalMap,
               typename TGainStageMap,
               typename TEnergyMap,
@@ -18,6 +19,7 @@ struct ClusterFinderKernel {
     ALPAKA_FN_ACC auto operator()(TAcc const& acc,
                                   TDetectorData const* const detectorData,
                                   TGainMap const* const gainMaps,
+                                  TInitPedestalMap* const initPedestalMaps,
                                   TPedestalMap* const pedestalMaps,
                                   TGainStageMap* const gainStageMaps,
                                   TEnergyMap* const energyMaps,
@@ -26,29 +28,26 @@ struct ClusterFinderKernel {
                                   TMask* const mask,
                                   TNumFrames const numFrames,
                                   TCurrentFrame const currentFrame,
-                                  TNumStdDevs const c = 5) const -> void
+                                  bool pedestalFallback,
+                                  TNumStdDevs const c = Config::C) const -> void
     {
-        auto const globalThreadIdx =
-            alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc);
-        auto const globalThreadExtent =
-            alpaka::workdiv::getWorkDiv<alpaka::Grid, alpaka::Threads>(acc);
+        auto id = getLinearIdx(acc);
 
-        auto const linearizedGlobalThreadIdx =
-            alpaka::idx::mapIdx<1u>(globalThreadIdx, globalThreadExtent);
+        // check range
+        if (id >= Config::MAPSIZE)
+            return;
 
-        auto id = linearizedGlobalThreadIdx[0u];
+        constexpr auto n = Config::CLUSTER_SIZE;
 
-        constexpr auto n = CLUSTER_SIZE;
-        
-        if (currentFrame) {                
+        if (currentFrame) {
             auto adc = getAdc(detectorData[currentFrame - 1].data[id]);
             const auto& gainStage = gainStageMaps[currentFrame - 1].data[id];
             float sum;
             decltype(id) max;
             const auto& energy = energyMaps[currentFrame - 1].data[id];
-            const auto& stddev = pedestalMaps[gainStage][id].stddev;
-            if (indexQualifiesAsClusterCenter(id)) {                
-                findClusterSumAndMax(
+            const auto& stddev = initPedestalMaps[gainStage][id].stddev;
+            if (indexQualifiesAsClusterCenter<Config>(id)) {
+              findClusterSumAndMax<Config>(
                     energyMaps[currentFrame - 1].data, id, sum, max);
 
                 // check cluster conditions
@@ -56,12 +55,15 @@ struct ClusterFinderKernel {
                     id == max) {
                     auto& cluster =
                         getClusterBuffer(acc, clusterArray, numClusters);
-                    copyCluster(energyMaps[currentFrame - 1], id, cluster);
+                    copyCluster<Config>(energyMaps[currentFrame - 1], id, cluster);
                 }
 
                 // check dark pixel condition
-                else if (-c * stddev <= energy && c * stddev >= energy) {
-                    updatePedestal(acc, adc, pedestalMaps[gainStage][id]);
+                else if (-c * stddev <= energy && c * stddev >= energy &&
+                         !pedestalFallback) {
+                    updatePedestal(adc,
+                                   Config::MOVING_STAT_WINDOW_SIZE,
+                                   pedestalMaps[gainStage][id]);
                 }
             }
         }
@@ -71,9 +73,11 @@ struct ClusterFinderKernel {
                          detectorData[currentFrame],
                          gainMaps,
                          pedestalMaps,
+                         initPedestalMaps,
                          gainStageMaps[currentFrame],
                          energyMaps[currentFrame],
                          mask,
-                         id);
+                         id,
+                         pedestalFallback);
     }
 };

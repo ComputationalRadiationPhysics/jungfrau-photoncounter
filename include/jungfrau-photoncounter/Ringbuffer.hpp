@@ -1,8 +1,7 @@
 #pragma once
 
 #include <cstring>
-#include <memory>
-#include <mutex>
+#include <vector>
 
 
 template <class T> class Ringbuffer {
@@ -12,43 +11,29 @@ public:
      * @param number of elements
      **/
     explicit Ringbuffer(std::size_t maxElements)
-        : data(new T[maxElements]), size(maxElements), head(0), tail(0), full(false)
+        : data(maxElements), size(maxElements), head(0), tail(0), full(false)
     {
     }
 
     /**
      * Copy constructor
      **/
-    Ringbuffer(const Ringbuffer& other)
-        : size(other.size),
-          full(other.full),
-          data(new T[size]),
-          head(other.head),
-          tail(other.tail)
-    {
-        memcpy(other.data, data, size * sizeof(T));
-    }
+  Ringbuffer(const Ringbuffer& other) = delete;//default;
+
+    /**
+     * Move constructor
+     **/
+    Ringbuffer(Ringbuffer&& other) = default;
 
     /**
      * Assignment operator
      **/
-    Ringbuffer& operator=(const Ringbuffer& other)
-	{
-		if(&other == this)
-			return *this;
-		size = other.size;
-		full = other.full;
-		head = other.head;
-		tail = other.tail;
+    Ringbuffer& operator=(const Ringbuffer& other) = delete;//default;
 
-		// delete old data and allocate space for the new data 
-		delete(data);
-		data = new T[other.size];
-		
-		memcpy(other.data, data, size * sizeof(T));
-
-        return *this;
-	}
+    /**
+     * Move assignment
+     **/
+    Ringbuffer& operator=(Ringbuffer&& other) = default;
 
     /**
      * Returns max number of elements
@@ -81,7 +66,6 @@ public:
      **/
     auto push(T element) -> bool
     {
-        std::lock_guard<std::mutex> lock(mutex);
         if (full)
             return false;
         data[tail] = element;
@@ -98,7 +82,6 @@ public:
      **/
     auto pop(T& element) -> bool
     {
-        std::lock_guard<std::mutex> lock(mutex);
         if (head == tail && !full)
             return false;
         full = false;
@@ -108,10 +91,9 @@ public:
     }
 
 private:
-    std::unique_ptr<T[]> data;
+    std::vector<T> data;
     std::size_t size;
     std::size_t head;
     std::size_t tail;
-    std::mutex mutex;
     bool full;
 };

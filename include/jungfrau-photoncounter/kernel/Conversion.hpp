@@ -1,44 +1,61 @@
 #pragma once
-#include "../Config.hpp"
 #include "helpers.hpp"
 
+template<typename Config>
 struct ConversionKernel {
     template <typename TAcc,
               typename TDetectorData,
               typename TGainMap,
+              typename TInitPedestalMap,
               typename TPedestalMap,
               typename TGainStageMap,
               typename TEnergyMap,
               typename TNumFrames,
-              typename TMask>
+              typename TMask,
+              typename TNumStdDevs = int>
     ALPAKA_FN_ACC auto operator()(TAcc const& acc,
                                   TDetectorData const* const detectorData,
                                   TGainMap const* const gainMaps,
+                                  TInitPedestalMap* const initPedestalMaps,
                                   TPedestalMap* const pedestalMaps,
                                   TGainStageMap* const gainStageMaps,
                                   TEnergyMap* const energyMaps,
                                   TNumFrames const numFrames,
-                                  TMask const* const mask) const -> void
+                                  TMask const* const mask,
+                                  bool pedestalFallback,
+                                  TNumStdDevs const c = Config::C) const -> void
     {
-        auto const globalThreadIdx =
-            alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc);
-        auto const globalThreadExtent =
-            alpaka::workdiv::getWorkDiv<alpaka::Grid, alpaka::Threads>(acc);
+        auto id = getLinearIdx(acc);
 
-        auto const linearizedGlobalThreadIdx =
-            alpaka::idx::mapIdx<1u>(globalThreadIdx, globalThreadExtent);
-
-        auto id = linearizedGlobalThreadIdx[0u];
+        // check range
+        if (id >= Config::MAPSIZE)
+            return;
 
         for (TNumFrames i = 0; i < numFrames; ++i) {
-            processInput(acc, 
-                         detectorData[i], 
-                         gainMaps, 
-                         pedestalMaps, 
+            processInput(acc,
+                         detectorData[i],
+                         gainMaps,
+                         pedestalMaps,
+                         initPedestalMaps,
                          gainStageMaps[i],
                          energyMaps[i],
                          mask,
-                         id);            
+                         id,
+                         pedestalFallback);
+
+            // read data from generated maps
+            auto dataword = detectorData[i].data[id];
+            auto adc = getAdc(dataword);
+            const auto& gainStage = gainStageMaps[i].data[id];
+            const auto& pedestal = pedestalMaps[gainStage][id];
+            const auto& stddev = initPedestalMaps[gainStage][id].stddev;
+
+            // check "dark pixel" condition
+            if (pedestal - c * stddev <= adc && pedestal + c * stddev >= adc &&
+                !pedestalFallback) {
+                updatePedestal(
+                    adc, Config::MOVING_STAT_WINDOW_SIZE, pedestalMaps[gainStage][id]);
+            }
         }
     }
 };

@@ -16,7 +16,7 @@ print(fileNames)
 for f in fileNames:
     try:
         print(f)
-        data = np.loadtxt(f).reshape((512, 1024))
+        data = np.loadtxt(f)
         (name, _) = os.path.splitext(f)
 
         try:
