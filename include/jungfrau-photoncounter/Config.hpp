@@ -71,7 +71,7 @@ struct DetectorConfig {
         TData data[DIMX * DIMY];
     };
 
-i    // the struct for the initial pedestal data
+    // the struct for the initial pedestal data
     struct InitPedestal {
         std::size_t count;
         double mean;

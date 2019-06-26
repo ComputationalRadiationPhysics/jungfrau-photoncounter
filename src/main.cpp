@@ -27,7 +27,7 @@ auto main(int argc, char* argv[]) -> int
     // load maps
     typename Config::FramePackage<typename Config::DetectorData, ConcreteAcc>
         pedestaldata(fc->loadMaps<typename Config::DetectorData, ConcreteAcc>(
-            "../../data_pool/px_101016/allpede_250us_1243__B_000000.dat",
+            "../../../data_pool/px_101016/allpede_250us_1243__B_000000.dat",
             //"../../../moench_data/"
             //"1000_frames_pede_e17050_1_00018_00000.dat",
             true));
@@ -35,7 +35,7 @@ auto main(int argc, char* argv[]) -> int
 
     typename Config::FramePackage<typename Config::DetectorData, ConcreteAcc>
         data(fc->loadMaps<typename Config::DetectorData, ConcreteAcc>(
-            "../../data_pool/px_101016/Insu_6_tr_1_45d_250us__B_000000.dat",
+            "../../../data_pool/px_101016/Insu_6_tr_1_45d_250us__B_000000.dat",
             //"../../../moench_data/"
             //"e17050_1_00018_00000_image.dat",
             true));
@@ -44,7 +44,7 @@ auto main(int argc, char* argv[]) -> int
     typename Config::FramePackage<typename Config::GainMap, ConcreteAcc> gain(
         fc->loadMaps<typename Config::GainMap, ConcreteAcc>(
             //"../../../moench_data/moench_gain.bin"
-            "../../data_pool/px_101016/gainMaps_M022.bin"));
+            "../../../data_pool/px_101016/gainMaps_M022.bin"));
     DEBUG(gain.numFrames, "gain maps loaded");
 
     typename Config::FramePackage<typename Config::MaskMap, ConcreteAcc> mask(
@@ -114,10 +114,10 @@ auto main(int argc, char* argv[]) -> int
 
     // set execution flags
     typename Config::ExecutionFlags ef;
-    ef.mode = 2;
-    ef.summation = 1;
+    ef.mode = 1;
+    ef.summation = 0;
     ef.masking = 1;
-    ef.maxValue = 1;
+    ef.maxValue = 0;
 
     // process data maps
     while (downloaded < data.numFrames) {
