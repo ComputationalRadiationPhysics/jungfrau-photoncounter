@@ -40,7 +40,7 @@ template <typename Config, typename TAccelerator> struct BenchmarkingInput {
         typename Config::template FramePackage<typename Config::SumMap,
                                                TAccelerator>>
         sum;
-    boost::optional<typename Config::template ClusterArray<TAccelerator>>
+    typename Config::template ClusterArray<TAccelerator>*
         clusters;
     boost::optional<
         typename Config::template FramePackage<typename Config::EnergyValue,
@@ -67,7 +67,7 @@ template <typename Config, typename TAccelerator> struct BenchmarkingInput {
         boost::optional<
             typename Config::template FramePackage<typename Config::SumMap,
                                                    TAccelerator>> sum,
-        boost::optional<typename Config::template ClusterArray<TAccelerator>>
+        typename Config::template ClusterArray<TAccelerator>*
             clusters,
         boost::optional<
             typename Config::template FramePackage<typename Config::EnergyValue,
@@ -85,9 +85,6 @@ template <typename Config, typename TAccelerator> struct BenchmarkingInput {
           ef(ef)
     {
     }
-
-    BenchmarkingInput(BenchmarkingInput<Config, TAccelerator>&& other) =
-        default;
 };
 
 // prepare and load data for the benchmark
@@ -164,8 +161,6 @@ auto SetUp(typename Config::ExecutionFlags flags,
         photon_data(data.numFrames);
     typename Config::template FramePackage<typename Config::SumMap, ConcreteAcc>
         sum_data(data.numFrames);
-    typename Config::template ClusterArray<ConcreteAcc> clusters_data(
-        maxClusterCount);
     typename Config::template FramePackage<typename Config::EnergyValue,
                                            ConcreteAcc>
         maxValues_data(data.numFrames);
@@ -183,8 +178,8 @@ auto SetUp(typename Config::ExecutionFlags flags,
         typename Config::template FramePackage<typename Config::SumMap,
                                                ConcreteAcc>>
         sum;
-    boost::optional<typename Config::template ClusterArray<ConcreteAcc>>
-        clusters;
+    typename Config::template ClusterArray<ConcreteAcc>*
+        clusters = nullptr;
     boost::optional<
         typename Config::template FramePackage<typename Config::EnergyValue,
                                                ConcreteAcc>>
@@ -198,11 +193,11 @@ auto SetUp(typename Config::ExecutionFlags flags,
         photon = photon_data;
     }
     else if (flags.mode == 2) {
-        clusters = clusters_data;
+      clusters = new typename Config::template ClusterArray<ConcreteAcc>(maxClusterCount * Config::DEV_FRAMES);
     }
     else {
         energy = energy_data;
-        clusters = clusters_data;
+        clusters = new typename Config::template ClusterArray<ConcreteAcc>(maxClusterCount * Config::DEV_FRAMES);
     }
 
     if (flags.summation)
@@ -265,12 +260,9 @@ auto bench(
     std::vector<std::tuple<std::size_t, std::future<bool>>> downloadFutures;
 
     
-    boost::optional<typename Config::template ClusterArray<ConcreteAcc>>
-      clusters;
+    typename Config::template ClusterArray<ConcreteAcc>*
+      clusters = benchmarkingConfig.clusters;
 
-    if (benchmarkingConfig.clusters)
-      clusters = *(benchmarkingConfig.clusters);
-    
     // process data maps
     while (downloaded < benchmarkingConfig.data.numFrames) {
         uploadFutures.emplace_back(dispenser.uploadData(
@@ -302,19 +294,6 @@ auto bench(
             return boost::none;
         }());
 
-
-        
-        if (clusters) {
-
-
-
-            DEBUG("downloaded clusters:", (*(clusters)).used);
-        }
-
-
-
-
-        
         downloadFutures.emplace_back(
             dispenser.downloadData(energy, photons, sum, maxValues, clusters));
         if (currently_downloaded_frames =
@@ -350,7 +329,7 @@ using Accelerator = GpuCudaRt<MAPSIZE>; // CpuOmp2Blocks< // GpuCudaRt<
 // MAPSIZE>; // CpuSerial<MAPSIZE>;//GpuCudaRt<MAPSIZE>;//GpuCudaRt<MAPSIZE>;
 // // CpuSerial;
 
-#define MOENCH
+//#define MOENCH
 
 #ifdef MOENCH
 using Config = MoenchConfig;
@@ -371,10 +350,7 @@ using ConcreteAcc = Accelerator<Config::MAPSIZE>;
 
 auto main(int argc, char* argv[]) -> int
 {
-    typename Config::ExecutionFlags flags = {2, 0, 1, 0};
-    // std::string pedestalPath = Paths::pedestalPath;
-    // std::string gainPath = Paths::gainPath;
-    // std::string dataPath = Paths::dataPath;
+    typename Config::ExecutionFlags flags = {1, 1, 1, 0};
 
     auto benchmarkingInput =
         SetUp<Config, ConcreteAcc>(flags, pedestalPath, gainPath, dataPath);
@@ -391,6 +367,16 @@ auto main(int argc, char* argv[]) -> int
             save_image<Config>("f" + std::to_string(i) + "_o",
                                alpakaNativePtr(benchmarkingInput.energy->data),
                                i);
+        if (benchmarkingInput.photons)
+            save_image<Config>("ph" + std::to_string(i) + "_o",
+                               alpakaNativePtr(benchmarkingInput.photons->data),
+                               i);
+        if (benchmarkingInput.sum)
+            save_image<Config>("su" + std::to_string(i) + "_o",
+                               alpakaNativePtr(benchmarkingInput.sum->data),
+                               i);
+        if (benchmarkingInput.maxValues)
+          std::cerr << alpakaNativePtr(benchmarkingInput.maxValues->data)[i];
     }
     if (benchmarkingInput.clusters) {
         saveClusters<Config>("clusters.txt", *benchmarkingInput.clusters);

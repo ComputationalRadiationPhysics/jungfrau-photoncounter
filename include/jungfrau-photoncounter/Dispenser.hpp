@@ -372,7 +372,7 @@ public:
         boost::optional<TFramePackagePhotonMap> photon,
         boost::optional<TFramePackageSumMap> sum,
         boost::optional<TFramePackageEnergyValue> maxValues,
-        boost::optional<typename TConfig::template ClusterArray<TAlpaka>>
+        typename TConfig::template ClusterArray<TAlpaka>*
             clusters) -> std::tuple<size_t, std::future<bool>>
     {
         struct DeviceData<TConfig, TAlpaka>* dev =
@@ -456,19 +456,19 @@ public:
             alpakaNativePtr((*clusters).usedPinned)[0] += oldNumClusters;
             (*clusters).used = alpakaNativePtr((*clusters).usedPinned)[0];
 
-            DEBUG("Downloading", clustersToDownload, "clusters. ");
+            DEBUG("Downloading ", clustersToDownload, "clusters. ");
             DEBUG("Total downloaded clusters:", (*clusters).used);
-
+            
             // create a subview in the cluster buffer where the new data shuld
             // be downloaded to
             auto const extentView(Vec(static_cast<Size>(clustersToDownload)));
             auto const offsetView(Vec(static_cast<Size>(oldNumClusters)));
             typename TAlpaka::template HostView<typename TConfig::Cluster>
-                clusterView((*clusters).clusters, extentView, offsetView);
-
+                clusterView(clusters->clusters, extentView, offsetView);
+            
             // download actual clusters
             alpakaCopy(
-                dev->queue, clusterView, dev->cluster, clustersToDownload);
+                       dev->queue, clusterView, dev->cluster, clustersToDownload);
         }
 
         dev->state = FREE;
@@ -892,8 +892,8 @@ private:
                 getWorkDiv<TAlpaka>(),
                 summationKernel,
                 alpakaNativePtr(dev->energy),
-                dev->numMaps,
                 decltype(TConfig::SUM_FRAMES)(TConfig::SUM_FRAMES),
+                dev->numMaps,
                 alpakaNativePtr(dev->sum)));
 
             alpakaEnqueueKernel(dev->queue, summation);
