@@ -10,8 +10,7 @@
  * only change this line to change the backend
  * see Alpakaconfig.hpp for all available
  */
-template <std::size_t MAPSIZE>
-using Accelerator = GpuCudaRt<MAPSIZE>;
+template <std::size_t MAPSIZE> using Accelerator = GpuCudaRt<MAPSIZE>;
 using Config = JungfrauConfig;
 using ConcreteAcc = Accelerator<Config::MAPSIZE>;
 
@@ -121,19 +120,21 @@ auto main(int argc, char* argv[]) -> int
 
     // process data maps
     while (downloaded < data.numFrames) {
-      // save the upload future
+        // save the upload future
         uploadFutures.emplace_back(dispenser.uploadData(data, offset, ef));
 
-        // get the number of frames that have been uploaded and add them to the offset
+        // get the number of frames that have been uploaded and add them to the
+        // offset
         offset = std::get<0>(*uploadFutures.rbegin());
 
         // save the download future
         downloadFutures.emplace_back(
             dispenser.downloadData(energy, photon, sum, maxValues, clusters));
 
-        // update the number of downloaded frames, if any frames where downloaded 
-        if (currently_downloaded_frames =
-                std::get<0>(*downloadFutures.rbegin())) {
+        // update the number of downloaded frames, if any frames where
+        // downloaded
+        currently_downloaded_frames = std::get<0>(*downloadFutures.rbegin());
+        if (currently_downloaded_frames) {
             downloaded += currently_downloaded_frames;
             DEBUG(downloaded,
                   "/",

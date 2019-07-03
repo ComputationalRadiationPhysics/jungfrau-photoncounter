@@ -187,7 +187,7 @@ typedef std::chrono::high_resolution_clock Clock;
 typedef std::chrono::milliseconds ms;
 static Clock::time_point t;
 
-#ifdef NDEBUG
+#ifdef VERBOSE
 #include <iostream>
 
 // empty print to end recursion
