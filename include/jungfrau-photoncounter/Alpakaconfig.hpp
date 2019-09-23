@@ -108,6 +108,8 @@ template <std::size_t MAPSIZE> struct CpuOmp2Blocks {
     template <typename T>
     using HostBuf = alpaka::mem::buf::Buf<DevHost, T, Dim, Size>;
     template <typename T>
+    using AccView = alpaka::mem::view::ViewSubView<DevAcc, T, Dim, Size>;
+    template <typename T>
     using HostView = alpaka::mem::view::ViewSubView<DevHost, T, Dim, Size>;
 
     static constexpr std::size_t STREAMS_PER_DEV = 4;
@@ -143,6 +145,8 @@ template <std::size_t MAPSIZE> struct CpuOmp4 {
     template <typename T>
     using HostBuf = alpaka::mem::buf::Buf<DevHost, T, Dim, Size>;
     template <typename T>
+    using AccView = alpaka::mem::view::ViewSubView<DevAcc, T, Dim, Size>;
+    template <typename T>
     using HostView = alpaka::mem::view::ViewSubView<DevHost, T, Dim, Size>;
 
     static constexpr std::size_t STREAMS_PER_DEV = 4;
@@ -177,6 +181,8 @@ template <std::size_t MAPSIZE> struct CpuSerial {
     template <typename T>
     using HostBuf = alpaka::mem::buf::Buf<DevHost, T, Dim, Size>;
     template <typename T>
+    using AccView = alpaka::mem::view::ViewSubView<DevAcc, T, Dim, Size>;
+    template <typename T>
     using HostView = alpaka::mem::view::ViewSubView<DevHost, T, Dim, Size>;
 
     static constexpr std::size_t STREAMS_PER_DEV = 4;
@@ -209,6 +215,8 @@ template <std::size_t MAPSIZE> struct CpuThreads {
     using AccBuf = alpaka::mem::buf::Buf<DevAcc, T, Dim, Size>;
     template <typename T>
     using HostBuf = alpaka::mem::buf::Buf<DevHost, T, Dim, Size>;
+    template <typename T>
+    using AccView = alpaka::mem::view::ViewSubView<DevAcc, T, Dim, Size>;
     template <typename T>
     using HostView = alpaka::mem::view::ViewSubView<DevHost, T, Dim, Size>;
 
@@ -243,6 +251,8 @@ template <std::size_t MAPSIZE> struct GpuCudaRt {
     using AccBuf = alpaka::mem::buf::Buf<DevAcc, T, Dim, Size>;
     template <typename T>
     using HostBuf = alpaka::mem::buf::Buf<DevHost, T, Dim, Size>;
+    template <typename T>
+    using AccView = alpaka::mem::view::ViewSubView<DevAcc, T, Dim, Size>;
     template <typename T>
     using HostView = alpaka::mem::view::ViewSubView<DevHost, T, Dim, Size>;
 

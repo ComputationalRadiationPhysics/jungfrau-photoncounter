@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.11.0)
 project("jungfrau-photoncounter")
+
+set(ALPAKA_CXX_STANDARD "14" CACHE STRING "Force C++ version to 14. ")
+
 find_package(alpaka REQUIRED)
 
 add_library(${CMAKE_PROJECT_NAME} INTERFACE)
