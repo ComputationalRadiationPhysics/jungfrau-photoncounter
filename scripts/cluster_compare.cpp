@@ -118,8 +118,7 @@ std::tuple<std::size_t, std::size_t> getOffset(T it1, T it2, TCmp cmp)
     if (cmp(it1->frameNumber, it2->frameNumber)) {
         while (cmp((++it1)->frameNumber, it2->frameNumber))
             ++offset1;
-    }
-    else {
+    } else if (cmp(it2->frameNumber, it1->frameNumber)) {
         while (cmp((++it2)->frameNumber, it1->frameNumber))
             ++offset2;
     }
@@ -134,13 +133,12 @@ selectCommonFrames(const std::vector<ClusterFrame>& v1,
     const auto start =
         getOffset(v1.begin(), v2.begin(), std::less_equal<size_t>());
     const auto end =
-        getOffset(v1.begin(), v2.begin(), std::greater_equal<size_t>());
+        getOffset(v1.rbegin(), v2.rbegin(), std::greater<size_t>());
     std::size_t begin1 = std::get<0>(start);
     std::size_t end1 = std::get<0>(end);
     std::size_t begin2 = std::get<1>(start);
-    std::size_t end2 = std::get<0>(end);
-
-
+    std::size_t end2 = std::get<1>(end);
+    
     return std::make_tuple(begin1, end1, begin2, end2);
 }
 
@@ -163,7 +161,7 @@ int main(int argc, char* argv[])
     }
 
     if (!checkFrameNumbers(reference)) {
-        std::cerr << "Error: detector clusters not in order!\n";
+        std::cerr << "Error: reference clusters not in order!\n";
         exit(-1);
     }
 

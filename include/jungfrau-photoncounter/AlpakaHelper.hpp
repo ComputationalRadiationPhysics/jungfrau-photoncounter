@@ -195,6 +195,16 @@ alpakaGetGlobalThreadExtent(TArgs &&... args)
       std::forward<TArgs>(args)...);
 }
 
+// rename alpaka get element extent
+template <typename... TArgs>
+ALPAKA_FN_ACC ALPAKA_FN_INLINE static auto
+alpakaGetElementExtent(TArgs &&... args)
+    -> decltype(alpaka::workdiv::getWorkDiv<alpaka::Thread, alpaka::Elems>(
+        std::forward<TArgs>(args)...)) {
+  return alpaka::workdiv::getWorkDiv<alpaka::Thread, alpaka::Elems>(
+      std::forward<TArgs>(args)...);
+}
+
 // rename alpaka get linearized global thread idx
 template <typename... TArgs>
 ALPAKA_FN_ACC ALPAKA_FN_INLINE static auto

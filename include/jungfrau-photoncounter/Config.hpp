@@ -5,6 +5,8 @@
 #include <fstream>
 #include <iostream>
 
+#include <optional.hpp>
+
 #include "AlpakaHelper.hpp"
 #include "CheapArray.hpp"
 
@@ -164,7 +166,7 @@ struct DetectorConfig {
   class DoubleBuffer<T, TAccelerator, TBufferHost, TBufferDevice, true> {
   public:
     // construct from optional host buffer and normal device buffer
-    DoubleBuffer(boost::optional<TBufferHost> h, TBufferDevice d,
+    DoubleBuffer(tl::optional<TBufferHost> h, TBufferDevice d,
                  typename TAccelerator::Queue *, std::size_t numMaps)
         : h(h ? getView(*h, numMaps) : getView(d, numMaps)) {}
 
@@ -173,7 +175,7 @@ struct DetectorConfig {
                  std::size_t numMaps)
         : h(getView(h, numMaps)) {}
 
-    void setSize(std::size_t) {}
+    void resize(std::size_t) {}
 
     void upload() {}
 
@@ -226,7 +228,7 @@ struct DetectorConfig {
   class DoubleBuffer<T, TAccelerator, TBufferHost, TBufferDevice, false> {
   public:
     // construct from optional host buffer and normal device buffer
-    DoubleBuffer(boost::optional<TBufferHost> h, TBufferDevice d,
+    DoubleBuffer(tl::optional<TBufferHost> h, TBufferDevice d,
                  typename TAccelerator::Queue *queue, std::size_t numMaps)
         : queue(queue), h(h), d(d), numMaps(numMaps) {}
 
@@ -237,7 +239,7 @@ struct DetectorConfig {
 
     // upload to GPU
     void upload() {
-      //! @todo: print error message since nothing is uploaded???
+      //! @todo: print error message if nothing is uploaded???
       if (h)
         alpakaCopy(*queue, d, *h, numMaps);
     }
@@ -248,14 +250,14 @@ struct DetectorConfig {
         alpakaCopy(*queue, *h, d, numMaps);
     }
 
-    void setSize(std::size_t numMaps) { this->numMaps = numMaps; }
+    void resize(std::size_t numMaps) { this->numMaps = numMaps; }
 
     // get the GPU buffer
     typename TAccelerator::template AccView<T> get() { return d; }
 
   private:
     typename TAccelerator::Queue *queue;
-    boost::optional<TBufferHost> h;
+    tl::optional<TBufferHost> h;
     typename TAccelerator::template AccView<T> d;
     std::size_t numMaps;
   };
@@ -276,17 +278,16 @@ struct DetectorConfig {
       : public GetDoubleBuffer<TAccelerator, decltype(TBufferHost::data),
                                TBufferDevice>::Buffer {
   public:
-    FramePackageDoubleBuffer(boost::optional<TBufferHost> h, TBufferDevice d,
+    FramePackageDoubleBuffer(tl::optional<TBufferHost> h, TBufferDevice d,
                              typename TAccelerator::Queue *queue,
                              std::size_t numMaps)
         : GetDoubleBuffer<TAccelerator, decltype(TBufferHost::data),
                           TBufferDevice>::
-              Buffer(
-                  h ? static_cast<boost::optional<decltype(TBufferHost::data)>>(
-                          h->data)
-                    : static_cast<boost::optional<decltype(TBufferHost::data)>>(
-                          boost::none),
-                  d, queue, numMaps) {}
+              Buffer(h ? static_cast<tl::optional<decltype(TBufferHost::data)>>(
+                             h->data)
+                       : static_cast<tl::optional<decltype(TBufferHost::data)>>(
+                             tl::nullopt),
+                     d, queue, numMaps) {}
 
     FramePackageDoubleBuffer(TBufferHost h, TBufferDevice d,
                              typename TAccelerator::Queue *queue,
@@ -327,14 +328,14 @@ template <typename... TArgs> void printArgs() { std::cout << std::endl; }
 // print one or more argument
 template <typename TFirst, typename... TArgs>
 void printArgs(TFirst first, TArgs... args) {
-  std::cout << first << " ";
+  std::cerr << first << " ";
   printArgs(args...);
 }
 
 // general debug print function
 template <typename... TArgs>
 void debugPrint(const char *file, unsigned int line, TArgs... args) {
-  std::cout << __FILE__ << "[" << __LINE__ << "]:\n\t"
+  std::cerr << __FILE__ << "[" << __LINE__ << "]:\n\t"
             << (std::chrono::duration_cast<ms>((Clock::now() - t))).count()
             << " ms\n\t";
   printArgs(args...);

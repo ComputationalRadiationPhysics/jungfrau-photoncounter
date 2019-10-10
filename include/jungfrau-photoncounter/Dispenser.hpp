@@ -17,8 +17,7 @@
 #include "kernel/Reduction.hpp"
 #include "kernel/Summation.hpp"
 
-#define BOOST_OPTIONAL_USE_OLD_DEFINITION_OF_NONE
-#include <boost/optional.hpp>
+#include <optional.hpp>
 
 #include <future>
 #include <iostream>
@@ -38,7 +37,7 @@ public:
   Dispenser(typename TConfig::template FramePackage<typename TConfig::GainMap,
                                                     TAlpaka>
                 gainMap,
-            boost::optional<typename TAlpaka::template HostBuf<MaskMap>> mask)
+            tl::optional<typename TAlpaka::template HostBuf<MaskMap>> mask)
       : gain(gainMap),
         mask((mask ? *mask
                    : alpakaAlloc<typename TConfig::MaskMap>(
@@ -47,9 +46,7 @@ public:
         drift(alpakaAlloc<typename TConfig::DriftMap>(
             alpakaGetHost<TAlpaka>(),
             decltype(TConfig::SINGLEMAP)(TConfig::SINGLEMAP))),
-        gainStage(alpakaAlloc<typename TConfig::GainStageMap>(
-            alpakaGetHost<TAlpaka>(),
-            decltype(TConfig::SINGLEMAP)(TConfig::SINGLEMAP))),
+        gainStage(decltype(TConfig::DEV_FRAMES)(TConfig::DEV_FRAMES)),
         maxValueMaps(alpakaAlloc<typename TConfig::EnergyMap>(
             alpakaGetHost<TAlpaka>(),
             decltype(TConfig::DEV_FRAMES)(TConfig::DEV_FRAMES))),
@@ -222,8 +219,9 @@ public:
    * Downloads the current gain stage map.
    * @return gain stage map
    */
-  auto downloadGainStages(std::size_t frame = 0) ->
-      typename TConfig::GainStageMap * {
+  auto downloadGainStages() ->
+      typename TConfig::template FramePackage<typename TConfig::GainStageMap,
+                                              TAlpaka> {
     DEBUG("downloading gain stage map...");
 
     // create handle for the device with the current version of the pedestal
@@ -235,19 +233,21 @@ public:
     auto const gainStageMasker(alpakaCreateKernel<TAlpaka>(
         getWorkDiv<TAlpaka>(), gainStageMasking,
         alpakaNativePtr(current_device.gainStage),
-        alpakaNativePtr(current_device.gainStageOutput), frame,
+        alpakaNativePtr(current_device.gainStageOutput), current_device.numMaps,
         alpakaNativePtr(current_device.mask)));
 
     alpakaEnqueueKernel(current_device.queue, gainStageMasker);
 
     // get the pedestal data from the device
-    alpakaCopy(current_device.queue, gainStage, current_device.gainStageOutput,
-               decltype(TConfig::SINGLEMAP)(TConfig::SINGLEMAP));
+    alpakaCopy(current_device.queue, gainStage.data,
+               current_device.gainStageOutput, current_device.numMaps);
 
     // wait for copy to finish
     alpakaWait(current_device.queue);
 
-    return alpakaNativePtr(gainStage);
+    gainStage.numFrames = current_device.numMaps;
+
+    return gainStage;
   }
 
   /**
@@ -291,70 +291,19 @@ public:
     return alpakaNativePtr(drift);
   }
 
-  //! @todo: remove this
-  /**
-   * Tries to upload one data package.
-   * @param Maps-struct with raw data, offset within the package
-   * @return number of frames uploaded from the package
-   * /
-  auto uploadData(
-      typename TConfig::template FramePackage<typename TConfig::DetectorData,
-                                              TAlpaka> data,
-      std::size_t offset,
-      typename TConfig::ExecutionFlags flags,
-      bool flushWhenFinished = true)
-      -> std::tuple<std::size_t, std::future<bool>>
-  {
-      if (!ringbuffer.isEmpty()) {
-          // try uploading one data package
-          if (offset <= data.numFrames - TConfig::DEV_FRAMES) {
-              auto result = calcData(alpakaNativePtr(data.data) + offset,
-                                     TConfig::DEV_FRAMES,
-                                     flags);
-              offset += std::get<0>(result);
-              DEBUG(offset, "/", data.numFrames, "frames uploaded");
-
-              return std::make_tuple(std::move(offset),
-                                     std::move(std::get<1>(result)));
-          }
-          // upload remaining frames
-          else if (offset != data.numFrames) {
-              auto result = calcData(alpakaNativePtr(data.data) + offset,
-                                     data.numFrames % TConfig::DEV_FRAMES,
-                                     flags);
-              DEBUG(offset, "/", data.numFrames, "frames uploaded");
-              offset += std::get<0>(result);
-              return std::make_tuple(std::move(offset),
-                                     std::move(std::get<1>(result)));
-          }
-          // force wait for one device to finish since there's no new data and
-          // the user wants the data flushed
-          else if (flushWhenFinished) {
-              DEBUG("flushing ...");
-
-              flush();
-          }
-      }
-
-      return std::make_tuple(
-          offset, std::async(std::launch::async, []() { return true; }));
-  }*/
-
   template <typename TFramePackageEnergyMap, typename TFramePackagePhotonMap,
             typename TFramePackageSumMap, typename TFramePackageEnergyValue>
   auto process(typename TConfig::template FramePackage<
                    typename TConfig::DetectorData, TAlpaka>
                    data,
                std::size_t offset, typename TConfig::ExecutionFlags flags,
-               boost::optional<TFramePackageEnergyMap> energy,
-               boost::optional<TFramePackagePhotonMap> photon,
-               boost::optional<TFramePackageSumMap> sum,
-               boost::optional<TFramePackageEnergyValue> maxValues,
+               tl::optional<TFramePackageEnergyMap> energy,
+               tl::optional<TFramePackagePhotonMap> photon,
+               tl::optional<TFramePackageSumMap> sum,
+               tl::optional<TFramePackageEnergyValue> maxValues,
                typename TConfig::template ClusterArray<TAlpaka> *clusters,
                bool flushWhenFinished = true)
       -> std::tuple<std::size_t, std::future<bool>> {
-    //! @todo: fix this
-    // if (!ringbuffer.isEmpty()) {
     // try uploading one data package
     if (offset <= data.numFrames - TConfig::DEV_FRAMES) {
 
@@ -386,132 +335,10 @@ public:
 
       flush();
     }
-    //}
 
     return std::make_tuple(
         offset, std::async(std::launch::async, []() { return true; }));
   }
-
-  //! @todo: remove this
-  /**
-   * Tries to download one data package.
-   * @param pointer to empty struct for photon and sum maps and cluster data
-   * @return boolean indicating whether maps were downloaded or not
-   * /
-  template <typename TFramePackageEnergyMap,
-            typename TFramePackagePhotonMap,
-            typename TFramePackageSumMap,
-            typename TFramePackageEnergyValue>
-  auto
-  downloadData(boost::optional<TFramePackageEnergyMap> energy,
-               boost::optional<TFramePackagePhotonMap> photon,
-               boost::optional<TFramePackageSumMap> sum,
-               boost::optional<TFramePackageEnergyValue> maxValues,
-               typename TConfig::template ClusterArray<TAlpaka>* clusters)
-      -> std::tuple<size_t, std::future<bool>>
-  {
-      // get the oldest finished device
-      struct DeviceData<TConfig, TAlpaka>* dev =
-          &Dispenser::devices[nextFree];
-
-      // to keep frames in order only download if the longest running device
-      // has finished
-      if (dev->state != READY)
-          return std::make_tuple(
-              0, std::async(std::launch::async, []() { return true; }));
-
-      // download energy if needed
-      if (energy) {
-          DEBUG("downloading energy");
-          (*energy).numFrames = dev->numMaps;
-          alpakaCopyIfNeeded(dev->queue, (*energy).data, dev->energy,
-  dev->numMaps);
-      }
-
-      // download photon data if needed
-      if (photon) {
-          DEBUG("downloading photons");
-          (*photon).numFrames = dev->numMaps;
-          alpakaCopyIfNeeded(dev->queue, (*photon).data, dev->photon,
-  dev->numMaps);
-      }
-
-      // download summation frames if needed
-      if (sum) {
-          DEBUG("downloading sum");
-          (*sum).numFrames = dev->numMaps / TConfig::SUM_FRAMES;
-          alpakaCopyIfNeeded(dev->queue,
-                     (*sum).data,
-                     dev->sum,
-                     (dev->numMaps / TConfig::SUM_FRAMES));
-      }
-
-      // download maximum values if needed
-      if (maxValues) {
-          DEBUG("downloading max values");
-          (*maxValues).numFrames = dev->numMaps;
-          alpakaCopyIfNeeded(dev->queue,
-                     (*maxValues).data,
-                     dev->maxValues,
-                     decltype(TConfig::DEV_FRAMES)(TConfig::DEV_FRAMES));
-      }
-
-      // download number of clusters if needed
-      if (clusters) {
-          // download number of found clusters
-          DEBUG("downloading clusters");
-          alpakaCopy(dev->queue,
-                     (*clusters).usedPinned,
-                     dev->numClusters,
-                     decltype(TConfig::SINGLEMAP)(TConfig::SINGLEMAP));
-
-          // wait for completion of copy operations
-          alpakaWait(dev->queue);
-
-          // reserve space in the cluster array for the new data and save
-          // the number of clusters to download temporarily
-          auto oldNumClusters = (*clusters).used;
-
-
-          DEBUG("total current clusters:", oldNumClusters);
-
-
-          auto clustersToDownload =
-              alpakaNativePtr((*clusters).usedPinned)[0];
-          alpakaNativePtr((*clusters).usedPinned)[0] += oldNumClusters;
-          (*clusters).used = alpakaNativePtr((*clusters).usedPinned)[0];
-
-          DEBUG("Downloading ", clustersToDownload, "clusters. ");
-          DEBUG("Total downloaded clusters:", (*clusters).used);
-
-          // create a subview in the cluster buffer where the new data
-          // shuld be downloaded to
-          auto const extentView(Vec(static_cast<Size>(clustersToDownload)));
-          auto const offsetView(Vec(static_cast<Size>(oldNumClusters)));
-          typename TAlpaka::template HostView<typename TConfig::Cluster>
-              clusterView(clusters->clusters, extentView, offsetView);
-
-          // download actual clusters
-          alpakaCopy(
-              dev->queue, clusterView, dev->cluster, clustersToDownload);
-      }
-
-      // free the device
-      dev->state = FREE;
-      nextFree = (nextFree + 1) % devices.size();
-      ringbuffer.push(dev);
-
-      // create a future, that waits for the copying to be finished
-      auto wait = [](decltype(dev) dev) {
-          alpakaWait(dev->queue);
-          return true;
-      };
-
-      // return the number of downloaded frames and the future
-      return std::make_tuple(dev->numMaps,
-                             std::async(std::launch::async, wait, dev));
-  }
-  */
 
   /**
    * Returns the a vector with the amount of memory of each device.
@@ -544,7 +371,9 @@ private:
       gain;
   typename TAlpaka::template HostBuf<typename TConfig::MaskMap> mask;
   typename TAlpaka::template HostBuf<typename TConfig::DriftMap> drift;
-  typename TAlpaka::template HostBuf<typename TConfig::GainStageMap> gainStage;
+  typename TConfig::template FramePackage<typename TConfig::GainStageMap,
+                                          TAlpaka>
+      gainStage;
   typename TAlpaka::template HostBuf<typename TConfig::EnergyMap> maxValueMaps;
 
   typename TConfig::template FramePackage<typename TConfig::PedestalMap,
@@ -719,324 +548,15 @@ private:
     synchronize();
   }
 
-  //! @todo: remove this
-  /**
-   * Executes summation and correction kernel.
-   * @param pointer to raw data and number of frames
-   * @return number of frames calculated
-   * /
-template <typename TDetectorData,
-          typename TFramePackageEnergyMap,
-            typename TFramePackagePhotonMap,
-            typename TFramePackageSumMap,
-            typename TFramePackageEnergyValue>
-  auto calcData(TDetectorData* data,
-                std::size_t numMaps,
-                typename TConfig::ExecutionFlags flags,
-                boost::optional<TFramePackageEnergyMap> energy,
-               boost::optional<TFramePackagePhotonMap> photon,
-               boost::optional<TFramePackageSumMap> sum,
-               boost::optional<TFramePackageEnergyValue> maxValues,
-               typename TConfig::template ClusterArray<TAlpaka>* clusters)
-      -> std::tuple<std::size_t, std::future<bool>>
-  {
-      // get the next free device from the ringbuffer
-      DeviceData<TConfig, TAlpaka>* dev;
-      if (!ringbuffer.pop(dev))
-          return std::make_tuple(
-              0, std::async(std::launch::async, []() { return true; }));
-
-      // set the state to processing
-      dev->state = PROCESSING;
-      dev->numMaps = numMaps;
-
-      // upload the data to the device
-      alpakaCopyIfNeeded(
-          dev->queue,
-          dev->data,
-          alpakaViewPlainPtrHost<TAlpaka, typename TConfig::DetectorData>(
-              data, alpakaGetHost<TAlpaka>(), numMaps),
-          numMaps);
-
-      // copy offset data from last device uploaded to
-      auto prevDevice = (nextFull + devices.size() - 1) % devices.size();
-      alpakaWait(dev->queue, devices[prevDevice].event);
-      DEBUG("device", devices[prevDevice].id, "finished");
-
-      devices[prevDevice].state = READY;
-      alpakaCopy(dev->queue,
-                 dev->pedestal,
-                 devices[prevDevice].pedestal,
-                 decltype(TConfig::PEDEMAPS)(TConfig::PEDEMAPS));
-
-      nextFull = (nextFull + 1) % devices.size();
-
-      typename TConfig::MaskMap* local_mask =
-          flags.masking ? alpakaNativePtr(dev->mask) : nullptr;
-
-      if (flags.mode == 0) {
-          // converting to energy
-          // the photon and cluster extraction kernels already include energy
-          // conversion
-          ConversionKernel<TConfig> conversionKernel{};
-          auto const conversion(alpakaCreateKernel<TAlpaka>(
-              getWorkDiv<TAlpaka>(),
-              conversionKernel,
-              alpakaNativePtr(dev->data),
-              alpakaNativePtr(dev->gain),
-              alpakaNativePtr(dev->initialPedestal),
-              alpakaNativePtr(dev->pedestal),
-              alpakaNativePtr(dev->gainStage),
-              alpakaNativePtr(dev->energy),
-              dev->numMaps,
-              local_mask,
-              pedestalFallback));
-
-          DEBUG("enqueueing conversion kernel");
-          alpakaEnqueueKernel(dev->queue, conversion);
-      }
-      else if (flags.mode == 1) {
-          // converting to photons (and energy)
-          PhotonFinderKernel<TConfig> photonFinderKernel{};
-          auto const photonFinder(alpakaCreateKernel<TAlpaka>(
-              getWorkDiv<TAlpaka>(),
-              photonFinderKernel,
-              alpakaNativePtr(dev->data),
-              alpakaNativePtr(dev->gain),
-              alpakaNativePtr(dev->initialPedestal),
-              alpakaNativePtr(dev->pedestal),
-              alpakaNativePtr(dev->gainStage),
-              alpakaNativePtr(dev->energy),
-              alpakaNativePtr(dev->photon),
-              dev->numMaps,
-              local_mask,
-              pedestalFallback));
-
-          DEBUG("enqueueing photon kernel");
-          alpakaEnqueueKernel(dev->queue, photonFinder);
-      }
-      else {
-          // clustering (and conversion to energy)
-          DEBUG("enqueueing clustering kernel");
-
-          // reset the number of clusters
-          alpakaMemSet(dev->queue,
-                       dev->numClusters,
-                       0,
-                       decltype(TConfig::SINGLEMAP)(TConfig::SINGLEMAP));
-
-          for (uint32_t i = 0; i < numMaps + 1; ++i) {
-              // execute the clusterfinder with the pedestalupdate on every
-              // frame
-              ClusterFinderKernel<TConfig> clusterFinderKernel{};
-              auto const clusterFinder(alpakaCreateKernel<TAlpaka>(
-                  getWorkDiv<TAlpaka>(),
-                  clusterFinderKernel,
-                  alpakaNativePtr(dev->data),
-                  alpakaNativePtr(dev->gain),
-                  alpakaNativePtr(dev->initialPedestal),
-                  alpakaNativePtr(dev->pedestal),
-                  alpakaNativePtr(dev->gainStage),
-                  alpakaNativePtr(dev->energy),
-                  alpakaNativePtr(dev->cluster),
-                  alpakaNativePtr(dev->numClusters),
-                  local_mask,
-                  dev->numMaps,
-                  i,
-                  pedestalFallback));
-
-              alpakaEnqueueKernel(dev->queue, clusterFinder);
-          }
-      }
-
-      // find max value
-      if (flags.maxValue) {
-          // get the max value
-          for (uint32_t i = 0; i < numMaps; ++i) {
-              // reduce all images
-              WorkDiv workdivRun1(
-                  decltype(TAlpaka::blocksPerGrid)(TAlpaka::blocksPerGrid),
-                  decltype(TAlpaka::threadsPerBlock)(
-                      TAlpaka::threadsPerBlock),
-                  static_cast<Size>(1));
-              ReduceKernel<TAlpaka::threadsPerBlock, double> reduceKernelRun1;
-              auto const reduceRun1(alpakaCreateKernel<TAlpaka>(
-                  workdivRun1,
-                  reduceKernelRun1,
-                  &alpakaNativePtr(dev->energy)[i],
-                  &alpakaNativePtr(dev->maxValueMaps)[i],
-                  TConfig::DIMX * TConfig::DIMY));
-
-              WorkDiv workdivRun2{static_cast<Size>(1),
-                                  decltype(TAlpaka::threadsPerBlock)(
-                                      TAlpaka::threadsPerBlock),
-                                  static_cast<Size>(1)};
-              ReduceKernel<TAlpaka::threadsPerBlock, double> reduceKernelRun2;
-              auto const reduceRun2(alpakaCreateKernel<TAlpaka>(
-                  workdivRun2,
-                  reduceKernelRun2,
-                  &alpakaNativePtr(dev->maxValueMaps)[i],
-                  &alpakaNativePtr(dev->maxValueMaps)[i],
-                  decltype(TAlpaka::blocksPerGrid)(TAlpaka::blocksPerGrid)));
-              alpakaEnqueueKernel(dev->queue, reduceRun1);
-              alpakaEnqueueKernel(dev->queue, reduceRun2);
-          }
-
-          WorkDiv workdivMaxValueCopy{
-              static_cast<Size>(std::ceil((double)numMaps /
-                                          decltype(TAlpaka::threadsPerBlock)(
-                                              TAlpaka::threadsPerBlock))),
-              decltype(TAlpaka::threadsPerBlock)(TAlpaka::threadsPerBlock),
-              static_cast<Size>(1)};
-          MaxValueCopyKernel<TConfig> maxValueCopyKernel{};
-          auto const maxValueCopy(
-              alpakaCreateKernel<TAlpaka>(workdivMaxValueCopy,
-                                          maxValueCopyKernel,
-                                          alpakaNativePtr(dev->maxValueMaps),
-                                          alpakaNativePtr(dev->maxValues),
-                                          numMaps));
-
-          DEBUG("enqueueing max value extraction kernel");
-          alpakaEnqueueKernel(dev->queue, maxValueCopy);
-      }
-
-      // summation
-      if (flags.summation) {
-          DEBUG("enqueueing summation kernel");
-
-          SummationKernel<TConfig> summationKernel{};
-          auto const summation(alpakaCreateKernel<TAlpaka>(
-              getWorkDiv<TAlpaka>(),
-              summationKernel,
-              alpakaNativePtr(dev->energy),
-              decltype(TConfig::SUM_FRAMES)(TConfig::SUM_FRAMES),
-              dev->numMaps,
-              alpakaNativePtr(dev->sum)));
-
-          alpakaEnqueueKernel(dev->queue, summation);
-      };
-
-      // the event is used to wait for pedestal data
-      alpakaEnqueueKernel(dev->queue, dev->event);
-
-
-
-
-
-
-      // download energy if needed
-      if (energy) {
-          DEBUG("downloading energy");
-          (*energy).numFrames = dev->numMaps;
-          alpakaCopyIfNeeded(dev->queue, (*energy).data, dev->energy,
-dev->numMaps);
-      }
-
-      // download photon data if needed
-      if (photon) {
-          DEBUG("downloading photons");
-          (*photon).numFrames = dev->numMaps;
-          alpakaCopyIfNeeded(dev->queue, (*photon).data, dev->photon,
-dev->numMaps);
-      }
-
-      // download summation frames if needed
-      if (sum) {
-          DEBUG("downloading sum");
-          (*sum).numFrames = dev->numMaps / TConfig::SUM_FRAMES;
-          alpakaCopyIfNeeded(dev->queue,
-                     (*sum).data,
-                     dev->sum,
-                     (dev->numMaps / TConfig::SUM_FRAMES));
-      }
-
-      // download maximum values if needed
-      if (maxValues) {
-          DEBUG("downloading max values");
-          (*maxValues).numFrames = dev->numMaps;
-          alpakaCopyIfNeeded(dev->queue,
-                     (*maxValues).data,
-                     dev->maxValues,
-                     decltype(TConfig::DEV_FRAMES)(TConfig::DEV_FRAMES));
-      }
-
-      // download number of clusters if needed
-      if (clusters) {
-          // download number of found clusters
-          DEBUG("downloading clusters");
-          alpakaCopy(dev->queue,
-                     (*clusters).usedPinned,
-                     dev->numClusters,
-                     decltype(TConfig::SINGLEMAP)(TConfig::SINGLEMAP));
-
-          // wait for completion of copy operations
-          alpakaWait(dev->queue);
-
-          // reserve space in the cluster array for the new data and save
-          // the number of clusters to download temporarily
-          auto oldNumClusters = (*clusters).used;
-
-
-          DEBUG("total current clusters:", oldNumClusters);
-
-
-          auto clustersToDownload =
-              alpakaNativePtr((*clusters).usedPinned)[0];
-          alpakaNativePtr((*clusters).usedPinned)[0] += oldNumClusters;
-          (*clusters).used = alpakaNativePtr((*clusters).usedPinned)[0];
-
-          DEBUG("Downloading ", clustersToDownload, "clusters. ");
-          DEBUG("Total downloaded clusters:", (*clusters).used);
-
-          // create a subview in the cluster buffer where the new data
-          // shuld be downloaded to
-          auto const extentView(Vec(static_cast<Size>(clustersToDownload)));
-          auto const offsetView(Vec(static_cast<Size>(oldNumClusters)));
-          typename TAlpaka::template HostView<typename TConfig::Cluster>
-              clusterView(clusters->clusters, extentView, offsetView);
-
-          // download actual clusters
-          alpakaCopy(
-              dev->queue, clusterView, dev->cluster, clustersToDownload);
-      }
-
-      // free the device
-      dev->state = FREE;
-      nextFree = (nextFree + 1) % devices.size();
-      ringbuffer.push(dev);
-
-
-
-
-
-
-
-
-
-      auto wait = [](decltype(dev) dev) {
-          alpakaWait(dev->queue);
-          return true;
-      };
-
-      return std::make_tuple(numMaps,
-                             std::async(std::launch::async, wait, dev));
-
-
-}
-*/
-
-#include <type_traits>
-
-  //! @todo: use ptr like stuff instead of FramePackages here!
   template <typename TFramePackageDetectorData, typename TFramePackageEnergyMap,
             typename TFramePackagePhotonMap, typename TFramePackageSumMap,
             typename TFramePackageEnergyValue>
   auto processData(TFramePackageDetectorData data, std::size_t numMaps,
                    typename TConfig::ExecutionFlags flags,
-                   boost::optional<TFramePackageEnergyMap> energy,
-                   boost::optional<TFramePackagePhotonMap> photon,
-                   boost::optional<TFramePackageSumMap> sum,
-                   boost::optional<TFramePackageEnergyValue> maxValues,
+                   tl::optional<TFramePackageEnergyMap> energy,
+                   tl::optional<TFramePackagePhotonMap> photon,
+                   tl::optional<TFramePackageSumMap> sum,
+                   tl::optional<TFramePackageEnergyValue> maxValues,
                    typename TConfig::template ClusterArray<TAlpaka> *clusters)
       -> std::tuple<std::size_t, std::future<bool>> {
 
@@ -1066,20 +586,15 @@ dev->numMaps);
         TAlpaka, TFramePackageEnergyValue, decltype(dev->maxValues)>
         maxValuesBuffer(maxValues, dev->maxValues, &dev->queue, numMaps);
 
-    // convert pointer to boost::optional
-    boost::optional<ClusterView> optionalClusters;
-    boost::optional<decltype(clusters->usedPinned)> optionalNumClusters;
+    // convert pointer to tl::optional
+    tl::optional<ClusterView> optionalClusters;
+    tl::optional<decltype(clusters->usedPinned)> optionalNumClusters;
     if (clusters) {
       // create subview of the free part of the cluster array
-
-      ClusterView c(clusters->clusters, clusters->used,
-                    alpakaGetExtent<0>(clusters->clusters) - clusters->used);
-
-      /*optionalClusters.emplace(
-          ClusterView(clusters->clusters, clusters->used,
-                      alpakaGetExtent<0>(clusters->clusters) -
-         clusters->used));*/
-      optionalClusters.emplace(c);
+      optionalClusters.emplace(clusters->clusters,
+                               alpakaGetExtent<0>(clusters->clusters) -
+                                   clusters->used,
+                               clusters->used);
       optionalNumClusters = clusters->usedPinned;
     }
 
@@ -1095,12 +610,6 @@ dev->numMaps);
         clustersUsedBuffer(optionalNumClusters, dev->numClusters, &dev->queue,
                            TConfig::SINGLEMAP);
 
-    //! @todo: remove this
-    // uploadData(dev, data,
-    // energy, photon, sum,
-    // maxValues, clusters,
-    // numMaps);
-
     // copy offset data from last device uploaded to current device
     auto prevDevice = (nextFull + devices.size() - 1) % devices.size();
     alpakaWait(dev->queue, devices[prevDevice].event);
@@ -1113,46 +622,32 @@ dev->numMaps);
     nextFull = (nextFull + 1) % devices.size();
 
     // enqueue the kernels
-    enqueueKernels(dev, numMaps, flags, dataBuffer, energyBuffer, photonBuffer,
-                   sumBuffer, maxValuesBuffer, clusterBuffer,
-                   clustersUsedBuffer);
+    enqueueKernels(dev, numMaps, flags, dataBuffer.get(), energyBuffer.get(),
+                   photonBuffer.get(), sumBuffer.get(), maxValuesBuffer.get(),
+                   clusterBuffer.get(), clustersUsedBuffer.get());
 
-    // the event is used to wait
-    // for pedestal data
+    // the event is used to wait for pedestal data
     alpakaEnqueueKernel(dev->queue, dev->event);
-    //! @todo: remove this
-    // enqueue download of the
-    // data downloadData(dev,
-    // energy, photon, sum,
-    // maxValues, clusters);
 
     // download the data
-    energyBuffer.download();
-    photonBuffer.download();
-    sumBuffer.download();
-    maxValuesBuffer.download();
     if (clusters) {
-      //! @todo: download correct amount of clusters
       clustersUsedBuffer.download();
 
       // wait for completion of copy operations
       alpakaWait(dev->queue);
+      auto clustersToDownload = alpakaNativePtr(clusters->usedPinned)[0];
+      clusters->used += clustersToDownload;
 
-      auto oldNumClusters = (*clusters).used;
-      DEBUG("total current clusters:", oldNumClusters);
+      DEBUG("Downloading ", clustersToDownload, "clusters (", clusters->used,
+            "in total). ");
 
-      auto clustersToDownload = alpakaNativePtr((*clusters).usedPinned)[0];
-      alpakaNativePtr((*clusters).usedPinned)[0] += oldNumClusters;
-      (*clusters).used = alpakaNativePtr((*clusters).usedPinned)[0];
-
-      DEBUG("Downloading ", clustersToDownload, "clusters. ");
-      DEBUG("Total downloaded clusters:", (*clusters).used);
-
-      //! @todo: find a better solution for this
-      clusterBuffer.setSize(alpakaNativePtr(clusters->usedPinned)[0]);
-
+      clusterBuffer.resize(clustersToDownload);
       clusterBuffer.download();
     }
+    energyBuffer.download();
+    photonBuffer.download();
+    sumBuffer.download();
+    maxValuesBuffer.download();
 
     // update the nextFree index
     nextFree = (nextFree + 1) % devices.size();
@@ -1164,54 +659,6 @@ dev->numMaps);
 
     return std::make_tuple(numMaps, std::async(std::launch::async, wait, dev));
   }
-
-  //! @todo: remove this
-  /*
-  template <typename TDetectorData,
-            typename TFramePackageEnergyMap,
-              typename TFramePackagePhotonMap,
-              typename TFramePackageSumMap,
-              typename TFramePackageEnergyValue>
-    auto
-    uploadData(DeviceData<TConfig, TAlpaka>* dev,
-               TDetectorData* data,
-                 boost::optional<TFramePackageEnergyMap> energy,
-                 boost::optional<TFramePackagePhotonMap> photon,
-                 boost::optional<TFramePackageSumMap> sum,
-                 boost::optional<TFramePackageEnergyValue> maxValues,
-               typename TConfig::template ClusterArray<TAlpaka>* clusters,
-               std::size_t numMaps)
-  {
-    // upload the data to the device
-        return alpakaCopyIfNeeded<TAlpaka>(
-            dev->queue,
-            dev->data,
-            alpakaViewPlainPtrHost<TAlpaka, typename TConfig::DetectorData>(
-                data, alpakaGetHost<TAlpaka>(), numMaps),
-            numMaps);
-
-
-        //! @todo: problems occur if data is only a buffer view
-        //! @todo: implement extra view for processing
-
-
-
-
-        // synchronize host and device buffers
-        /*if(energy)
-          alpakaSyncHostBuffers<TAlpaka>(dev->energy, energy);
-        if(photon)
-          alpakaSyncHostBuffers<TAlpaka>(dev->photon, photon);
-        if(sum)
-          alpakaSyncHostBuffers<TAlpaka>(dev->sum, sum);
-        if(maxValues)
-          alpakaSyncHostBuffers<TAlpaka>(dev->maxValues, maxValues);
-        if(clusters) {
-          alpakaSyncHostBuffers<TAlpaka>(dev->cluster, clusters->clusters);
-          alpakaSyncHostBuffers<TAlpaka>(dev->numClusters,
-  clusters->usedPinned);
-          }* /
-          }*/
 
   template <typename TData, typename TOptionalEnergy, typename TOptionalPhoton,
             typename TOptionalSum, typename TOptionalMaxValues,
@@ -1225,15 +672,6 @@ dev->numMaps);
     typename TConfig::MaskMap *local_mask =
         flags.masking ? alpakaNativePtr(dev->mask) : nullptr;
 
-    // generate local variables (required for alpakaNativePtr)
-    auto dataPtr = data.get();
-    auto energyPtr = energy.get();
-    auto photonPtr = photon.get();
-    auto sumPtr = sum.get();
-    auto maxValuesPtr = maxValues.get();
-    auto clustersPtr = clusters.get();
-    auto usedClustersPtr = usedClusters.get();
-
     if (flags.mode == 0) {
       // converting to energy
       // the photon and cluster extraction kernels already include energy
@@ -1241,11 +679,10 @@ dev->numMaps);
 
       ConversionKernel<TConfig> conversionKernel{};
       auto const conversion(alpakaCreateKernel<TAlpaka>(
-          getWorkDiv<TAlpaka>(), conversionKernel, alpakaNativePtr(dataPtr),
+          getWorkDiv<TAlpaka>(), conversionKernel, alpakaNativePtr(data),
           alpakaNativePtr(dev->gain), alpakaNativePtr(dev->initialPedestal),
           alpakaNativePtr(dev->pedestal), alpakaNativePtr(dev->gainStage),
-          alpakaNativePtr(energyPtr), dev->numMaps, local_mask,
-          pedestalFallback));
+          alpakaNativePtr(energy), dev->numMaps, local_mask, pedestalFallback));
 
       DEBUG("enqueueing conversion kernel");
       alpakaEnqueueKernel(dev->queue, conversion);
@@ -1253,10 +690,10 @@ dev->numMaps);
       // converting to photons (and energy)
       PhotonFinderKernel<TConfig> photonFinderKernel{};
       auto const photonFinder(alpakaCreateKernel<TAlpaka>(
-          getWorkDiv<TAlpaka>(), photonFinderKernel, alpakaNativePtr(dataPtr),
+          getWorkDiv<TAlpaka>(), photonFinderKernel, alpakaNativePtr(data),
           alpakaNativePtr(dev->gain), alpakaNativePtr(dev->initialPedestal),
           alpakaNativePtr(dev->pedestal), alpakaNativePtr(dev->gainStage),
-          alpakaNativePtr(energyPtr), alpakaNativePtr(photonPtr), dev->numMaps,
+          alpakaNativePtr(energy), alpakaNativePtr(photon), dev->numMaps,
           local_mask, pedestalFallback));
 
       DEBUG("enqueueing photon kernel");
@@ -1266,20 +703,19 @@ dev->numMaps);
       DEBUG("enqueueing clustering kernel");
 
       // reset the number of clusters
-      alpakaMemSet(dev->queue, usedClustersPtr, 0,
+      alpakaMemSet(dev->queue, usedClusters, 0,
                    decltype(TConfig::SINGLEMAP)(TConfig::SINGLEMAP));
 
       for (uint32_t i = 0; i < numMaps + 1; ++i) {
-        // execute the clusterfinder with the pedestalupdate on every
+        // execute the clusterfinder with the pedestal update on every
         // frame
         ClusterFinderKernel<TConfig> clusterFinderKernel{};
         auto const clusterFinder(alpakaCreateKernel<TAlpaka>(
-            getWorkDiv<TAlpaka>(), clusterFinderKernel,
-            alpakaNativePtr(dataPtr), alpakaNativePtr(dev->gain),
-            alpakaNativePtr(dev->initialPedestal),
+            getWorkDiv<TAlpaka>(), clusterFinderKernel, alpakaNativePtr(data),
+            alpakaNativePtr(dev->gain), alpakaNativePtr(dev->initialPedestal),
             alpakaNativePtr(dev->pedestal), alpakaNativePtr(dev->gainStage),
-            alpakaNativePtr(energyPtr), alpakaNativePtr(clustersPtr),
-            alpakaNativePtr(usedClustersPtr), local_mask, dev->numMaps, i,
+            alpakaNativePtr(energy), alpakaNativePtr(clusters),
+            alpakaNativePtr(usedClusters), local_mask, dev->numMaps, i,
             pedestalFallback));
 
         alpakaEnqueueKernel(dev->queue, clusterFinder);
@@ -1297,7 +733,7 @@ dev->numMaps);
             static_cast<Size>(1));
         ReduceKernel<TAlpaka::threadsPerBlock, double> reduceKernelRun1;
         auto const reduceRun1(alpakaCreateKernel<TAlpaka>(
-            workdivRun1, reduceKernelRun1, &alpakaNativePtr(energyPtr)[i],
+            workdivRun1, reduceKernelRun1, &alpakaNativePtr(energy)[i],
             &alpakaNativePtr(dev->maxValueMaps)[i],
             TConfig::DIMX * TConfig::DIMY));
 
@@ -1325,7 +761,7 @@ dev->numMaps);
       auto const maxValueCopy(
           alpakaCreateKernel<TAlpaka>(workdivMaxValueCopy, maxValueCopyKernel,
                                       alpakaNativePtr(dev->maxValueMaps),
-                                      alpakaNativePtr(maxValuesPtr), numMaps));
+                                      alpakaNativePtr(maxValues), numMaps));
 
       DEBUG("enqueueing max value extraction kernel");
       alpakaEnqueueKernel(dev->queue, maxValueCopy);
@@ -1337,102 +773,11 @@ dev->numMaps);
 
       SummationKernel<TConfig> summationKernel{};
       auto const summation(alpakaCreateKernel<TAlpaka>(
-          getWorkDiv<TAlpaka>(), summationKernel, alpakaNativePtr(energyPtr),
+          getWorkDiv<TAlpaka>(), summationKernel, alpakaNativePtr(energy),
           decltype(TConfig::SUM_FRAMES)(TConfig::SUM_FRAMES), dev->numMaps,
-          alpakaNativePtr(sumPtr)));
+          alpakaNativePtr(sum)));
 
       alpakaEnqueueKernel(dev->queue, summation);
     };
   }
-
-  //! @todo: remove this
-  /*    template <typename TFramePackageEnergyMap,
-              typename TFramePackagePhotonMap,
-              typename TFramePackageSumMap,
-              typename TFramePackageEnergyValue>
-    auto
-    downloadData(DeviceData<TConfig, TAlpaka>* dev,
-                 boost::optional<TFramePackageEnergyMap> energy,
-                 boost::optional<TFramePackagePhotonMap> photon,
-                 boost::optional<TFramePackageSumMap> sum,
-                 boost::optional<TFramePackageEnergyValue> maxValues,
-                 typename TConfig::template ClusterArray<TAlpaka>* clusters)
-        -> void
-    {
-        // download energy if needed
-        if (energy) {
-            DEBUG("downloading energy");
-            (*energy).numFrames = dev->numMaps;
-            alpakaCopyIfNeeded<TAlpaka>(dev->queue, (*energy).data, dev->energy,
-    dev->numMaps);
-        }
-
-        // download photon data if needed
-        if (photon) {
-            DEBUG("downloading photons");
-            (*photon).numFrames = dev->numMaps;
-            alpakaCopyIfNeeded<TAlpaka>(dev->queue, (*photon).data, dev->photon,
-    dev->numMaps);
-        }
-
-        // download summation frames if needed
-        if (sum) {
-            DEBUG("downloading sum");
-            (*sum).numFrames = dev->numMaps / TConfig::SUM_FRAMES;
-            alpakaCopyIfNeeded<TAlpaka>(dev->queue,
-                       (*sum).data,
-                       dev->sum,
-                       (dev->numMaps / TConfig::SUM_FRAMES));
-        }
-
-        // download maximum values if needed
-        if (maxValues) {
-            DEBUG("downloading max values");
-            (*maxValues).numFrames = dev->numMaps;
-            alpakaCopyIfNeeded<TAlpaka>(dev->queue,
-                       (*maxValues).data,
-                       dev->maxValues,
-                       decltype(TConfig::DEV_FRAMES)(TConfig::DEV_FRAMES));
-        }
-
-        // download number of clusters if needed
-        if (clusters) {
-            // download number of found clusters
-            DEBUG("downloading clusters");
-            alpakaCopy(dev->queue,
-                       (*clusters).usedPinned,
-                       dev->numClusters,
-                       decltype(TConfig::SINGLEMAP)(TConfig::SINGLEMAP));
-
-            // wait for completion of copy operations
-            alpakaWait(dev->queue);
-
-            // reserve space in the cluster array for the new data and save
-            // the number of clusters to download temporarily
-            auto oldNumClusters = (*clusters).used;
-
-
-            DEBUG("total current clusters:", oldNumClusters);
-
-
-            auto clustersToDownload =
-                alpakaNativePtr((*clusters).usedPinned)[0];
-            alpakaNativePtr((*clusters).usedPinned)[0] += oldNumClusters;
-            (*clusters).used = alpakaNativePtr((*clusters).usedPinned)[0];
-
-            DEBUG("Downloading ", clustersToDownload, "clusters. ");
-            DEBUG("Total downloaded clusters:", (*clusters).used);
-
-            // create a subview in the cluster buffer where the new data
-            // shuld be downloaded to
-            auto const extentView(Vec(static_cast<Size>(clustersToDownload)));
-            auto const offsetView(Vec(static_cast<Size>(oldNumClusters)));
-            typename TAlpaka::template HostView<typename TConfig::Cluster>
-                clusterView(clusters->clusters, extentView, offsetView);
-
-            // download actual clusters
-            alpakaCopy(
-                dev->queue, clusterView, dev->cluster, clustersToDownload);
-        }
-        }*/
 };
