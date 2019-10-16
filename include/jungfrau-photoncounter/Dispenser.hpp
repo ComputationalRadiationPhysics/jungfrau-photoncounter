@@ -452,8 +452,11 @@ private:
     nextFull = (nextFull + 1) % devices.size();
     nextFree = (nextFree + 1) % devices.size();
 
+    // zero out initial pedestal maps and normal pedestal maps
     if (!init) {
       alpakaMemSet(dev->queue, dev->pedestal, 0,
+                   decltype(TConfig::SINGLEMAP)(TConfig::SINGLEMAP));
+      alpakaMemSet(dev->queue, dev->initialPedestal, 0,
                    decltype(TConfig::SINGLEMAP)(TConfig::SINGLEMAP));
       alpakaWait(dev->queue);
       init = true;
@@ -630,27 +633,10 @@ private:
       clusterBuffer.download();
     }
 
-    DEBUG("Download data");
-
     energyBuffer.download();
-
-    //! @todo: remove this
-    DEBUG("downloaded energy");
-
     photonBuffer.download();
-
-    //! @todo: remove this
-    DEBUG("downloaded photons");
-
     sumBuffer.download();
-
-    //! @todo: remove this
-    DEBUG("downloaded sums");
-
     maxValuesBuffer.download();
-
-    //! @todo: remove this
-    DEBUG("asödflkj");
 
     // update the nextFree index
     nextFree = (nextFree + 1) % devices.size();
