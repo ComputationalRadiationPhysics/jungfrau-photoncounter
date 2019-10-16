@@ -5,6 +5,8 @@
 #include <fstream>
 #include <iostream>
 
+#include <optional.hpp>
+
 #include "AlpakaHelper.hpp"
 #include "CheapArray.hpp"
 
@@ -68,7 +70,151 @@ template <typename T, typename TAlpaka> struct FramePackage {
         data, offset, numFrames);
   }
 };
+// define void_t
+template <typename... Ts> struct make_void { typedef void type; };
+template <typename... Ts> using void_t = typename make_void<Ts...>::type;
 
+// define a double buffer / shadow buffer
+template <typename T, typename TAccelerator, typename TBufferHost,
+          typename TBufferDevice, bool>
+class DoubleBuffer;
+
+// CPU implementation
+template <typename T, typename TAccelerator, typename TBufferHost,
+          typename TBufferDevice>
+class DoubleBuffer<T, TAccelerator, TBufferHost, TBufferDevice, true> {
+public:
+  // construct from optional host buffer and normal device buffer
+  DoubleBuffer(tl::optional<TBufferHost> h, TBufferDevice d,
+               typename TAccelerator::Queue *, std::size_t numMaps)
+      : h(h ? getView(*h, numMaps) : getView(d, numMaps)) {}
+
+  // create from normal host- and device buffer
+  DoubleBuffer(TBufferHost h, TBufferDevice d, typename TAccelerator::Queue *,
+               std::size_t numMaps)
+      : h(getView(h, numMaps)) {}
+
+  void resize(std::size_t) {}
+
+  void upload() {}
+
+  void download() {}
+
+  // get the device buffer
+  typename TAccelerator::template HostView<T> get() { return h; }
+
+private:
+  //! @todo: is this really required?
+  // extract the view from a FramePackage
+  static typename TAccelerator::template HostView<T>
+  getView(FramePackage<T, TAccelerator> buf, std::size_t numMaps) {
+    (void)numMaps;
+    return getView(buf.data);
+  }
+
+  //! @todo: is this really required?
+  // extract the view from a FramePackageView
+  static typename TAccelerator::template HostView<T>
+  getView(FramePackageView<T, TAccelerator,
+                           typename TAccelerator::template HostView<T>>
+              buf,
+          std::size_t numMaps) {
+    (void)numMaps;
+    return buf.data;
+  }
+
+  // extract the view from a normal buffer
+  static typename TAccelerator::template HostView<T>
+  getView(typename TAccelerator::template HostBuf<T> buf, std::size_t numMaps) {
+    long unsigned int offset = 0;
+    return typename TAccelerator::template HostView<T>(buf, numMaps, offset);
+  }
+
+  // extract the view from another view
+  static typename TAccelerator::template HostView<T>
+  getView(typename TAccelerator::template HostView<T> view,
+          std::size_t numMaps) {
+    return view;
+  }
+
+  typename TAccelerator::template HostView<T> h;
+};
+
+// GPU implementation
+template <typename T, typename TAccelerator, typename TBufferHost,
+          typename TBufferDevice>
+class DoubleBuffer<T, TAccelerator, TBufferHost, TBufferDevice, false> {
+public:
+  // construct from optional host buffer and normal device buffer
+  DoubleBuffer(tl::optional<TBufferHost> h, TBufferDevice d,
+               typename TAccelerator::Queue *queue, std::size_t numMaps)
+      : queue(queue), h(h), d(d), numMaps(numMaps) {}
+
+  // create from normal host- and device buffer
+  DoubleBuffer(TBufferHost h, TBufferDevice d,
+               typename TAccelerator::Queue *queue, std::size_t numMaps)
+      : queue(queue), h(h), d(d), numMaps(numMaps) {}
+
+  // upload to GPU
+  void upload() {
+    //! @todo: print error message if nothing is uploaded???
+    if (h)
+      alpakaCopy(*queue, d, *h, numMaps);
+  }
+
+  // download from GPU
+  void download() {
+    if (h)
+      alpakaCopy(*queue, *h, d, numMaps);
+  }
+
+  void resize(std::size_t numMaps) { this->numMaps = numMaps; }
+
+  // get the GPU buffer
+  typename TAccelerator::template AccView<T> get() { return d; }
+
+private:
+  typename TAccelerator::Queue *queue;
+  tl::optional<TBufferHost> h;
+  typename TAccelerator::template AccView<T> d;
+  std::size_t numMaps;
+};
+
+// meta function to get the right class for the device
+template <typename TAccelerator, typename TBufferHost, typename TBufferDevice>
+struct GetDoubleBuffer {
+  using Buffer =
+      DoubleBuffer<typename alpaka::elem::traits::ElemType<TBufferDevice>::type,
+                   TAccelerator, TBufferHost, TBufferDevice,
+                   std::is_same<typename TAccelerator::Acc,
+                                typename TAccelerator::Host>::value>;
+};
+
+// extend the double buffer to FramePackages
+template <typename TAccelerator, typename TBufferHost, typename TBufferDevice>
+class FramePackageDoubleBuffer
+    : public GetDoubleBuffer<TAccelerator, decltype(TBufferHost::data),
+                             TBufferDevice>::Buffer {
+public:
+  FramePackageDoubleBuffer(tl::optional<TBufferHost> h, TBufferDevice d,
+                           typename TAccelerator::Queue *queue,
+                           std::size_t numMaps)
+      : GetDoubleBuffer<TAccelerator, decltype(TBufferHost::data),
+                        TBufferDevice>::
+            Buffer(h ? static_cast<tl::optional<decltype(TBufferHost::data)>>(
+                           h->data)
+                     : static_cast<tl::optional<decltype(TBufferHost::data)>>(
+                           tl::nullopt),
+                   d, queue, numMaps) {}
+
+  FramePackageDoubleBuffer(TBufferHost h, TBufferDevice d,
+                           typename TAccelerator::Queue *queue,
+                           std::size_t numMaps)
+      : GetDoubleBuffer<TAccelerator, decltype(TBufferHost::data),
+                        TBufferDevice>::Buffer(h.data, d, queue, numMaps) {}
+};
+
+// type definitions
 using Pedestal = double;
 using EnergyValue = double;
 template <typename T, typename TAlpaka>
@@ -149,7 +295,6 @@ struct DetectorConfig {
     }
   };
 
-  // type definitions
   using DetectorData = Frame<std::uint16_t>;
   using PhotonMap = DetectorData;
   using SumMap = Frame<double>;
@@ -183,13 +328,14 @@ void printArgs(TFirst first, TArgs... args) {
 // general debug print function
 template <typename... TArgs>
 void debugPrint(const char *file, unsigned int line, TArgs... args) {
-  std::cout << __FILE__ << "[" << __LINE__ << "]:\n\t"
-            << (std::chrono::duration_cast<ms>((Clock::now() - t))).count()
-            << " ms\n\t";
+  std::cerr
+      << __FILE__ << "[" << __LINE__ << "]:\n\t"
+      << "_" //(std::chrono::duration_cast<ms>((Clock::now() - t))).count()
+      << " ms\n\t";
   printArgs(args...);
 }
 
-#define DEBUG(...) debugPrint(__FILE__, __LINE__, ##__VA_ARGS__);
+#define DEBUG(...) debugPrint(__FILE__, __LINE__, ##__VA_ARGS__)
 #else
 #define DEBUG(...)
 #endif

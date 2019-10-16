@@ -10,8 +10,12 @@
  * only change this line to change the backend
  * see Alpakaconfig.hpp for all available
  */
-template <std::size_t MAPSIZE> using Accelerator = CpuSerial<MAPSIZE>;
-using Config = JungfrauConfig;
+template <std::size_t MAPSIZE>
+using Accelerator =
+    GpuCudaRt<MAPSIZE>; // CpuOmp2Blocks<MAPSIZE>; // GpuCudaRt<MAPSIZE>; //
+                        // CpuSerial<MAPSIZE>;
+// GpuCudaRt<MAPSIZE>;
+using Config = JungfrauConfig; // MoenchConfig; // JungfrauConfig;
 using ConcreteAcc = Accelerator<Config::MAPSIZE>;
 
 auto main(int argc, char *argv[]) -> int {
@@ -41,7 +45,7 @@ auto main(int argc, char *argv[]) -> int {
 
   FramePackage<typename Config::GainMap, ConcreteAcc> gain(
       fc->loadMaps<typename Config::GainMap, ConcreteAcc>(
-          //"../../../moench_data/moench_gain.bin"
+          //"../../../moench_data/moench_gain.bin"));
           "../../../data_pool/px_101016/gainMaps_M022.bin"));
   DEBUG(gain.numFrames, "gain maps loaded");
 
@@ -50,7 +54,7 @@ auto main(int argc, char *argv[]) -> int {
   delete (fc);
 
   // create empty, optional input mask
-  boost::optional<ConcreteAcc::HostBuf<typename Config::MaskMap>> maskPtr;
+  tl::optional<ConcreteAcc::HostBuf<typename Config::MaskMap>> maskPtr;
   if (mask.numFrames == Config::SINGLEMAP)
     maskPtr = mask.data;
 
@@ -67,29 +71,27 @@ auto main(int argc, char *argv[]) -> int {
 
   // allocate space for output data
   FramePackage<typename Config::EnergyMap, ConcreteAcc> energy_data(
-      Config::DEV_FRAMES);
+      data.numFrames);
   FramePackage<typename Config::PhotonMap, ConcreteAcc> photon_data(
-      Config::DEV_FRAMES);
+      data.numFrames);
   FramePackage<typename Config::SumMap, ConcreteAcc> sum_data(
-      Config::DEV_FRAMES / Config::SUM_FRAMES);
+      (data.numFrames + Config::SUM_FRAMES - 1) / Config::SUM_FRAMES);
   typename Config::ClusterArray<ConcreteAcc> clusters_data(30000 * 40000 / 50);
-  FramePackage<EnergyValue, ConcreteAcc> maxValues_data(Config::DEV_FRAMES);
+  FramePackage<EnergyValue, ConcreteAcc> maxValues_data(data.numFrames);
 
-  boost::optional<FramePackage<typename Config::EnergyMap, ConcreteAcc> &>
-      energy = energy_data;
-  boost::optional<FramePackage<typename Config::PhotonMap, ConcreteAcc> &>
-      photon; // = photon_data;
-  boost::optional<FramePackage<typename Config::SumMap, ConcreteAcc> &> sum =
+  tl::optional<FramePackage<typename Config::EnergyMap, ConcreteAcc>> energy =
+      energy_data;
+  tl::optional<FramePackage<typename Config::PhotonMap, ConcreteAcc>> photon =
+      photon_data;
+  tl::optional<FramePackage<typename Config::SumMap, ConcreteAcc>> sum =
       sum_data;
   typename Config::ClusterArray<ConcreteAcc> *clusters = &clusters_data;
 
-  boost::optional<FramePackage<EnergyValue, ConcreteAcc> &> maxValues =
+  tl::optional<FramePackage<EnergyValue, ConcreteAcc>> maxValues =
       maxValues_data;
 
-  // create variables to track the progress
+  // create variable to track the progress
   std::size_t offset = 0;
-  std::size_t downloaded = 0;
-  std::size_t currently_downloaded_frames = 0;
 
   // create vectors to hold the number of downloaded / uploaded frames and a
   // future The future is a variable, which is not "ready", when it is
@@ -100,37 +102,182 @@ auto main(int argc, char *argv[]) -> int {
   // returned, doesn't hold any deeper meaning. Once a future goes out pf
   // scope, it waits for its variable to be calculated. To delay this to the
   // end of the program, we create a vector of futures and store them there.
-  std::vector<std::tuple<std::size_t, std::future<bool>>> uploadFutures;
-  std::vector<std::tuple<std::size_t, std::future<bool>>> downloadFutures;
+  std::vector<std::tuple<std::size_t, std::future<bool>>> futures;
 
   // set execution flags
   ExecutionFlags ef;
   ef.mode = 1;
-  ef.summation = 0;
+  ef.summation = 1;
   ef.masking = 1;
-  ef.maxValue = 0;
+  ef.maxValue = 1;
+
+  using EnergyPackageView =
+      FramePackageView_t<typename Config::EnergyMap, ConcreteAcc>;
+  using PhotonPackageView =
+      FramePackageView_t<typename Config::PhotonMap, ConcreteAcc>;
+  using SumPackageView =
+      FramePackageView_t<typename Config::SumMap, ConcreteAcc>;
+  using MaxValuePackageView = FramePackageView_t<EnergyValue, ConcreteAcc>;
 
   // process data maps
-  while (downloaded < data.numFrames) {
+  while (offset < data.numFrames) {
+
+    auto energy_view([&]() -> tl::optional<EnergyPackageView> {
+      if (energy)
+        return energy->getView(offset, Config::DEV_FRAMES);
+      return tl::nullopt;
+    }());
+
+    auto photon_view([&]() -> tl::optional<PhotonPackageView> {
+      if (photon)
+        return photon->getView(offset, Config::DEV_FRAMES);
+      return tl::nullopt;
+    }());
+
+    auto sum_view([&]() -> tl::optional<SumPackageView> {
+      if (sum)
+        return sum->getView(
+            (offset + Config::SUM_FRAMES - 1) / Config::SUM_FRAMES,
+            (Config::DEV_FRAMES + Config::SUM_FRAMES - 1) / Config::SUM_FRAMES);
+      return tl::nullopt;
+    }());
+
+    auto maxValues_view([&]() -> tl::optional<MaxValuePackageView> {
+      if (maxValues)
+        return maxValues->getView(offset, Config::DEV_FRAMES);
+      return tl::nullopt;
+    }());
+
     // save the upload future
-    uploadFutures.emplace_back(dispenser.uploadData(data, offset, ef));
+    futures.emplace_back(dispenser.process(data, offset, ef, energy_view,
+                                           photon_view, sum_view,
+                                           maxValues_view, clusters));
 
     // get the number of frames that have been uploaded and add them to the
     // offset
-    offset = std::get<0>(*uploadFutures.rbegin());
+    offset = std::get<0>(*futures.rbegin());
 
-    // save the download future
-    downloadFutures.emplace_back(
-        dispenser.downloadData(energy, photon, sum, maxValues, clusters));
+    // download first image
+    /*if (futures.size() == 1) {
+      // wait for calculation to finish
+      std::get<1>(futures.back()).wait();
+      if (energy)
+        save_image<Config>("ebegin", alpakaNativePtr(energy->data), 0);
 
-    // update the number of downloaded frames, if any frames where
-    // downloaded
-    currently_downloaded_frames = std::get<0>(*downloadFutures.rbegin());
-    if (currently_downloaded_frames) {
-      downloaded += currently_downloaded_frames;
-      DEBUG(downloaded, "/", data.numFrames, "downloaded;", offset, "uploaded");
-    }
+      if (photon)
+        save_image<Config>("pbegin", alpakaNativePtr(photon->data), 0);
+
+      if (sum)
+        save_image<Config>("sbegin", alpakaNativePtr(sum->data), 0);
+
+      if (maxValues)
+        DEBUG("max value:", alpakaNativePtr(maxValues->data)[0]);
+      save_image<Config>("pedestal_begin",
+                         alpakaNativePtr(dispenser.downloadPedestaldata().data),
+                         0);
+      save_image<Config>("gainstage_begin",
+                         alpakaNativePtr(dispenser.downloadGainStages().data),
+                         0);
+      save_single_map<Config>("drift_begin",
+                              dispenser.downloadDriftMap()->data);
+      save_single_map<Config>("mask_begin", dispenser.downloadMask()->data);
+    } else if (futures.size() == 2) {
+      // wait for calculation to finish
+      std::get<1>(futures.back()).wait();
+      if (energy)
+        save_image<Config>("ebegin2", alpakaNativePtr(energy->data),
+                           energy->numFrames - 1);
+
+      if (photon)
+        save_image<Config>("pbegin2", alpakaNativePtr(photon->data),
+                           photon->numFrames - 1);
+
+      if (sum)
+        save_image<Config>("sbegin2", alpakaNativePtr(sum->data),
+                           sum->numFrames - 1);
+
+      if (maxValues)
+        DEBUG("max value:",
+              alpakaNativePtr(maxValues->data)[maxValues->numFrames - 1]);
+      save_image<Config>("pedestal_begin2",
+                         alpakaNativePtr(dispenser.downloadPedestaldata().data),
+                         0);
+      save_image<Config>("gainstage_begin2",
+                         alpakaNativePtr(dispenser.downloadGainStages().data),
+                         0);
+      save_single_map<Config>("drift_begin2",
+                              dispenser.downloadDriftMap()->data);
+      save_single_map<Config>("mask_begin2", dispenser.downloadMask()->data);
+
+    } else if (futures.size() >=
+               (10000 - 1 * Config::DEV_FRAMES) / Config::DEV_FRAMES) {
+      DEBUG("saving second to last image");
+
+      // wait for calculation to finish
+      // std::get<1>(futures.back()).wait();
+      / *if (energy)
+        save_image<Config>("eend3", alpakaNativePtr(energy->data), 0);
+
+      if (photon)
+        save_image<Config>("pend3", alpakaNativePtr(photon->data), 0);
+
+      if (sum)
+        save_image<Config>("send3", alpakaNativePtr(sum->data), 0);
+
+      if (maxValues)
+        DEBUG("max value:", alpakaNativePtr(maxValues->data)[0]);
+      save_image<Config>("pedestal3",
+                         alpakaNativePtr(dispenser.downloadPedestaldata().data),
+                         0);
+      save_image<Config>("gainstage3",
+                         alpakaNativePtr(dispenser.downloadGainStages().data),
+                         0);
+      save_single_map<Config>("drift3", dispenser.downloadDriftMap()->data);
+      save_single_map<Config>("mask3", dispenser.downloadMask()->data);
+* /
+    } else if (futures.size() >= data.numFrames - 2 * Config::DEV_FRAMES - 1) {
+      std::get<1>(futures.back()).wait();
+      DEBUG("waiting");
+    }*/
+
+    // print status message
+    DEBUG(offset, "/", data.numFrames, "enqueued");
   }
+
+  // wait for calculation to finish
+  std::get<1>(futures.back()).wait();
+
+  // save second last images
+  if (energy)
+    save_image<Config>("eend2", alpakaNativePtr(energy->data),
+                       energy->numFrames - 2);
+
+  if (photon)
+    save_image<Config>("pend2", alpakaNativePtr(photon->data),
+                       photon->numFrames - 2);
+
+  // save last images
+  if (energy)
+    save_image<Config>("eend", alpakaNativePtr(energy->data),
+                       energy->numFrames - 1);
+
+  if (photon)
+    save_image<Config>("pend", alpakaNativePtr(photon->data),
+                       photon->numFrames - 1);
+
+  if (sum)
+    save_image<Config>("send", alpakaNativePtr(sum->data), sum->numFrames - 1);
+
+  if (maxValues)
+    DEBUG("max value:",
+          alpakaNativePtr(maxValues->data)[maxValues->numFrames - 1]);
+
+  save_image<Config>("pedestal",
+                     alpakaNativePtr(dispenser.downloadPedestaldata().data), 0);
+  save_image<Config>("gainstage",
+                     alpakaNativePtr(dispenser.downloadGainStages().data), 0);
+  save_single_map<Config>("drift", dispenser.downloadDriftMap()->data);
+  save_single_map<Config>("mask", dispenser.downloadMask()->data);
 
   // save clusters (currently only used for debugging)
   if (clusters) {

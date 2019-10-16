@@ -8,7 +8,7 @@
 #include <vector>
 
 constexpr std::size_t CLUSTER_SIZE = 3;
-constexpr std::size_t MAX_CLUSTER_NUM = 15000;
+constexpr std::size_t MAX_CLUSTER_NUM = 10000000;
 
 struct Cluster {
     std::uint64_t frameNumber;
@@ -102,8 +102,10 @@ bool checkFrameNumbers(std::vector<ClusterFrame>& clusters)
     std::cout << "Checking frame order ...\n";
 
     for (unsigned int i = 1; i < clusters.size(); ++i) {
-        if (std::abs(clusters[i - 1].frameNumber - clusters[i].frameNumber) > 1)
+        if (std::abs(clusters[i - 1].frameNumber - clusters[i].frameNumber) > 1) {
+            std::cerr << "Framenumber out of order at position " << i << " / " << clusters.size() << " (" << static_cast<float>(i) / static_cast<float>(clusters.size()) * 100.0 <<"%): " << clusters[i - 1].frameNumber << " vs. " << clusters[i].frameNumber << "\n";
             return false;
+        }
     }
     return true;
 }
@@ -116,8 +118,7 @@ std::tuple<std::size_t, std::size_t> getOffset(T it1, T it2, TCmp cmp)
     if (cmp(it1->frameNumber, it2->frameNumber)) {
         while (cmp((++it1)->frameNumber, it2->frameNumber))
             ++offset1;
-    }
-    else {
+    } else if (cmp(it2->frameNumber, it1->frameNumber)) {
         while (cmp((++it2)->frameNumber, it1->frameNumber))
             ++offset2;
     }
@@ -132,13 +133,12 @@ selectCommonFrames(const std::vector<ClusterFrame>& v1,
     const auto start =
         getOffset(v1.begin(), v2.begin(), std::less_equal<size_t>());
     const auto end =
-        getOffset(v1.begin(), v2.begin(), std::greater_equal<size_t>());
+        getOffset(v1.rbegin(), v2.rbegin(), std::greater<size_t>());
     std::size_t begin1 = std::get<0>(start);
     std::size_t end1 = std::get<0>(end);
     std::size_t begin2 = std::get<1>(start);
-    std::size_t end2 = std::get<0>(end);
-
-
+    std::size_t end2 = std::get<1>(end);
+    
     return std::make_tuple(begin1, end1, begin2, end2);
 }
 
@@ -155,11 +155,15 @@ int main(int argc, char* argv[])
     std::vector<ClusterFrame> reference = readClusters(reference_path);
 
     // check frame numbers
-    if (!checkFrameNumbers(detector))
+    if (!checkFrameNumbers(detector)) {
         std::cerr << "Error: detector clusters not in order!\n";
+        exit(-1);
+    }
 
-    if (!checkFrameNumbers(reference))
-        std::cerr << "Error: detector clusters not in order!\n";
+    if (!checkFrameNumbers(reference)) {
+        std::cerr << "Error: reference clusters not in order!\n";
+        exit(-1);
+    }
 
     // extract offset information
     auto offsets = selectCommonFrames(detector, reference);
