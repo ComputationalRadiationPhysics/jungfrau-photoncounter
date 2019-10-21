@@ -243,8 +243,6 @@ struct DetectorConfig {
   static constexpr std::size_t FRAME_HEADER_SIZE = 16;
   static constexpr std::size_t PEDEMAPS = 3;
   static constexpr std::size_t GAINMAPS = 3;
-  static constexpr float BEAMCONST = 6.2;
-  static constexpr float PHOTONCONST = (1. / 12.4);
 
   // derived settings
   static constexpr std::size_t MAPSIZE = DIMX * DIMY;
@@ -328,10 +326,9 @@ void printArgs(TFirst first, TArgs... args) {
 // general debug print function
 template <typename... TArgs>
 void debugPrint(const char *file, unsigned int line, TArgs... args) {
-  std::cerr
-      << __FILE__ << "[" << __LINE__ << "]:\n\t"
-      << "_" //(std::chrono::duration_cast<ms>((Clock::now() - t))).count()
-      << " ms\n\t";
+  std::cerr << __FILE__ << "[" << __LINE__ << "]:\n\t"
+            << (std::chrono::duration_cast<ms>((Clock::now() - t))).count()
+            << " ms\n\t";
   printArgs(args...);
 }
 

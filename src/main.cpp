@@ -49,6 +49,10 @@ auto main(int argc, char *argv[]) -> int {
           "../../../data_pool/px_101016/gainMaps_M022.bin"));
   DEBUG(gain.numFrames, "gain maps loaded");
 
+  float beamConst = 12.4;
+  // Jungfrau: 12.4keV
+  // MOENCH: 8.7keV
+
   FramePackage<typename Config::MaskMap, ConcreteAcc> mask(Config::SINGLEMAP);
   mask.numFrames = 0;
   delete (fc);
@@ -59,7 +63,7 @@ auto main(int argc, char *argv[]) -> int {
     maskPtr = mask.data;
 
   // initialize the dispenser
-  Dispenser<Config, Accelerator> dispenser(gain, maskPtr);
+  Dispenser<Config, Accelerator> dispenser(gain, beamConst, maskPtr);
 
   // print info
 #ifdef ALPAKA_ACC_GPU_CUDA_ENABLED

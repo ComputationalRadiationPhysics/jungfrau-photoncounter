@@ -23,8 +23,7 @@ endif()
 
 if(${BENCHMARKING_ENABLED})
   # build benchmarks
-  #add_subdirectory(benchmark/)
   alpaka_add_executable(bench src/bench.cpp)
   target_include_directories(bench PUBLIC include/ PUBLIC optional/include/tl/)
-  target_link_libraries(bench PUBLIC alpaka benchmark PRIVATE ${CMAKE_PROJECT_NAME})
+  target_link_libraries(bench PUBLIC alpaka PRIVATE ${CMAKE_PROJECT_NAME})
 endif()

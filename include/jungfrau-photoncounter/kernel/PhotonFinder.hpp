@@ -5,14 +5,15 @@ template <typename Config> struct PhotonFinderKernel {
   template <typename TAcc, typename TDetectorData, typename TGainMap,
             typename TInitPedestalMap, typename TPedestalMap,
             typename TGainStageMap, typename TEnergyMap, typename TPhotonMap,
-            typename TNumFrames, typename TMask, typename TNumStdDevs = int>
+            typename TNumFrames, typename TBeamConst, typename TMask,
+            typename TNumStdDevs = int>
   ALPAKA_FN_ACC auto operator()(
       TAcc const &acc, TDetectorData const *const detectorData,
       TGainMap const *const gainMaps, TInitPedestalMap *const initPedestalMaps,
       TPedestalMap *const pedestalMaps, TGainStageMap *const gainStageMaps,
       TEnergyMap *const energyMaps, TPhotonMap *const photonMaps,
-      TNumFrames const numFrames, TMask *const mask, bool pedestalFallback,
-      TNumStdDevs const c = Config::C) const -> void {
+      TNumFrames const numFrames, TBeamConst beamConst, TMask *const mask,
+      bool pedestalFallback, TNumStdDevs const c = Config::C) const -> void {
     auto globalId = getLinearIdx(acc);
     auto elementsPerThread = getLinearElementExtent(acc);
 
@@ -44,10 +45,8 @@ template <typename Config> struct PhotonFinderKernel {
         auto &photonCount = photonMaps[i].data[id];
 
         // calculate photon count from calibrated energy
-        float photonCountFloat =
-            (energy + Config::BEAMCONST) * Config::PHOTONCONST;
-        photonCount =
-            (energy + Config::BEAMCONST < 0.0f) ? 0 : photonCountFloat;
+        float photonCountFloat = (energy + beamConst / 2) / beamConst;
+        photonCount = (energy + beamConst / 2 < 0.0f) ? 0 : photonCountFloat;
 
         const auto &pedestal = pedestalMaps[gainStage][id];
         const auto &stddev = initPedestalMaps[gainStage][id].stddev;

@@ -35,6 +35,7 @@ public:
    * @param Maps-Struct with initial gain
    */
   Dispenser(FramePackage<typename TConfig::GainMap, TAlpaka> gainMap,
+            float beamConst,
             tl::optional<typename TAlpaka::template HostBuf<MaskMap>> mask)
       : gain(gainMap),
         mask((mask ? *mask
@@ -51,8 +52,9 @@ public:
         pedestalFallback(false), init(false),
         ringbuffer(TAlpaka::STREAMS_PER_DEV * alpakaGetDevCount<TAlpaka>()),
         pedestal(TConfig::PEDEMAPS, alpakaGetHost<TAlpaka>()),
-        initPedestal(TConfig::PEDEMAPS, alpakaGetHost<TAlpaka>()), nextFull(0),
-        nextFree(0), deviceContainer(alpakaGetDevs<TAlpaka>()) {
+        initPedestal(TConfig::PEDEMAPS, alpakaGetHost<TAlpaka>()),
+        beamConst(beamConst), nextFull(0), nextFree(0),
+        deviceContainer(alpakaGetDevs<TAlpaka>()) {
     initDevices();
 
     // make room for live mask information
@@ -376,6 +378,8 @@ private:
   Ringbuffer<DeviceData<TConfig, TAlpaka> *> ringbuffer;
   std::vector<DeviceData<TConfig, TAlpaka>> devices;
 
+  float beamConst;
+
   std::size_t nextFree, nextFull;
 
   /**
@@ -683,7 +687,7 @@ private:
           alpakaNativePtr(dev->gain), alpakaNativePtr(dev->initialPedestal),
           alpakaNativePtr(dev->pedestal), alpakaNativePtr(dev->gainStage),
           alpakaNativePtr(energy), alpakaNativePtr(photon), dev->numMaps,
-          local_mask, pedestalFallback));
+          beamConst, local_mask, pedestalFallback));
 
       DEBUG("enqueueing photon kernel");
       alpakaEnqueueKernel(dev->queue, photonFinder);
