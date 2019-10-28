@@ -35,7 +35,7 @@ public:
    * @param Maps-Struct with initial gain
    */
   Dispenser(FramePackage<typename TConfig::GainMap, TAlpaka> gainMap,
-            float beamConst,
+            double beamConst,
             tl::optional<typename TAlpaka::template HostBuf<MaskMap>> mask)
       : gain(gainMap),
         mask((mask ? *mask
@@ -378,7 +378,7 @@ private:
   Ringbuffer<DeviceData<TConfig, TAlpaka> *> ringbuffer;
   std::vector<DeviceData<TConfig, TAlpaka>> devices;
 
-  float beamConst;
+  double beamConst;
 
   std::size_t nextFree, nextFull;
 

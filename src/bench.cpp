@@ -1,4 +1,5 @@
 #include "bench.hpp"
+#include "check.hpp"
 #include "confgen.hpp"
 
 #include "jungfrau-photoncounter/Alpakaconfig.hpp"
@@ -15,30 +16,7 @@
  * see Alpakaconfig.hpp for all available
  */
 
-template <std::size_t MAPSIZE>
-using Accelerator = CpuOmp2Blocks<MAPSIZE>; // CpuOmp2Blocks< // GpuCudaRt<
-// MAPSIZE>; // CpuSerial<MAPSIZE>;//GpuCudaRt<MAPSIZE>;//GpuCudaRt<MAPSIZE>;
-// // CpuSerial;
-
-/*
-//#define MOENCH
-
-#ifdef MOENCH
-// using Config = MoenchConfig;
-const std::string pedestalPath =
-    "../../../../moench_data/1000_frames_pede_e17050_1_00018_00000.dat";
-const std::string gainPath = "../../../../moench_data/moench_gain.bin";
-const std::string dataPath =
-    "../../../../moench_data/e17050_1_00018_00000_image.dat";
-#else
-// using Config = JungfrauConfig;
-const std::string pedestalPath =
-    "../../../data_pool/px_101016/allpede_250us_1243__B_000000.dat";
-const std::string gainPath = "../../../data_pool/px_101016/gainMaps_M022.bin";
-const std::string dataPath =
-    "../../../data_pool/px_101016/Insu_6_tr_1_45d_250us__B_000000.dat";
-#endif
-*/
+template <std::size_t TMapSize> using Accelerator = GpuCudaRt<TMapSize>;
 
 constexpr auto framesPerStageG0 = Values<std::size_t, 1000>();
 constexpr auto framesPerStageG1 = Values<std::size_t, 1000>();
@@ -82,7 +60,8 @@ template <class Tuple>
 std::vector<Duration> benchmark(unsigned int iterations, ExecutionFlags flags,
                                 const std::string &pedestalPath,
                                 const std::string &gainPath,
-                                const std::string &dataPath, float beamConst) {
+                                const std::string &dataPath, double beamConst,
+                                ResultCheck resultCheck) {
   using Config = typename ConfigFrom<Tuple>::Result;
   using ConcreteAcc = Accelerator<Config::MAPSIZE>;
   auto benchmarkingInput = setUp<Config, ConcreteAcc>(
@@ -96,14 +75,34 @@ std::vector<Duration> benchmark(unsigned int iterations, ExecutionFlags flags,
     auto t1 = Timer::now();
     results.push_back(std::chrono::duration_cast<Duration>(t1 - t0));
   }
+
+  // check result if requested
+  std::cout << "Checking energy if needed ..." << std::endl;
+  if (!checkResult(benchmarkingInput.energy, resultCheck.energyPath))
+    std::cerr << "Energy result mismatch!\n";
+
+  std::cout << "Checking photons if needed ..." << std::endl;
+  if (!checkResult(benchmarkingInput.photons, resultCheck.photonPath))
+    std::cerr << "Photon result mismatch!\n";
+
+  std::cout << "Checking sums if needed ..." << std::endl;
+  if (!checkResult(benchmarkingInput.sum, resultCheck.sumPath))
+    std::cerr << "Sum result mismatch!\n";
+
+  std::cout << "Checking max values if needed ..." << std::endl;
+  if (!checkResultRaw(benchmarkingInput.maxValues, resultCheck.maxValuesPath))
+    std::cerr << "Maximum value result mismatch!\n";
+
+  std::cout << "Checking clusters if needed ..." << std::endl;
+  if (!checkClusters(benchmarkingInput.clusters, resultCheck.clusterPath))
+    std::cerr << "Cluster result mismatch!\n";
+
   return results;
 }
 
-using BenchmarkFunction = std::vector<Duration> (*)(unsigned int,
-                                                    ExecutionFlags,
-                                                    const std::string &,
-                                                    const std::string &,
-                                                    const std::string &, float);
+using BenchmarkFunction = std::vector<Duration> (*)(
+    unsigned int, ExecutionFlags, const std::string &, const std::string &,
+    const std::string &, double, ResultCheck resultCheck);
 
 static std::unordered_map<int, BenchmarkFunction> benchmarks;
 
@@ -119,18 +118,20 @@ template <class List> void registerBenchmarks(int x, const List &) {
 
 int main(int argc, char *argv[]) {
   // check command line parameters
-  if (argc != 11 && argc != 12) {
+  if (argc < 11 || argc > 17) {
     std::cerr
         << "Usage: bench <benchmark id> <iteration count> <beamConst> <mode> "
            "<masking> <max values> <summation> <pedestal path> <gain "
-           "path> <data path> [output prefix]\n";
+           "path> <data path> [output prefix] [energy reference result path] "
+           "[photon reference result path] [max value reference result path] "
+           "[sum reference result path] [cluster reference result path]\n";
     abort();
   }
 
   // initialize parameters
   int benchmarkID = std::atoi(argv[1]);
   unsigned int iterationCount = static_cast<unsigned int>(std::atoi(argv[2]));
-  float beamConst = std::atoi(argv[3]);
+  double beamConst = std::atof(argv[3]);
   ExecutionFlags ef;
   ef.mode = static_cast<std::uint8_t>(std::atoi(argv[4]));
   ef.masking = static_cast<std::uint8_t>(std::atoi(argv[5]));
@@ -154,6 +155,19 @@ int main(int argc, char *argv[]) {
   std::transform(outputPath.begin(), outputPath.end(), outputPath.begin(),
                  [](char c) -> char { return (c == '/') ? ' ' : c; });
 
+  // store reference result pathes (enter "_" for none)
+  ResultCheck resultCheck;
+  if (argc > 12)
+    resultCheck.energyPath = argv[12];
+  if (argc > 13)
+    resultCheck.photonPath = argv[13];
+  if (argc > 14)
+    resultCheck.maxValuesPath = argv[14];
+  if (argc > 15)
+    resultCheck.sumPath = argv[15];
+  if (argc > 16)
+    resultCheck.clusterPath = argv[16];
+
   // register benchmarks
   registerBenchmarks(0, parameterSpace);
   std::cout << "Registered " << benchmarks.size() << " benchmarks. \n";
@@ -173,8 +187,9 @@ int main(int argc, char *argv[]) {
   }
 
   // run benchmark
-  auto results = benchmarks[benchmarkID](iterationCount, ef, pedestalPath,
-                                         gainPath, dataPath, beamConst);
+  auto results =
+      benchmarks[benchmarkID](iterationCount, ef, pedestalPath, gainPath,
+                              dataPath, beamConst, resultCheck);
 
   // store results
   for (const auto &r : results)

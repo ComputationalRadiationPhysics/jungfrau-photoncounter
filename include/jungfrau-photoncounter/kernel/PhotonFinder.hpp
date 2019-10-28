@@ -45,8 +45,10 @@ template <typename Config> struct PhotonFinderKernel {
         auto &photonCount = photonMaps[i].data[id];
 
         // calculate photon count from calibrated energy
-        float photonCountFloat = (energy + beamConst / 2) / beamConst;
-        photonCount = (energy + beamConst / 2 < 0.0f) ? 0 : photonCountFloat;
+        double photonCountFloat = (static_cast<double>(energy) +
+                                   static_cast<double>(beamConst) / 2.0) /
+                                  static_cast<double>(beamConst);
+        photonCount = (photonCountFloat < 0.0f) ? 0 : photonCountFloat;
 
         const auto &pedestal = pedestalMaps[gainStage][id];
         const auto &stddev = initPedestalMaps[gainStage][id].stddev;

@@ -15,7 +15,7 @@ template <typename Config, typename TAccelerator> struct BenchmarkingInput {
   FramePackage<typename Config::DetectorData, TAccelerator> pedestalData;
   FramePackage<typename Config::DetectorData, TAccelerator> data;
   FramePackage<typename Config::GainMap, TAccelerator> gain;
-  float beamConst;
+  double beamConst;
   tl::optional<typename TAccelerator::template HostBuf<MaskMap>> maskPtr;
 
   // output buffers
@@ -31,7 +31,7 @@ template <typename Config, typename TAccelerator> struct BenchmarkingInput {
       FramePackage<typename Config::DetectorData, TAccelerator> pedestalData,
       FramePackage<typename Config::DetectorData, TAccelerator> data,
       FramePackage<typename Config::GainMap, TAccelerator> gain,
-      float beamConst,
+      double beamConst,
       tl::optional<typename TAccelerator::template HostBuf<MaskMap>> maskPtr,
       tl::optional<FramePackage<typename Config::EnergyMap, TAccelerator>>
           energy,
@@ -50,7 +50,7 @@ template <typename Config, typename TAccelerator> struct BenchmarkingInput {
 // prepare and load data for the benchmark
 template <typename Config, typename ConcreteAcc>
 auto setUp(ExecutionFlags flags, std::string pedestalPath, std::string gainPath,
-           std::string dataPath, float beamConst, std::string maskPath = "",
+           std::string dataPath, double beamConst, std::string maskPath = "",
            std::size_t cacheSize = 1024UL * 1024 * 1024 * 16,
            std::size_t maxClusterCount = Config::MAX_CLUSTER_NUM)
     -> BenchmarkingInput<Config, ConcreteAcc> {
@@ -96,7 +96,8 @@ auto setUp(ExecutionFlags flags, std::string pedestalPath, std::string gainPath,
       data.numFrames);
   FramePackage<typename Config::PhotonMap, ConcreteAcc> photon_data(
       data.numFrames);
-  FramePackage<typename Config::SumMap, ConcreteAcc> sum_data(data.numFrames);
+  FramePackage<typename Config::SumMap, ConcreteAcc> sum_data(
+      (data.numFrames + Config::SUM_FRAMES - 1) / Config::SUM_FRAMES);
   FramePackage<EnergyValue, ConcreteAcc> maxValues_data(data.numFrames);
 
   // create optional values
@@ -162,7 +163,7 @@ auto bench(
   using MaxValuePackageView = FramePackageView_t<EnergyValue, ConcreteAcc>;
 
   std::size_t offset = 0;
-  std::size_t currently_downloaded_frames = 0;
+  std::size_t sum_offset = 0;
   std::vector<std::tuple<std::size_t, std::future<bool>>> futures;
 
   typename Config::template ClusterArray<ConcreteAcc> *clusters =
@@ -184,7 +185,7 @@ auto bench(
     }());
     auto sum([&]() -> tl::optional<SumPackageView> {
       if (benchmarkingConfig.sum)
-        return benchmarkingConfig.sum->getView(offset, Config::SUM_FRAMES);
+        return benchmarkingConfig.sum->getView(sum_offset, Config::SUM_FRAMES);
       return tl::nullopt;
     }());
     auto maxValues([&]() -> tl::optional<MaxValuePackageView> {
@@ -198,7 +199,9 @@ auto bench(
     futures.emplace_back(dispenser.process(benchmarkingConfig.data, offset,
                                            benchmarkingConfig.ef, energy,
                                            photons, sum, maxValues, clusters));
+    auto offset_diff = std::get<0>(*futures.rbegin()) - offset;
     offset = std::get<0>(*futures.rbegin());
+    sum_offset += (offset_diff + Config::SUM_FRAMES - 1) / Config::SUM_FRAMES;
 
     DEBUG(offset, "/", benchmarkingConfig.data.numFrames, "enqueued");
   }
