@@ -63,7 +63,7 @@ initPedestal(const TAcc &acc, TAdcValue const adc, TInitPedestal &initPedestal,
   // add
   else if (count <= windowSize) {
     m += adc;
-    m2 += adc;
+    m2 += adc * adc;
   }
   // push
   else {
