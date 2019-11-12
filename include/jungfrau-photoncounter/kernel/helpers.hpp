@@ -64,7 +64,7 @@ ALPAKA_FN_ACC ALPAKA_FN_INLINE auto initPedestal(const TAcc& acc,
     // add
     else if (count <= windowSize) {
         m += adc;
-        m2 += adc;
+        m2 += adc * adc;
     }
     // push
     else {
