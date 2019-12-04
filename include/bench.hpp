@@ -169,6 +169,20 @@ auto bench(
   typename Config::template ClusterArray<ConcreteAcc> *clusters =
       benchmarkingConfig.clusters;
 
+  save_image<Config>("pedestal_begin0",
+                     alpakaNativePtr(dispenser.downloadPedestaldata().data), 0);
+
+  // download and save std dev of the initial pedestal map
+  auto initPed = dispenser.downloadInitialPedestaldata();
+  std::ofstream outPede("pede_stddev.bin", std::ios::binary);
+  InitPedestal *pedePtr = alpakaNativePtr(initPed.data)->data;
+  for (unsigned int y = 0; y < Config::DIMY; ++y)
+    for (unsigned int x = 0; x < Config::DIMX; ++x)
+      outPede.write(reinterpret_cast<char *>(&(pedePtr[y * 1024 + x].stddev)),
+                    sizeof(double));
+  outPede.flush();
+  outPede.close();
+
   // process data maps
   while (offset < benchmarkingConfig.data.numFrames) {
 

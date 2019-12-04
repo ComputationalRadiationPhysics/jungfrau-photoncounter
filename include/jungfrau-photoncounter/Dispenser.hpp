@@ -702,7 +702,7 @@ private:
       for (uint32_t i = 0; i < numMaps + 1; ++i) {
         // execute the clusterfinder with the pedestal update on every
         // frame
-        ClusterFinderKernel<TConfig> clusterFinderKernel{};
+        ClusterFinderKernel<TConfig, TAlpaka> clusterFinderKernel{};
         auto const clusterFinder(alpakaCreateKernel<TAlpaka>(
             getWorkDiv<TAlpaka>(), clusterFinderKernel, alpakaNativePtr(data),
             alpakaNativePtr(dev->gain), alpakaNativePtr(dev->initialPedestal),

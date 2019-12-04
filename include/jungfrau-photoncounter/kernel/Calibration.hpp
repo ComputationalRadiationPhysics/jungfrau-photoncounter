@@ -43,6 +43,7 @@ template <typename Config> struct CalibrationKernel {
 
         auto dataword = detectorData[i].data[id];
         auto adc = getAdc(dataword);
+
         uint8_t gainStage = getGainStage(dataword);
 
         if (expectedGainStage == 0) {

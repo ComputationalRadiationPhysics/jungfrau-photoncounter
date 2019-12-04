@@ -17,7 +17,7 @@ ALPAKA_FN_ACC ALPAKA_FN_INLINE auto getLinearIdx(const TAcc &acc)
 
 template <typename TAcc>
 ALPAKA_FN_ACC ALPAKA_FN_INLINE auto getLinearElementExtent(const TAcc &acc)
-    -> std::uint64_t {
+    -> unsigned long {
   return alpakaGetElementExtent(acc)[0u];
 }
 

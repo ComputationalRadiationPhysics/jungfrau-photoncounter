@@ -38,7 +38,10 @@ public:
     std::size_t numFrames = fileSize / sizeof(TData);
 
     if (fileSize + bufferPointer >= buffer.get() + sizeBytes) {
-      std::cerr << "Error: Not enough memory allocated!\n";
+      if (bufferPointer == 0)
+        std::cerr << "Error: Nothing loaded! Is the file path correct?\n";
+      else
+        std::cerr << "Error: Not enough memory allocated!\n";
       exit(EXIT_FAILURE);
     }
 

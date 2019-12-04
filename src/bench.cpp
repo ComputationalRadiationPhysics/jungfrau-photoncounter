@@ -16,7 +16,10 @@
  * see Alpakaconfig.hpp for all available
  */
 
-template <std::size_t TMapSize> using Accelerator = GpuCudaRt<TMapSize>;
+template <std::size_t TMapSize>
+using Accelerator =
+    GpuCudaRt<TMapSize>; // CpuOmp2Blocks<TMapSize>; // CpuSerial<TMapSize>; //
+                         // GpuCudaRt<TMapSize>;
 
 constexpr auto framesPerStageG0 = Values<std::size_t, 1000>();
 constexpr auto framesPerStageG1 = Values<std::size_t, 1000>();
@@ -29,7 +32,7 @@ constexpr auto devFrames =
     Values<std::size_t, 10>(); // Values<std::size_t, 10, 100, 1000>();
 constexpr auto movingStatWindowSize = Values<std::size_t, 100>();
 constexpr auto clusterSize =
-    Values<std::size_t, 2>(); // Values<std::size_t, 2, 3, 7, 11>();
+    Values<std::size_t, 2, 3>(); // Values<std::size_t, 2, 3, 7, 11>();
 constexpr auto cs = Values<std::size_t, 5>();
 
 constexpr auto parameterSpace =
@@ -75,7 +78,6 @@ std::vector<Duration> benchmark(unsigned int iterations, ExecutionFlags flags,
     auto t1 = Timer::now();
     results.push_back(std::chrono::duration_cast<Duration>(t1 - t0));
   }
-
   // check result if requested
   std::cout << "Checking energy if needed ..." << std::endl;
   if (!checkResult(benchmarkingInput.energy, resultCheck.energyPath))
@@ -94,7 +96,8 @@ std::vector<Duration> benchmark(unsigned int iterations, ExecutionFlags flags,
     std::cerr << "Maximum value result mismatch!\n";
 
   std::cout << "Checking clusters if needed ..." << std::endl;
-  if (!checkClusters(benchmarkingInput.clusters, resultCheck.clusterPath))
+  if (!checkClusters<Config, ConcreteAcc>(benchmarkingInput.clusters,
+                                          resultCheck.clusterPath))
     std::cerr << "Cluster result mismatch!\n";
 
   return results;

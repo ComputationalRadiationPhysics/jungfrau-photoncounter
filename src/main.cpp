@@ -12,8 +12,8 @@
  */
 template <std::size_t MAPSIZE>
 using Accelerator =
-    GpuCudaRt<MAPSIZE>; // CpuOmp2Blocks<MAPSIZE>; // GpuCudaRt<MAPSIZE>; //
-                        // CpuSerial<MAPSIZE>;
+    CpuOmp2Blocks<MAPSIZE>; // CpuOmp2Blocks<MAPSIZE>; // GpuCudaRt<MAPSIZE>; //
+                            // CpuSerial<MAPSIZE>;
 // GpuCudaRt<MAPSIZE>;
 
 #define MOENCH

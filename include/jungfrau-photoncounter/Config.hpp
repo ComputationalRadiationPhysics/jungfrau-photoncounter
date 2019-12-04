@@ -20,8 +20,8 @@ struct FrameHeader {
 struct InitPedestal {
   std::size_t count;
   double mean;
-  uint64_t m;
-  uint64_t m2;
+  double m;
+  double m2;
   double stddev;
 };
 
@@ -275,7 +275,7 @@ struct DetectorConfig {
     std::uint64_t frameNumber;
     std::int16_t x;
     std::int16_t y;
-    std::int32_t data[CLUSTER_SIZE * CLUSTER_SIZE];
+    EnergyValue data[CLUSTER_SIZE * CLUSTER_SIZE];
   };
 
   // a struct to hold multiple clusters (on host and device)

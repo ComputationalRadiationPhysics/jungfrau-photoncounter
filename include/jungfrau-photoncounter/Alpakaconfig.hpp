@@ -251,7 +251,7 @@ template <std::size_t MAPSIZE> struct GpuCudaRt {
   template <typename T>
   using HostView = alpaka::mem::view::ViewSubView<DevHost, T, Dim, Size>;
 
-  static constexpr std::size_t STREAMS_PER_DEV = 3;
+  static constexpr std::size_t STREAMS_PER_DEV = 1;
   static constexpr Size elementsPerThread = 1u;
   static constexpr Size threadsPerBlock = 256;
   static constexpr Size blocksPerGrid = (MAPSIZE + 255) / 256;

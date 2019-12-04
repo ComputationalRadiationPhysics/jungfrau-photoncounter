@@ -1,7 +1,7 @@
 #pragma once
 #include "helpers.hpp"
 
-template <typename Config> struct ClusterFinderKernel {
+template <typename Config, typename AccConfig> struct ClusterFinderKernel {
   template <typename TAcc, typename TDetectorData, typename TGainMap,
             typename TInitPedestalMap, typename TPedestalMap,
             typename TGainStageMap, typename TEnergyMap, typename TClusterArray,
@@ -15,9 +15,13 @@ template <typename Config> struct ClusterFinderKernel {
       TNumClusters *const numClusters, TMask *const mask,
       TNumFrames const numFrames, TCurrentFrame const currentFrame,
       bool pedestalFallback, TNumStdDevs const c = Config::C) const -> void {
+    unsigned long globalId = getLinearIdx(acc);
+    unsigned long elementsPerThread =
+        AccConfig::elementsPerThread; // getLinearElementExtent(acc);
 
-    auto globalId = getLinearIdx(acc);
-    auto elementsPerThread = getLinearElementExtent(acc);
+    // elementsPerThread = 1;
+
+    constexpr auto n = Config::CLUSTER_SIZE;
 
     // iterate over all elements in the thread
     for (auto id = globalId * elementsPerThread;
@@ -25,18 +29,14 @@ template <typename Config> struct ClusterFinderKernel {
 
       // check range
       if (id >= Config::MAPSIZE)
-        break;
-
-      constexpr auto n = Config::CLUSTER_SIZE;
+        return;
 
       if (currentFrame) {
-
         auto adc = getAdc(detectorData[currentFrame - 1].data[id]);
         const auto &gainStage = gainStageMaps[currentFrame - 1].data[id];
         float sum;
         decltype(id) max;
         const auto &energy = energyMaps[currentFrame - 1].data[id];
-
         const auto &stddev = initPedestalMaps[gainStage][id].stddev;
         if (indexQualifiesAsClusterCenter<Config>(id)) {
           findClusterSumAndMax<Config>(energyMaps[currentFrame - 1].data, id,
@@ -47,6 +47,7 @@ template <typename Config> struct ClusterFinderKernel {
             auto &cluster = getClusterBuffer(acc, clusterArray, numClusters);
             copyCluster<Config>(energyMaps[currentFrame - 1], id, cluster);
           }
+
           // check dark pixel condition
           else if (-c * stddev <= energy && c * stddev >= energy &&
                    !pedestalFallback) {
