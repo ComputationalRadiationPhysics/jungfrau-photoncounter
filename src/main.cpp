@@ -12,7 +12,7 @@
  */
 template <std::size_t MAPSIZE>
 using Accelerator =
-    CpuOmp2Blocks<MAPSIZE>; // CpuOmp2Blocks<MAPSIZE>; // GpuCudaRt<MAPSIZE>; //
+    GpuCudaRt<MAPSIZE>; // CpuOmp2Blocks<MAPSIZE>; // GpuCudaRt<MAPSIZE>; //
                             // CpuSerial<MAPSIZE>;
 // GpuCudaRt<MAPSIZE>;
 
