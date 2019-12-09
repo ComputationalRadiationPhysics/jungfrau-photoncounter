@@ -96,6 +96,27 @@ public:
       alpakaWait(dev.queue);
   }
 
+  auto reset() -> void {
+    // reset variables
+    pedestalFallback = false;
+    init = false;
+    nextFull = 0;
+    nextFree = 0;
+    ringbuffer.reset();
+    devices.clear();
+
+    // init devices
+    initDevices();
+
+    // clear mask
+    alpakaMemSet(devices[devices.size() - 1].queue,
+                 devices[devices.size() - 1].mask, 1,
+                 decltype(TConfig::SINGLEMAP)(TConfig::SINGLEMAP));
+
+    // synchronize
+    synchronize();
+  }
+
   /**
    * Tries to upload all data packages requiered for the inital offset.
    * Only stops after all data packages are uploaded.

@@ -18,8 +18,8 @@
 
 template <std::size_t TMapSize>
 using Accelerator =
-    GpuCudaRt<TMapSize>; // CpuOmp2Blocks<TMapSize>; // CpuSerial<TMapSize>; //
-                         // GpuCudaRt<TMapSize>;
+    GpuCudaRt<TMapSize>; // CpuOmp2Blocks<TMapSize>; // CpuSerial<TMapSize>;
+                         // // GpuCudaRt<TMapSize>;
 
 constexpr auto framesPerStageG0 = Values<std::size_t, 1000>();
 constexpr auto framesPerStageG1 = Values<std::size_t, 1000>();
@@ -72,6 +72,7 @@ std::vector<Duration> benchmark(unsigned int iterations, ExecutionFlags flags,
   std::vector<Duration> results;
   results.reserve(iterations);
   for (unsigned int i = 0; i < iterations; ++i) {
+    benchmarkingInput.clusters->used = 0;
     auto dispenser = calibrate(benchmarkingInput);
     auto t0 = Timer::now();
     bench(dispenser, benchmarkingInput);

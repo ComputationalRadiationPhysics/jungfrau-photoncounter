@@ -140,6 +140,8 @@ auto calibrate(const BenchmarkingInput<Config, Accelerator<Config::MAPSIZE>>
                                            benchmarkingConfig.beamConst,
                                            benchmarkingConfig.maskPtr);
 
+  // reset dispenser to get rid of artefacts from previous runs
+  dispenser.reset();
   // upload and calculate pedestal data
   dispenser.uploadPedestaldata(benchmarkingConfig.pedestalData);
   dispenser.synchronize();
