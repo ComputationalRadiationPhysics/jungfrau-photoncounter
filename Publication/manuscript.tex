@@ -46,7 +46,7 @@ Heide Mei{\ss}ner}
 {\bf Abstract}\\
 Highly segmented photon detectors play a crucial role at synchrotron and X-ray free electron laser facilities, detecting the photons scattered from targets of interest. These measurements allow the determination of biological and inorganic structures and processes, leading to an advanced understanding of life and material sciences and enabling improvements and discoveries in pharmaceutical and engineering industries. However, as targets become ever-more challenging and photon fluxes intensify, detector frame rates increase and the generated data streams risk becoming overwhelming. Here we demonstrate one solution, exploiting the highly parallelisable nature of data from the JUNGFRAU charge integrating photon detector and processing using the Alpaka library. We find that... To date, no other solution was able to process JUNGFRAU data at this throughput(?). Our results demonstrate that parallel processing, for example in a GPU, is a valuable tool in the treatment of photon detector data. Advantages of this method include online data correction aiding storage efficiency by allowing raw data to be immediately discarded and enabling fast feedback to users for whom time and target resources are at a premium. We see this as an important step in the development of a chain of specialised hardware and software tools necessary to operate charge integrating photon detectors at high frame rates.
 
-{\bf Keywords:} Photon pixel detector, fast data processing, GPU programming, Alpaka...
+{\bf Keywords:} Photon pixel detector, fast data processing, GPU programming, Alpaka \textcolor{magenta}{...}
 
 
 
@@ -219,26 +219,79 @@ Whether online or offline, whether implemented in CPU, GPU, FPGA or other hardwa
 \subsection{Alpaka implementation of fast data processing (Jonas, Florian)}
 \label{subsec:alpaka}
 
-requirements:
- - realtime data processing (at least 1 detector at 2.5 kHz)
- - simple and extensible design
- - portable to other architectures (CPU OpenMP, TBB, ...) with minimal code changes
 
+
+\textcolor{magenta}{
+\textbf{requirements:}
+\begin{itemize}
+	\item real-time data processing (at least 1 detector at 2.5 kHz)
+	\item simple and extensible design(?)
+	\item portable to other architectures (CPU OpenMP, TBB, ...) with minimal code changes
+\end{itemize}
 optional requirements:
- - easily adaptable to similar detectors (e.g. MÖNCH)
-
-design overview:
- - wrap for most important alpaka functions (for ease of use)
- - templated for maximal performance and configurability
- - stream processing of data: upload data to GPU -> process -> download again
- - multiple detectors and multiple GPUs usable in parallel
+\begin{itemize}
+	\item easily adaptable to similar detectors (e.g. MÖNCH)
+\end{itemize}
+expected bottlenecks:
+\begin{itemize}
+	\item communication speed between host and GPU
+	\item RAM speed
+\end{itemize}
+\textbf{design overview:}
+\begin{itemize}
+	\item wrap for most important alpaka functions (for ease of use) --$>$ explain alpaka shortly (?)
+	\item templated for maximal performance and configurability (?)
+	\item written in modern C++ for optimal performance
+	\item pipelined stream processing of data: upload data to GPU -$>$ process -$>$ download again
+	\item multiple detectors and multiple GPUs usable in parallel
+\end{itemize}
+$<$insert data flow diagram here$>$ \\
+architecture specific optimizations:
+\begin{itemize}
+	\item contiguous memory vs. grid striding loop
+	\item only upload data if needed
+\end{itemize}
+\textbf{software architecture:}
+\textit{hardware accelerator concept}
+\begin{itemize}
+	\item host
+	\item device
+	\item memory not necessarily shared
+	\item data might need to be copied onto device
+	\item device starts (possibly asynchronous) execution
+	\item result is copied back to host
+	\item common host: CPU
+	\item common devices: GPUs, FPGAs, Multicore CPUs (in general multi- and manycore systems)
+\end{itemize}
+$<$insert hardware sketch here$>$
+\textit{the dispenser}
+\begin{itemize}
+	\item handles devices (initialization, memory management, etc.)
+	\item enqueues data to next free devices (asynchronously)
+	\item copies data back from devices (asynchronously)
+\end{itemize}
+$<$insert dispenser structure here$>$
+\textit{the kernel structure}
+\begin{itemize}
+	\item written in empty struct as static function
+	\item all needed values passed to function, no real access to member variables
+	\item most data passed by pointer, only single numbers passed directly
+	\item kernel has access to device properties (block size, grid size, device specific functions, etc.)
+\end{itemize}
+$<$insert example here$>$
+\textit{easy hardware abstraction}
+\begin{itemize}
+	\item useful settings defined for every possible device class
+	\item device is selected by using statement (similar to a typedef)
+	\item no additional changes needed
+\end{itemize}
+$<$insert example here$>$
+}
 
 
 \subsection{Benchmark tests (Jonas, Florian)}
 \label{subsec:benchmark}
 Design, objectives, and evaluation of tests
-
-benchmarked with google benchmark
 
 \section{Results}
 \label{sec:results}
@@ -262,7 +315,7 @@ calculation on FPGAs in the future
 
 
 \section{Acknowledges}
-The authors would like to thank  the Alpaka developers (\textcolor{blue}{names?})for their support.\\
+The authors would like to thank the Alpaka developers (\textcolor{blue}{names?})for their support.\\
 
 This project has received funding from the European Union's Horizon 2020 research and innovation programme under grant agreement No 654220 (EUCALL).
 
