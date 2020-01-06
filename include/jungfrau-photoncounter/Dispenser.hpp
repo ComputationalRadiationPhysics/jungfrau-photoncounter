@@ -322,7 +322,7 @@ public:
     // try uploading one data package
     if (offset + TConfig::DEV_FRAMES <= data.numFrames) {
 
-      // TODO: combine these two cases
+      //! @todo: combine these two cases
       auto dataView = data.getView(offset, TConfig::DEV_FRAMES);
 
       auto result = processData(dataView, TConfig::DEV_FRAMES, flags, energy,

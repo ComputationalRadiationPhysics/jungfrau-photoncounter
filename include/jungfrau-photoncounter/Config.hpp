@@ -310,8 +310,6 @@ typedef std::chrono::high_resolution_clock Clock;
 typedef std::chrono::milliseconds ms;
 static Clock::time_point t;
 
-#define VERBOSE
-
 #ifdef VERBOSE
 #include <iostream>
 

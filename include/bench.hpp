@@ -84,13 +84,13 @@ auto setUp(ExecutionFlags flags, std::string pedestalPath, std::string gainPath,
         fc.template loadMaps<typename Config::MaskMap, ConcreteAcc>(maskPath);
     DEBUG(mask.numFrames, "mask maps loaded");
   }
-
+  
   // create empty, optional input mask
   using MaskMap = typename Config::MaskMap;
   tl::optional<typename ConcreteAcc::template HostBuf<MaskMap>> maskPtr;
   if (mask.numFrames == Config::SINGLEMAP)
     maskPtr = mask.data;
-
+  
   // allocate space for output data
   FramePackage<typename Config::EnergyMap, ConcreteAcc> energy_data(
       data.numFrames);
@@ -125,7 +125,7 @@ auto setUp(ExecutionFlags flags, std::string pedestalPath, std::string gainPath,
     sum = sum_data;
   if (flags.maxValue)
     maxValues = maxValues_data;
-
+  
   // return configuration
   return BenchmarkingInput<Config, ConcreteAcc>(
       pedestalData, data, gain, beamConst, maskPtr, energy, photon, sum,
@@ -135,7 +135,7 @@ auto setUp(ExecutionFlags flags, std::string pedestalPath, std::string gainPath,
 // calibrate the detector
 template <typename Config, template <std::size_t> typename Accelerator>
 auto calibrate(const BenchmarkingInput<Config, Accelerator<Config::MAPSIZE>>
-                   &benchmarkingConfig) -> Dispenser<Config, Accelerator> {
+                   &benchmarkingConfig) -> Dispenser<Config, Accelerator> {  
   Dispenser<Config, Accelerator> dispenser(benchmarkingConfig.gain,
                                            benchmarkingConfig.beamConst,
                                            benchmarkingConfig.maskPtr);
@@ -170,20 +170,6 @@ auto bench(
 
   typename Config::template ClusterArray<ConcreteAcc> *clusters =
       benchmarkingConfig.clusters;
-
-  save_image<Config>("pedestal_begin0",
-                     alpakaNativePtr(dispenser.downloadPedestaldata().data), 0);
-
-  // download and save std dev of the initial pedestal map
-  auto initPed = dispenser.downloadInitialPedestaldata();
-  std::ofstream outPede("pede_stddev.bin", std::ios::binary);
-  InitPedestal *pedePtr = alpakaNativePtr(initPed.data)->data;
-  for (unsigned int y = 0; y < Config::DIMY; ++y)
-    for (unsigned int x = 0; x < Config::DIMX; ++x)
-      outPede.write(reinterpret_cast<char *>(&(pedePtr[y * 1024 + x].stddev)),
-                    sizeof(double));
-  outPede.flush();
-  outPede.close();
 
   // process data maps
   while (offset < benchmarkingConfig.data.numFrames) {

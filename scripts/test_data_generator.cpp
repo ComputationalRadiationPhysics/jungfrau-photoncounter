@@ -262,18 +262,11 @@ void generateCluster(std::string path, float clusterAmount,
 }
 
 int main() {
-  // generateCalibration("/bigdata/hplsim/production/jungfrau-photoncounter/tmp/pede.bin");
-  // generateMainG0("/bigdata/hplsim/production/jungfrau-photoncounter/tmp/g0.bin",
-  // 10); //working
-  // generateMainG13("/bigdata/hplsim/production/jungfrau-photoncounter/tmp/g13.bin",
-  // 10); //working
-  // generateCluster<3>(
-  //    "/bigdata/hplsim/production/jungfrau-photoncounter/tmp/cluster_0.bin",
-  //    0.f, 10); //working
-  // generateCluster<3>("/bigdata/hplsim/production/jungfrau-photoncounter/tmp/cluster_4.bin",
-  // 0.04f, 10); // seems working
-  generateCluster<3>(
-      "/bigdata/hplsim/production/jungfrau-photoncounter/tmp/cluster_8.bin",
-      0.08f, 10); // seems working
+  generateCalibration("/bigdata/hplsim/production/jungfrau-photoncounter/data_pool/synthetic/pede.bin");
+  generateMainG0("/bigdata/hplsim/production/jungfrau-photoncounter/data_pool/synthetic/g0.bin", 10000);
+  generateMainG13("/bigdata/hplsim/production/jungfrau-photoncounter/data_pool/synthetic/g13.bin", 10000);
+  generateCluster<3>("/bigdata/hplsim/production/jungfrau-photoncounter/data_pool/synthetic/cluster_0.bin", 0.f, 10000);
+  generateCluster<3>("/bigdata/hplsim/production/jungfrau-photoncounter/data_pool/synthetic/cluster_4.bin", 0.04f, 10000);
+  generateCluster<3>("/bigdata/hplsim/production/jungfrau-photoncounter/data_pool/synthetic/cluster_8.bin", 0.08f, 10000);
   return 0;
 }
