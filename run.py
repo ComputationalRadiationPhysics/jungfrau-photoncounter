@@ -6,7 +6,7 @@ from itertools import product
 
 # define possible values
 masking = [0, 1]
-devFrames = [10, 100, 1000]
+devFrames = [10, 100]#, 1000]
 maxValue = [0, 1]
 summation = [0, 2, 10, 20, 100]
 clusterSizes = [2, 3, 7, 11]
@@ -30,7 +30,7 @@ configID = int(sys.argv[1])
 
 # initialize values
 summationEnable = 0 if sumFrames == 0 else 1
-benchmarkID = sumFrames * len(devFrames) * len(clusterSizes) + devFramesOption * len(clusterSizes) + clusterSize
+benchmarkID = (summation.index(sumFrames) - 1) * (len(devFrames) - 1) * len(clusterSizes) + devFrames.index(devFramesOption) * len(clusterSizes) + clusterSizes.index(clusterSize)
     
 iterationCount = 100
 beamConst = 12.4

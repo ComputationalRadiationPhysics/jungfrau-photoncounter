@@ -16,20 +16,22 @@
  * see Alpakaconfig.hpp for all available
  */
 
-template <std::size_t TMapSize>
-using Accelerator = GpuCudaRt<TMapSize>; // CpuOmp2Blocks<TMapSize>;
-// CpuSerial<TMapSize>;
-// GpuCudaRt<TMapSize>;
+template <std::size_t TMapSize> using Accelerator = GpuCudaRt<TMapSize>;
+// CpuOmp2Blocks<MAPSIZE>;
+// CpuTbbRt<MAPSIZE>;
+// CpuSerial<MAPSIZE>;
+// GpuCudaRt<MAPSIZE>;
+// GpuHipRt<MAPSIZE>;
 
 constexpr auto framesPerStageG0 = Values<std::size_t, 1000>();
 constexpr auto framesPerStageG1 = Values<std::size_t, 1000>();
 constexpr auto framesPerStageG2 = Values<std::size_t, 999>();
 constexpr auto dimX = Values<std::size_t, 1024>();
 constexpr auto dimY = Values<std::size_t, 512>();
-constexpr auto sumFrames = Values<std::size_t, 2, 10, 20, 100>();
-constexpr auto devFrames = Values<std::size_t, 10, 100, 1000>();
+constexpr auto sumFrames = Values<std::size_t, 100>(); // 2, 10, 20, 100>();
+constexpr auto devFrames = Values<std::size_t, 100>(); // 10, 100, 1000>();
 constexpr auto movingStatWindowSize = Values<std::size_t, 100>();
-constexpr auto clusterSize = Values<std::size_t, 2, 3, 7, 11>();
+constexpr auto clusterSize = Values<std::size_t, 2>(); // 2, 3, 7, 11>();
 constexpr auto cs = Values<std::size_t, 5>();
 
 constexpr auto parameterSpace =
@@ -73,6 +75,15 @@ std::vector<Duration> benchmark(unsigned int iterations,
 {
     using Config = typename ConfigFrom<Tuple>::Result;
     using ConcreteAcc = Accelerator<Config::MAPSIZE>;
+
+    std::cout << "Parameters: sumFrames=" << Config::SUM_FRAMES
+              << "; devFrames=" << Config::DEV_FRAMES
+              << "; clusterSize=" << Config::CLUSTER_SIZE << "\n";
+    std::cout << "Flags: mode=" << static_cast<int>(flags.mode)
+              << "; summation=" << static_cast<int>(flags.summation)
+              << "; masking=" << static_cast<int>(flags.masking)
+              << "; maxValue=" << static_cast<int>(flags.maxValue) << "\n";
+
     auto benchmarkingInput = setUp<Config, ConcreteAcc>(
         flags, pedestalPath, gainPath, dataPath, beamConst);
     std::vector<Duration> results;

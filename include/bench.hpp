@@ -52,7 +52,7 @@ template <typename Config, typename ConcreteAcc>
 auto setUp(ExecutionFlags flags, std::string pedestalPath, std::string gainPath,
            std::string dataPath, double beamConst, std::string maskPath = "",
            std::size_t cacheSize = 1024UL * 1024 * 1024 * 16,
-           std::size_t maxClusterCount = Config::MAX_CLUSTER_NUM)
+           std::size_t maxClusterCount = Config::MAX_CLUSTER_NUM_USER)
     -> BenchmarkingInput<Config, ConcreteAcc> {
   t = Clock::now();
 

@@ -61,75 +61,15 @@ struct CpuOmp2Threads {};
 #endif
 
 #ifdef ALPAKA_ACC_CPU_B_TBB_T_SEQ_ENABLED
-struct CpuTbbBlocks {};
-//! @todo: increase this
-#endif
-
-/*
-template <typename THost, typename TAcc, typename TQueue> struct AccTraits {
-    using Host = THost;
-    using Acc = TAcc;
-    using Queue = TQueue;
-    using DevHost = alpaka::dev::Dev<THost>;
-    using DevAcc = alpaka::dev::Dev<TAcc>;
-    using PltfHost = alpaka::pltf::Pltf<DevHost>;
-    using PltfAcc = alpaka::pltf::Pltf<DevAcc>;
-    using Event = alpaka::event::Event<TQueue>;
-    template <typename T>
-    using AccBuf = alpaka::mem::buf::Buf<DevAcc, T, Dim, Size>;
-    template <typename T>
-    using HostBuf = alpaka::mem::buf::Buf<DevHost, T, Dim, Size>;
-    template <typename T>
-    using HostView = alpaka::mem::view::ViewSubView<DevHost, T, Dim, Size>;
-};
-*/
-
-#ifdef ALPAKA_ACC_CPU_B_OMP2_T_SEQ_ENABLED
-//#############################################################################
-//! OpenMP 2 Blocks defines
-//!
-//! Defines Host, Device, etc. for the OpenMP 2 Blocks accelerator.
-template <std::size_t MAPSIZE> struct CpuOmp2Blocks {
-  using Host = alpaka::acc::AccCpuOmp2Blocks<Dim, Size>;
-  using Acc = alpaka::acc::AccCpuOmp2Blocks<Dim, Size>;
-  using Queue = alpaka::queue::QueueCpuBlocking;
-  using DevHost = alpaka::dev::Dev<Host>;
-  using DevAcc = alpaka::dev::Dev<Acc>;
-  using PltfHost = alpaka::pltf::Pltf<DevHost>;
-  using PltfAcc = alpaka::pltf::Pltf<DevAcc>;
-  using Event = alpaka::event::Event<Queue>;
-  template <typename T>
-  using AccBuf = alpaka::mem::buf::Buf<DevAcc, T, Dim, Size>;
-  template <typename T>
-  using HostBuf = alpaka::mem::buf::Buf<DevHost, T, Dim, Size>;
-  template <typename T>
-  using AccView = alpaka::mem::view::ViewSubView<DevAcc, T, Dim, Size>;
-  template <typename T>
-  using HostView = alpaka::mem::view::ViewSubView<DevHost, T, Dim, Size>;
-
-  static constexpr std::size_t STREAMS_PER_DEV = 1;
-  static constexpr Size elementsPerThread = 256u;
-  static constexpr Size threadsPerBlock = 1u;
-  static constexpr Size blocksPerGrid = (MAPSIZE + 255) / 256;
-};
-
-template <typename T, typename TBuf, typename... TArgs>
-struct GetIterator<T, TBuf, alpaka::acc::AccCpuOmp2Blocks<TArgs...>> {
-  using Iterator =
-      IteratorCpu<alpaka::acc::AccCpuOmp2Blocks<TArgs...>, T, TBuf>;
-};
-#endif
-
-#ifdef ALPAKA_ACC_CPU_BT_OMP4_ENABLED
 #ifdef ALPAKA_ACC_CPU_B_SEQ_T_SEQ_ENABLED
 //#############################################################################
-//! OpenMP 4 defines
+//! Intel TBB defines
 //!
-//! Defines Host, Device, etc. for the OpenMP 4 accelerator.
-template <std::size_t MAPSIZE> struct CpuOmp4 {
+//! Defines Host, Device, etc. for the Intel TBB accelerator.
+template <std::size_t MAPSIZE> struct CpuTbbBlocks {
   using Host = alpaka::acc::AccCpuSerial<Dim, Size>;
-  using Acc = alpaka::acc::AccCpuOmp4<Dim, Size>;
-  using Queue = alpaka::queue::QueueCpuBlocking;
+  using Acc = alpaka::acc::AccCpuTbbBlocks<Dim, Size>;
+  using Queue = alpaka::queue::QueueCpuNonBlocking;
   using DevHost = alpaka::dev::Dev<Host>;
   using DevAcc = alpaka::dev::Dev<Acc>;
   using PltfHost = alpaka::pltf::Pltf<DevHost>;
@@ -156,6 +96,101 @@ struct GetIterator<T, TBuf, alpaka::acc::AccCpuOmp4<TArgs...>> {
 };
 #endif
 #endif
+
+/*
+template <typename THost, typename TAcc, typename TQueue> struct AccTraits {
+    using Host = THost;
+    using Acc = TAcc;
+    using Queue = TQueue;
+    using DevHost = alpaka::dev::Dev<THost>;
+    using DevAcc = alpaka::dev::Dev<TAcc>;
+    using PltfHost = alpaka::pltf::Pltf<DevHost>;
+    using PltfAcc = alpaka::pltf::Pltf<DevAcc>;
+    using Event = alpaka::event::Event<TQueue>;
+    template <typename T>
+    using AccBuf = alpaka::mem::buf::Buf<DevAcc, T, Dim, Size>;
+    template <typename T>
+    using HostBuf = alpaka::mem::buf::Buf<DevHost, T, Dim, Size>;
+    template <typename T>
+    using HostView = alpaka::mem::view::ViewSubView<DevHost, T, Dim, Size>;
+};
+*/
+  
+#ifdef ALPAKA_ACC_CPU_B_OMP2_T_SEQ_ENABLED
+#ifdef ALPAKA_ACC_CPU_B_SEQ_T_SEQ_ENABLED
+//#############################################################################
+//! OpenMP 2 Blocks defines
+//!
+//! Defines Host, Device, etc. for the OpenMP 2 Blocks accelerator.
+template <std::size_t MAPSIZE> struct CpuOmp2Blocks {
+  using Host = alpaka::acc::AccCpuSerial<Dim, Size>;
+  using Acc = alpaka::acc::AccCpuOmp2Blocks<Dim, Size>;
+  using Queue = alpaka::queue::QueueCpuNonBlocking;
+  using DevHost = alpaka::dev::Dev<Host>;
+  using DevAcc = alpaka::dev::Dev<Acc>;
+  using PltfHost = alpaka::pltf::Pltf<DevHost>;
+  using PltfAcc = alpaka::pltf::Pltf<DevAcc>;
+  using Event = alpaka::event::Event<Queue>;
+  template <typename T>
+  using AccBuf = alpaka::mem::buf::Buf<DevAcc, T, Dim, Size>;
+  template <typename T>
+  using HostBuf = alpaka::mem::buf::Buf<DevHost, T, Dim, Size>;
+  template <typename T>
+  using AccView = alpaka::mem::view::ViewSubView<DevAcc, T, Dim, Size>;
+  template <typename T>
+  using HostView = alpaka::mem::view::ViewSubView<DevHost, T, Dim, Size>;
+
+  static constexpr std::size_t STREAMS_PER_DEV = 1;
+  static constexpr Size elementsPerThread = 256u;
+  static constexpr Size threadsPerBlock = 1u;
+  static constexpr Size blocksPerGrid = (MAPSIZE + 255) / 256;
+};
+
+template <typename T, typename TBuf, typename... TArgs>
+struct GetIterator<T, TBuf, alpaka::acc::AccCpuOmp2Blocks<TArgs...>> {
+  using Iterator =
+      IteratorCpu<alpaka::acc::AccCpuOmp2Blocks<TArgs...>, T, TBuf>;
+};
+#endif
+#endif
+
+#ifdef ALPAKA_ACC_CPU_BT_OMP4_ENABLED
+#ifdef ALPAKA_ACC_CPU_B_SEQ_T_SEQ_ENABLED
+//#############################################################################
+//! OpenMP 4 defines
+//!
+//! Defines Host, Device, etc. for the OpenMP 4 accelerator.
+template <std::size_t MAPSIZE> struct CpuOmp4 {
+  using Host = alpaka::acc::AccCpuSerial<Dim, Size>;
+  using Acc = alpaka::acc::AccCpuOmp4<Dim, Size>;
+  using Queue = alpaka::queue::QueueCpuNonBlocking;
+  using DevHost = alpaka::dev::Dev<Host>;
+  using DevAcc = alpaka::dev::Dev<Acc>;
+  using PltfHost = alpaka::pltf::Pltf<DevHost>;
+  using PltfAcc = alpaka::pltf::Pltf<DevAcc>;
+  using Event = alpaka::event::Event<Queue>;
+  template <typename T>
+  using AccBuf = alpaka::mem::buf::Buf<DevAcc, T, Dim, Size>;
+  template <typename T>
+  using HostBuf = alpaka::mem::buf::Buf<DevHost, T, Dim, Size>;
+  template <typename T>
+  using AccView = alpaka::mem::view::ViewSubView<DevAcc, T, Dim, Size>;
+  template <typename T>
+  using HostView = alpaka::mem::view::ViewSubView<DevHost, T, Dim, Size>;
+
+  static constexpr std::size_t STREAMS_PER_DEV = 4;
+  static constexpr Size elementsPerThread = 1u;
+  static constexpr Size threadsPerBlock = 1u;
+  static constexpr Size blocksPerGrid = MAPSIZE;
+};
+
+template <typename T, typename TBuf, typename... TArgs>
+struct GetIterator<T, TBuf, alpaka::acc::AccCpuOmp4<TArgs...>> {
+  using Iterator = IteratorCpu<alpaka::acc::AccCpuOmp4<TArgs...>, T, TBuf>;
+};
+#endif
+#endif
+
 
 #ifdef ALPAKA_ACC_CPU_B_SEQ_T_SEQ_ENABLED
 //#############################################################################
@@ -192,15 +227,16 @@ struct GetIterator<T, TBuf, alpaka::acc::AccCpuSerial<TArgs...>> {
 };
 #endif
 
+#ifdef ALPAKA_ACC_CPU_B_SEQ_T_SEQ_ENABLED
 #ifdef ALPAKA_ACC_CPU_B_SEQ_T_THREADS_ENABLED
 //#############################################################################
 //! CPU Threads defines
 //!
 //! Defines Host, Device, etc. for the CPU Threads accelerator.
 template <std::size_t MAPSIZE> struct CpuThreads {
-  using Host = alpaka::acc::AccCpuThreads<Dim, Size>;
+  using Host = alpaka::acc::AccCpuSerial<Dim, Size>;
   using Acc = alpaka::acc::AccCpuThreads<Dim, Size>;
-  using Queue = alpaka::queue::QueueCpuBlocking;
+  using Queue = alpaka::queue::QueueCpuNonBlocking;
   using DevHost = alpaka::dev::Dev<Host>;
   using DevAcc = alpaka::dev::Dev<Acc>;
   using PltfHost = alpaka::pltf::Pltf<DevHost>;
@@ -225,6 +261,7 @@ template <typename T, typename TBuf, typename... TArgs>
 struct GetIterator<T, TBuf, alpaka::acc::AccCpuThreads<TArgs...>> {
   using Iterator = IteratorCpu<alpaka::acc::AccCpuThreads<TArgs...>, T, TBuf>;
 };
+#endif
 #endif
 
 #ifdef ALPAKA_ACC_GPU_CUDA_ENABLED
@@ -284,6 +321,43 @@ template <std::size_t MAPSIZE> struct GpuCudaRtSync {
   static constexpr Size elementsPerThread = 1u;
   static constexpr Size threadsPerBlock = 256;
   static constexpr Size blocksPerGrid = (MAPSIZE + 255) / 256;
+};
+#endif
+#endif
+
+#ifdef ALPAKA_ACC_GPU_HIP_ENABLED
+#ifdef ALPAKA_ACC_CPU_B_SEQ_T_SEQ_ENABLED
+//#############################################################################
+//! HIP defines
+//!
+//! Defines Host, Device, etc. for the HIP accelerator.
+template <std::size_t MAPSIZE> struct GpuHipRt {
+  using Host = alpaka::acc::AccCpuSerial<Dim, Size>;
+  using Acc = alpaka::acc::AccGpuHipRt<Dim, Size>;
+  using Queue = alpaka::queue::QueueHipRtNonBlocking;
+  using DevHost = alpaka::dev::Dev<Host>;
+  using DevAcc = alpaka::dev::Dev<Acc>;
+  using PltfHost = alpaka::pltf::Pltf<DevHost>;
+  using PltfAcc = alpaka::pltf::Pltf<DevAcc>;
+  using Event = alpaka::event::Event<Queue>;
+  template <typename T>
+  using AccBuf = alpaka::mem::buf::Buf<DevAcc, T, Dim, Size>;
+  template <typename T>
+  using HostBuf = alpaka::mem::buf::Buf<DevHost, T, Dim, Size>;
+  template <typename T>
+  using AccView = alpaka::mem::view::ViewSubView<DevAcc, T, Dim, Size>;
+  template <typename T>
+  using HostView = alpaka::mem::view::ViewSubView<DevHost, T, Dim, Size>;
+
+  static constexpr std::size_t STREAMS_PER_DEV = 3;
+  static constexpr Size elementsPerThread = 1u;
+  static constexpr Size threadsPerBlock = 256;
+  static constexpr Size blocksPerGrid = (MAPSIZE + 255) / 256;
+};
+
+template <typename T, typename TBuf, typename... TArgs>
+struct GetIterator<T, TBuf, alpaka::acc::AccGpuCudaRt<TArgs...>> {
+  using Iterator = IteratorGpu<alpaka::acc::AccGpuCudaRt<TArgs...>, T, TBuf>;
 };
 #endif
 #endif

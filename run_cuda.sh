@@ -9,7 +9,7 @@
 #SBATCH --mem=300000
 #SBATCH --cpus-per-task=24
 #SBATCH --exclusive
-#SBATCH --array=0-360
+#SBATCH --array=0-240
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=j.schenke@hzdr.de
 #SBATCH -o log.slurm-cuda_%A_%a.out

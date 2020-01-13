@@ -411,21 +411,18 @@ private:
     const GainmapInversionKernel<TConfig> gainmapInversionKernel{};
     std::size_t deviceCount = alpakaGetDevCount<TAlpaka>();
     devices.reserve(deviceCount * TAlpaka::STREAMS_PER_DEV);
-
     for (std::size_t num = 0; num < deviceCount * TAlpaka::STREAMS_PER_DEV;
          ++num) {
       // initialize variables
       devices.emplace_back(num,
                            &deviceContainer[num / TAlpaka::STREAMS_PER_DEV]);
       alpakaCopy(devices[num].queue, devices[num].gain, gain.data,
-                 decltype(TConfig::GAINMAPS)(TConfig::GAINMAPS));
-
+                 decltype(TConfig::GAINMAPS)(TConfig::GAINMAPS));      
       // compute reciprocals of gain maps
       auto const gainmapInversion(alpakaCreateKernel<TAlpaka>(
           getWorkDiv<TAlpaka>(), gainmapInversionKernel,
           alpakaNativePtr(devices[num].gain)));
       alpakaEnqueueKernel(devices[num].queue, gainmapInversion);
-
       if (!ringbuffer.push(&devices[num])) {
         fputs("FATAL ERROR (RingBuffer): Unexpected size!\n", stderr);
         exit(EXIT_FAILURE);
