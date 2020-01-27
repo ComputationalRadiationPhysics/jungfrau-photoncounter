@@ -16,16 +16,15 @@ template <typename Config, typename AccConfig> struct ClusterFinderKernel {
       TNumFrames const numFrames, TCurrentFrame const currentFrame,
       bool pedestalFallback, TNumStdDevs const c = Config::C) const -> void {
     unsigned long globalId = getLinearIdx(acc);
-    unsigned long elementsPerThread =
-        AccConfig::elementsPerThread; // getLinearElementExtent(acc);
-
-    // elementsPerThread = 1;
+    unsigned long elementsPerThread = getLinearElementExtent(acc);
+    //AccConfig::elementsPerThread; // getLinearElementExtent(acc);
 
     constexpr auto n = Config::CLUSTER_SIZE;
 
     // iterate over all elements in the thread
-    for (auto id = globalId * elementsPerThread;
-         id < (globalId + 1) * elementsPerThread; ++id) {
+    //for (auto id = globalId * elementsPerThread;
+    //     id < (globalId + 1) * elementsPerThread; ++id) {
+    auto id = globalId;
 
       // check range
       if (id >= Config::MAPSIZE)
@@ -47,10 +46,15 @@ template <typename Config, typename AccConfig> struct ClusterFinderKernel {
             auto &cluster = getClusterBuffer(acc, clusterArray, numClusters);
             copyCluster<Config>(energyMaps[currentFrame - 1], id, cluster);
           }
-
           // check dark pixel condition
           else if (-c * stddev <= energy && c * stddev >= energy &&
                    !pedestalFallback) {
+
+
+            if(id == 0)
+              printf("asdfasdfasdf\n");
+
+            
             updatePedestal(adc, Config::MOVING_STAT_WINDOW_SIZE,
                            pedestalMaps[gainStage][id]);
           }
@@ -61,6 +65,6 @@ template <typename Config, typename AccConfig> struct ClusterFinderKernel {
         processInput(acc, detectorData[currentFrame], gainMaps, pedestalMaps,
                      initPedestalMaps, gainStageMaps[currentFrame],
                      energyMaps[currentFrame], mask, id, pedestalFallback);
-    }
+      //}
   }
 };

@@ -114,11 +114,11 @@ auto setUp(ExecutionFlags flags, std::string pedestalPath, std::string gainPath,
     photon = photon_data;
   } else if (flags.mode == 2) {
     clusters = new typename Config::template ClusterArray<ConcreteAcc>(
-        maxClusterCount * Config::DEV_FRAMES);
+        maxClusterCount * data.numFrames);
   } else {
     energy = energy_data;
     clusters = new typename Config::template ClusterArray<ConcreteAcc>(
-        maxClusterCount * Config::DEV_FRAMES);
+        maxClusterCount * data.numFrames);
   }
 
   if (flags.summation)

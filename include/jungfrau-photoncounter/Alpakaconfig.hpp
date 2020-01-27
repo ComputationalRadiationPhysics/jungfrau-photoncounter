@@ -67,7 +67,7 @@ struct CpuOmp2Threads {};
 //!
 //! Defines Host, Device, etc. for the Intel TBB accelerator.
 template <std::size_t MAPSIZE> struct CpuTbbBlocks {
-  using Host = alpaka::acc::AccCpuSerial<Dim, Size>;
+  using Host = alpaka::acc::AccCpuTbbBlocks<Dim, Size>;
   using Acc = alpaka::acc::AccCpuTbbBlocks<Dim, Size>;
   using Queue = alpaka::queue::QueueCpuNonBlocking;
   using DevHost = alpaka::dev::Dev<Host>;
@@ -125,7 +125,7 @@ template <typename THost, typename TAcc, typename TQueue> struct AccTraits {
 template <std::size_t MAPSIZE> struct CpuOmp2Blocks {
   using Host = alpaka::acc::AccCpuSerial<Dim, Size>;
   using Acc = alpaka::acc::AccCpuOmp2Blocks<Dim, Size>;
-  using Queue = alpaka::queue::QueueCpuNonBlocking;
+  using Queue = alpaka::queue::QueueCpuBlocking;
   using DevHost = alpaka::dev::Dev<Host>;
   using DevAcc = alpaka::dev::Dev<Acc>;
   using PltfHost = alpaka::pltf::Pltf<DevHost>;
@@ -141,9 +141,9 @@ template <std::size_t MAPSIZE> struct CpuOmp2Blocks {
   using HostView = alpaka::mem::view::ViewSubView<DevHost, T, Dim, Size>;
 
   static constexpr std::size_t STREAMS_PER_DEV = 1;
-  static constexpr Size elementsPerThread = 256u;
+  static constexpr Size elementsPerThread = 1u;//256u;
   static constexpr Size threadsPerBlock = 1u;
-  static constexpr Size blocksPerGrid = (MAPSIZE + 255) / 256;
+  static constexpr Size blocksPerGrid = MAPSIZE;//(MAPSIZE + 255) / 256;
 };
 
 template <typename T, typename TBuf, typename... TArgs>
@@ -161,7 +161,7 @@ struct GetIterator<T, TBuf, alpaka::acc::AccCpuOmp2Blocks<TArgs...>> {
 //!
 //! Defines Host, Device, etc. for the OpenMP 4 accelerator.
 template <std::size_t MAPSIZE> struct CpuOmp4 {
-  using Host = alpaka::acc::AccCpuSerial<Dim, Size>;
+  using Host = alpaka::acc::AccCpuOmp4<Dim, Size>;
   using Acc = alpaka::acc::AccCpuOmp4<Dim, Size>;
   using Queue = alpaka::queue::QueueCpuNonBlocking;
   using DevHost = alpaka::dev::Dev<Host>;
@@ -216,9 +216,9 @@ template <std::size_t MAPSIZE> struct CpuSerial {
   using HostView = alpaka::mem::view::ViewSubView<DevHost, T, Dim, Size>;
 
   static constexpr std::size_t STREAMS_PER_DEV = 1;
-  static constexpr Size elementsPerThread = 256u;
+  static constexpr Size elementsPerThread = 1u;//256u;
   static constexpr Size threadsPerBlock = 1u;
-  static constexpr Size blocksPerGrid = (MAPSIZE + 255) / 256;
+  static constexpr Size blocksPerGrid = MAPSIZE;//(MAPSIZE + 255) / 256;
 };
 
 template <typename T, typename TBuf, typename... TArgs>
@@ -234,7 +234,7 @@ struct GetIterator<T, TBuf, alpaka::acc::AccCpuSerial<TArgs...>> {
 //!
 //! Defines Host, Device, etc. for the CPU Threads accelerator.
 template <std::size_t MAPSIZE> struct CpuThreads {
-  using Host = alpaka::acc::AccCpuSerial<Dim, Size>;
+  using Host = alpaka::acc::AccCpuThreads<Dim, Size>;
   using Acc = alpaka::acc::AccCpuThreads<Dim, Size>;
   using Queue = alpaka::queue::QueueCpuNonBlocking;
   using DevHost = alpaka::dev::Dev<Host>;

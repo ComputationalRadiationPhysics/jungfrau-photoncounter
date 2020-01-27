@@ -321,8 +321,8 @@ struct DetectorConfig {
         "Moving stat window size is bigger than the frames supplied for the "
         "callibration of the pedestal values for the first gain stage. ");
 
-    // restrict number of clusters centers to 10% of all pixels
-    static constexpr uint64_t MAX_CLUSTER_NUM_USER = DIMX * DIMY / 10;
+    // restrict number of clusters centers to 10% of all pixels (or the maximum number of clusters)
+  static constexpr uint64_t MAX_CLUSTER_NUM_USER = std::min(DIMX * DIMY / 10, MAX_CLUSTER_NUM);
 
     // maximal number of seperated clusters:
     // static constexpr uint64_t MAX_CLUSTER_NUM_USER = DIMX * DIMY /
@@ -348,7 +348,7 @@ struct DetectorConfig {
         typename TAlpaka::template HostBuf<unsigned long long> usedPinned;
         typename TAlpaka::template HostBuf<Cluster> clusters;
 
-        ClusterArray(std::size_t maxClusterCount = MAX_CLUSTER_NUM * DEV_FRAMES,
+        ClusterArray(std::size_t maxClusterCount = MAX_CLUSTER_NUM_USER * DEV_FRAMES,
                      typename TAlpaka::DevHost host = alpakaGetHost<TAlpaka>())
             : used(0),
               usedPinned(alpakaAlloc<unsigned long long>(
@@ -377,6 +377,8 @@ typedef std::chrono::high_resolution_clock Clock;
 typedef std::chrono::milliseconds ms;
 static Clock::time_point t;
 
+#define VERBOSE
+
 #ifdef VERBOSE
 #include <iostream>
 
@@ -387,7 +389,7 @@ template <typename... TArgs> void printArgs() { std::cout << std::endl; }
 template <typename TFirst, typename... TArgs>
 void printArgs(TFirst first, TArgs... args)
 {
-    std::cout << first << " ";
+    std::cerr << first << " ";
     printArgs(args...);
 }
 
@@ -395,7 +397,7 @@ void printArgs(TFirst first, TArgs... args)
 template <typename... TArgs>
 void debugPrint(const char* file, unsigned int line, TArgs... args)
 {
-    std::cerr << __FILE__ << "[" << __LINE__ << "]:\n\t"
+    std::cerr << file << "[" << line << "]:\n\t"
               << (std::chrono::duration_cast<ms>((Clock::now() - t))).count()
               << " ms\n\t";
     printArgs(args...);
@@ -408,5 +410,5 @@ void debugPrint(const char* file, unsigned int line, TArgs... args)
 
 // predefine detector configurations
 using JungfrauConfig =
-    DetectorConfig<1000, 1000, 999, 1024, 512, 10, 100, 100, 3, 5>;
+    DetectorConfig<1000, 1000, 999, 1024, 512, 2, 1, 100, 3, 5>;
 using MoenchConfig = DetectorConfig<1000, 0, 0, 400, 400, 10, 300, 100, 3, 5>;

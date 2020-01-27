@@ -14,7 +14,7 @@ template <typename Config> struct ConversionKernel {
              TGainStageMap *const gainStageMaps, TEnergyMap *const energyMaps,
              TNumFrames const numFrames, TMask const *const mask,
              bool pedestalFallback, TNumStdDevs const c = Config::C) const
-      -> void {
+      -> void {    
     auto globalId = getLinearIdx(acc);
     auto elementsPerThread = getLinearElementExtent(acc);
 

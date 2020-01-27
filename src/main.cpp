@@ -10,9 +10,11 @@
  * only change this line to change the backend
  * see Alpakaconfig.hpp for all available
  */
-template <std::size_t MAPSIZE>
-using Accelerator =
-    GpuCudaRt<MAPSIZE>;
+#ifdef ALPAKA_ACC_GPU_CUDA_ENABLED
+template <std::size_t TMapSize> using Accelerator = GpuCudaRt<TMapSize>;
+#else
+template <std::size_t TMapSize> using Accelerator = CpuOmp2Blocks<TMapSize>;
+#endif
 // CpuOmp2Blocks<MAPSIZE>;
 // CpuTbbRt<MAPSIZE>;
 // CpuSerial<MAPSIZE>;
@@ -20,6 +22,7 @@ using Accelerator =
 // GpuHipRt<MAPSIZE>;
 
 //#define MOENCH
+#define SYNTH8
 
 #ifdef MOENCH
 using Config = MoenchConfig;
@@ -29,6 +32,15 @@ const std::string pedestalPath =
 const std::string gainPath = "../../../moench_data/moench_gain.bin";
 const std::string dataPath =
     "../../../moench_data/e17050_1_00018_00000_image.dat";
+//#else//if SYNTH8
+//using Config = JungfrauConfig;
+//constexpr float BeamConst = 12.4f;
+//const std::string pedestalPath =
+//    "/bigdata/hplsim/production/jungfrau-photoncounter/data_pool/synthetic/pede.bin";
+//const std::string gainPath = "../../../data_pool/px_101016/gainMaps_M022.bin";
+//const std::string dataPath =
+//    "/bigdata/hplsim/production/jungfrau-photoncounter/data_pool/synthetic/cluster_8_100.bin";
+//"/bigdata/hplsim/production/jungfrau-photoncounter/data_pool/synthetic/cluster_8.bin";
 #else
 using Config = JungfrauConfig;
 constexpr float BeamConst = 12.4f;
@@ -36,7 +48,8 @@ const std::string pedestalPath =
     "../../../data_pool/px_101016/allpede_250us_1243__B_000000.dat";
 const std::string gainPath = "../../../data_pool/px_101016/gainMaps_M022.bin";
 const std::string dataPath =
-    "../../../data_pool/px_101016/Insu_6_tr_1_45d_250us__B_000000.dat";
+  "../../../data_pool/px_101016/Insu100.dat";
+//"../../../data_pool/px_101016/Insu_6_tr_1_45d_250us__B_000000.dat";
 #endif
 
 using ConcreteAcc = Accelerator<Config::MAPSIZE>;
@@ -45,7 +58,7 @@ auto main(int argc, char* argv[]) -> int
 {
     // t is used in all debug-messages
     t = Clock::now();
-
+    
     // create a file cache for all input files
     Filecache<Config>* fc = new Filecache<Config>(1024UL * 1024 * 1024 * 16);
     DEBUG("filecache created");
@@ -53,15 +66,15 @@ auto main(int argc, char* argv[]) -> int
     // load maps
     FramePackage<typename Config::DetectorData, ConcreteAcc> pedestaldata(
         fc->loadMaps<typename Config::DetectorData, ConcreteAcc>(pedestalPath, true));
-    DEBUG(pedestaldata.numFrames, "pedestaldata maps loaded");
+    DEBUG(pedestaldata.numFrames, "pedestaldata maps loaded from", pedestalPath);
 
     FramePackage<typename Config::DetectorData, ConcreteAcc> data(
         fc->loadMaps<typename Config::DetectorData, ConcreteAcc>(dataPath, true));
-    DEBUG(data.numFrames, "data maps loaded");
+    DEBUG(data.numFrames, "data maps loaded from", dataPath);
 
     FramePackage<typename Config::GainMap, ConcreteAcc> gain(
         fc->loadMaps<typename Config::GainMap, ConcreteAcc>(gainPath));
-    DEBUG(gain.numFrames, "gain maps loaded");
+    DEBUG(gain.numFrames, "gain maps loaded from", gainPath);
 
     float beamConst = BeamConst;
     // Jungfrau: 12.4keV
@@ -97,8 +110,7 @@ auto main(int argc, char* argv[]) -> int
     FramePackage<typename Config::SumMap, ConcreteAcc> sum_data(
         (data.numFrames + Config::SUM_FRAMES - 1) / Config::SUM_FRAMES +
         (data.numFrames + Config::DEV_FRAMES - 1) / Config::DEV_FRAMES);
-    typename Config::ClusterArray<ConcreteAcc> clusters_data(30000 * 40000 /
-                                                             50);
+    typename Config::ClusterArray<ConcreteAcc> clusters_data(Config::MAX_CLUSTER_NUM_USER * data.numFrames);
     FramePackage<EnergyValue, ConcreteAcc> maxValues_data(data.numFrames);
 
     tl::optional<FramePackage<typename Config::EnergyMap, ConcreteAcc>> energy =
@@ -128,10 +140,10 @@ auto main(int argc, char* argv[]) -> int
 
     // set execution flags
     ExecutionFlags ef;
-    ef.mode = 1;
-    ef.summation = 1;
-    ef.masking = 1;
-    ef.maxValue = 1;
+    ef.mode = 3;
+    ef.summation = 0;
+    ef.masking = 0;
+    ef.maxValue = 0;
 
     using EnergyPackageView =
         FramePackageView_t<typename Config::EnergyMap, ConcreteAcc>;
@@ -141,6 +153,18 @@ auto main(int argc, char* argv[]) -> int
         FramePackageView_t<typename Config::SumMap, ConcreteAcc>;
     using MaxValuePackageView = FramePackageView_t<EnergyValue, ConcreteAcc>;
 
+
+
+
+  std::ofstream energy_file("cluster_energy.bin", std::ios_base::binary);
+
+  if (!energy_file.is_open()) {
+    std::cerr << "Couldn't open energy output file!\n";
+    abort();
+  }
+    
+    int frameCounter = 0;
+    
     // process data maps
     while (offset < data.numFrames) {
 
@@ -186,6 +210,27 @@ auto main(int argc, char* argv[]) -> int
         // offset
         offset = std::get<0>(*futures.rbegin());
 
+
+
+        std::get<1>(futures.back()).wait();
+        dispenser.synchronize();
+        
+        save_image<Config>("pedestal_" + std::to_string(frameCounter),
+            alpakaNativePtr(dispenser.downloadPedestaldata().data), 0);
+
+        if (energy)
+          save_image<Config>("energy_" + std::to_string(frameCounter),
+                             alpakaNativePtr(energy_view->data), 0);
+
+        
+      // save energy data if available                                                                                                                                                                                                                       
+      if (energy)
+        energy_file.write(
+            reinterpret_cast<char *>(alpakaNativePtr(energy->data)),
+            sizeof(typename Config::EnergyMap) * offset);
+
+        ++frameCounter;
+        
         // print status message
         DEBUG(offset, "/", data.numFrames, "enqueued");
     }
@@ -193,6 +238,13 @@ auto main(int argc, char* argv[]) -> int
     // wait for calculation to finish
     std::get<1>(futures.back()).wait();
 
+    
+    // save clusters (currently only used for debugging)
+    if (clusters) {
+        saveClustersBin<Config, ConcreteAcc>("clusters.bin", *clusters);
+    }
+    
+    /*
     // save second last images
     if (energy)
         save_image<Config>(
@@ -232,6 +284,48 @@ auto main(int argc, char* argv[]) -> int
         saveClustersBin<Config, ConcreteAcc>("clusters.bin", *clusters);
     }
 
+*/
+
+    save_image<Config>(
+        "pedestal", alpakaNativePtr(dispenser.downloadPedestaldata().data), 0);
+    
+  // download and save std dev of the initial pedestal map                                                                                                                                                                                                   
+  auto initPed = dispenser.downloadInitialPedestaldata();
+  std::ofstream outPede("pede_stddev.bin", std::ios::binary);
+  InitPedestal *pedePtr = alpakaNativePtr(initPed.data)->data;
+  for (unsigned int y = 0; y < Config::DIMY; ++y)
+    for (unsigned int x = 0; x < Config::DIMX; ++x)
+      outPede.write(reinterpret_cast<char *>(&(pedePtr[y * 1024 + x].stddev)),
+                    sizeof(double));
+  outPede.flush();
+  outPede.close();
+
+  outPede.open("pede_m.bin", std::ios::binary);
+  pedePtr = alpakaNativePtr(initPed.data)->data;
+  for (unsigned int y = 0; y < Config::DIMY; ++y)
+    for (unsigned int x = 0; x < Config::DIMX; ++x)
+      outPede.write(
+          reinterpret_cast<char *>(&(pedePtr[y * Config::DIMX + x].m)),
+          sizeof(pedePtr[y * Config::DIMX + x].m));
+  outPede.flush();
+  outPede.close();
+
+  outPede.open("pede_m2.bin", std::ios::binary);
+  pedePtr = alpakaNativePtr(initPed.data)->data;
+  for (unsigned int y = 0; y < Config::DIMY; ++y)
+    for (unsigned int x = 0; x < Config::DIMX; ++x)
+      outPede.write(
+          reinterpret_cast<char *>(&(pedePtr[y * Config::DIMX + x].m2)),
+          sizeof(pedePtr[y * Config::DIMX + x].m2));
+  outPede.flush();
+  outPede.close();
+
+    // save clusters (currently only used for debugging)
+    if (clusters) {
+        saveClusters<Config, ConcreteAcc>("clusters.txt", *clusters);
+        saveClustersBin<Config, ConcreteAcc>("clusters.bin", *clusters);
+    }
+    
     // print out GPU memory usage
     auto sizes = dispenser.getMemSize();
     auto free_mem = dispenser.getFreeMem();
