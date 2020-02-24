@@ -216,7 +216,7 @@ The following enumerates the typical data acquisition and processing steps for a
 Whether online or offline, whether implemented in CPU, GPU, FPGA or other hardware, this processing pipeline must be realised in order to convert the raw data output from the JUNGFRAU into information in terms of number of photons per pixel, for use in later analyses.
 
 
-\subsection{Alpaka implementation of fast data processing (Jonas, Florian)}
+\subsection{Alpaka implementation of fast data processing (Jonas)}
 \label{subsec:alpaka}
 
 
@@ -225,8 +225,8 @@ Whether online or offline, whether implemented in CPU, GPU, FPGA or other hardwa
 \textbf{requirements:}
 \begin{itemize}
 	\item real-time data processing (at least 1 detector at 2.5 kHz)
-	\item simple and extensible design(?)
 	\item portable to other architectures (CPU OpenMP, TBB, ...) with minimal code changes
+	\item library for easy integration into existing projects
 \end{itemize}
 optional requirements:
 \begin{itemize}
@@ -234,14 +234,25 @@ optional requirements:
 \end{itemize}
 expected bottlenecks:
 \begin{itemize}
-	\item communication speed between host and GPU
+	\item communication speed between host and device
 	\item RAM speed
 \end{itemize}
-\textbf{design overview:}
+features:
 \begin{itemize}
-	\item wrap for most important alpaka functions (for ease of use) --$>$ explain alpaka shortly (?)
-	\item templated for maximal performance and configurability (?)
-	\item written in modern C++ for optimal performance
+	\item automatic pixel masking (wrong gainstage in calibration; stddev threshold; user supplied mask)
+	\item max value extraction
+	\item pedestal updates $\rightarrow$ runtime fallback to initial pedestalmaps also implemented
+\end{itemize}
+\textbf{design overview:}\\
+upload strategies:
+\begin{itemize}
+	\item split frames and upload them $\rightarrow$ very inefficient
+	\item upload blocks sequentially $\rightarrow$ inefficient because application is memory bound
+	\item pipeline copy and kernel operations
+\end{itemize}
+\begin{itemize}
+	\item use alpaka to write platform independent code --$>$ explain alpaka shortly (?)
+	\item written in modern C++ for performance
 	\item pipelined stream processing of data: upload data to GPU -$>$ process -$>$ download again
 	\item multiple detectors and multiple GPUs usable in parallel
 \end{itemize}
@@ -251,7 +262,7 @@ architecture specific optimizations:
 	\item contiguous memory vs. grid striding loop
 	\item only upload data if needed
 \end{itemize}
-\textbf{software architecture:}
+\textbf{software architecture:}\\
 \textit{hardware accelerator concept}
 \begin{itemize}
 	\item host
@@ -263,14 +274,20 @@ architecture specific optimizations:
 	\item common host: CPU
 	\item common devices: GPUs, FPGAs, Multicore CPUs (in general multi- and manycore systems)
 \end{itemize}
-$<$insert hardware sketch here$>$
+$<$insert hardware sketch here$>$\\
 \textit{the dispenser}
+possible work distribution
 \begin{itemize}
-	\item handles devices (initialization, memory management, etc.)
+	\item thread pool $\rightarrow$ unnecessarily complex
+	\item source-sink relationship $\rightarrow$ every source has a dedicated sink in which data is written $\rightarrow$ enqueueing of source sink pairs
+\end{itemize}
+\begin{itemize}
+	\item handles devices (initialization, memory management, etc.) using a ringbuffer
+	\item usage of double buffering (input data in user provided buffers which is then uploaded to the device, calculated into a new device buffer and downloaded into a user provided output buffer) $\rightarrow$ minimal number of buffers; user is in charge of buffer handling
 	\item enqueues data to next free devices (asynchronously)
 	\item copies data back from devices (asynchronously)
 \end{itemize}
-$<$insert dispenser structure here$>$
+$<$insert dispenser structure here$>$\\
 \textit{the kernel structure}
 \begin{itemize}
 	\item written in empty struct as static function
@@ -278,7 +295,7 @@ $<$insert dispenser structure here$>$
 	\item most data passed by pointer, only single numbers passed directly
 	\item kernel has access to device properties (block size, grid size, device specific functions, etc.)
 \end{itemize}
-$<$insert example here$>$
+$<$insert example here$>$\\
 \textit{easy hardware abstraction}
 \begin{itemize}
 	\item useful settings defined for every possible device class
@@ -289,9 +306,19 @@ $<$insert example here$>$
 }
 
 
-\subsection{Benchmark tests (Jonas, Florian)}
+\subsection{Benchmark tests (Jonas)}
 \label{subsec:benchmark}
 Design, objectives, and evaluation of tests
+
+\textcolor{magenta}{
+\begin{itemize}
+	\item machine specks
+	\item used libraries
+	\item which tests where chosen?
+	\item why were they chosen?
+	\item what are the expectations?
+\end{itemize}
+}
 
 \section{Results}
 \label{sec:results}
@@ -300,9 +327,40 @@ Results of tests of software parts on various computing hardware using suitable 
 
 Where are the bottlenecks\\
 
+\textcolor{magenta}{
+expected:
+\begin{itemize}
+	\item RAM and PCIe bandwidth @ \textasciitilde12 GB/s, after that: multiple nodes necessary
+	\item unbalanced up- and downloads (mainly on GPU)
+	\item multiple different accelerators will be each as fast as the slowest one
+\end{itemize}
+}
+
 Available capacity on GPUs\\
 
+\textcolor{magenta}{
+expected: up to 1000 Frames/s; 100 to 1000 Frames per stream \\
+\textbf{comparison of devices (expected):}
+\begin{itemize}
+	\item after 10 Frames per stream the frame count has diminishing effects on performance (on GPU)
+	\item on CPU: number of Frames per streams doesn't effect performance much
+	\item photon calculation a lot faster (\textasciitilde4x) than energy; clustering in between (this effect will probably be less on CPU)
+	\item number and type of kernels mostly insignificant for GPU; some effects on CPU
+	\item frame summing will speed up almost linearly on less frames on GPU, on CPU not so big differences
+	\item almost linear scaling with number of GPUs
+	\item almost linear scaling with number of cores on CPU
+	\item pedestal updates and masking doesn't effect performance mush
+	\item exception: clustering (mainly on GPU): scales linearly with clusters to download \ calculate
+	\item multiple modules show weak scaling
+	\item effects of cluster size???
+\end{itemize}
+}
+
 Best system
+
+\textcolor{magenta}{
+	expected: 4x V100 System with 100 or 1000 frames per stream @ $>$ 10000 Frames/s
+}
 
 \subsection{Experiences from practical application of improved code (PSI)}
 Application results
@@ -311,8 +369,15 @@ Application results
 \label{sec:conclusions}
 Is presented method applicable / useful for other detectors, e.g. AGIPD? \\
 
+\textcolor{magenta}{
+applicable to data from similar sensors (rectangular sensor, consecutive in memory)
+}
+
 calculation on FPGAs in the future
 
+\textcolor{magenta}{
+more backends to come (SYCL, ...)
+}
 
 \section{Acknowledges}
 The authors would like to thank the Alpaka developers (\textcolor{blue}{names?})for their support.\\
