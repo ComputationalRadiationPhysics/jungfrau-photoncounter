@@ -171,21 +171,6 @@ auto bench(
   typename Config::template ClusterArray<ConcreteAcc> *clusters =
       benchmarkingConfig.clusters;
 
-
-
-
-
-  //! @todo: remove debugging code
-  // write out initial pedestal data
-  save_image<Config>(
-                     "pedestal_start",
-                     alpakaNativePtr(dispenser.downloadPedestaldata().data), 0);
-
-
-
-
-
-  
   // process data maps
   while (offset < benchmarkingConfig.data.numFrames) {
 
@@ -217,31 +202,6 @@ auto bench(
                                            benchmarkingConfig.ef, energy,
                                            photons, sum, maxValues, clusters));
 
-
-
-
-
-
-
-
-    //! @todo: remove debugging code
-    // write out pedestal and image values
-            std::get<1>(futures.back()).wait();
-        dispenser.synchronize();
-
-        save_image<Config>("pedestal_" + std::to_string(offset),
-            alpakaNativePtr(dispenser.downloadPedestaldata().data), 0);
-
-        if (energy)
-          save_image<Config>("energy_" + std::to_string(offset),
-                             alpakaNativePtr(energy->data), 0);
-
-
-
-
-
-
-        
     auto offset_diff = std::get<0>(*futures.rbegin()) - offset;
     offset = std::get<0>(*futures.rbegin());
     sum_offset += (offset_diff + Config::SUM_FRAMES - 1) / Config::SUM_FRAMES;

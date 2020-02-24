@@ -61,11 +61,7 @@ bool checkResult(tl::optional<T> result, std::string referencePath) {
   if (readBytes < dataSize || !reference_file.read(&dummyByte, 1).eof()) {
     std::cerr << "Number of read bytes does not match (" << readBytes << " vs. "
               << dataSize << "; eof: " << reference_file.eof() << ")!\n";
-
-
-
-    //! @todo: remove debugging code
-    //return false;
+    return false;
   }
 
   // compare data
