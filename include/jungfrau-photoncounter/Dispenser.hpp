@@ -122,6 +122,51 @@ public:
         while (offset <= data.numFrames - TConfig::DEV_FRAMES) {
             offset += calcPedestaldata(alpakaNativePtr(data.data) + offset,
                                        TConfig::DEV_FRAMES);
+
+
+
+            if(offset >= 990 && offset < 1000) {
+              // download and save std dev of the initial pedestal map
+              auto initPed = downloadInitialPedestaldata();
+              std::ofstream outPede("pede/stddev_" + std::to_string(offset) + ".txt");
+              typename TConfig::InitPedestal *pedePtr = alpakaNativePtr(initPed.data)->data;
+              for (unsigned int y = 0; y < TConfig::DIMY; ++y) {
+                outPede << "\t";
+                for (unsigned int x = 0; x < TConfig::DIMX; ++x) {
+                  outPede << pedePtr[y * TConfig::DIMX + x].stddev << " ";
+                }
+                outPede << "\n";
+              }
+              outPede.flush();
+              outPede.close();
+
+              outPede.open("pede/m_" + std::to_string(offset) + ".txt");
+              pedePtr = alpakaNativePtr(initPed.data)->data;
+              for (unsigned int y = 0; y < TConfig::DIMY; ++y) {
+                outPede << "\t";
+                for (unsigned int x = 0; x < TConfig::DIMX; ++x) {
+                  outPede << pedePtr[y * TConfig::DIMX + x].m << " ";
+                }
+                outPede << "\n";
+              }
+              outPede.flush();
+              outPede.close();
+
+              outPede.open("pede/m2_" + std::to_string(offset) + ".txt");
+              pedePtr = alpakaNativePtr(initPed.data)->data;
+              for (unsigned int y = 0; y < TConfig::DIMY; ++y) {
+                outPede << "\t";
+                for (unsigned int x = 0; x < TConfig::DIMX; ++x) {
+                  outPede << pedePtr[y * TConfig::DIMX + x].m2 << " ";
+                }
+                outPede << "\n";
+              }
+              outPede.flush();
+              outPede.close();
+            }
+
+
+            
         }
 
         // upload remaining frames

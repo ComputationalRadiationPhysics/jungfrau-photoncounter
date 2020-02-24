@@ -1,8 +1,7 @@
 #pragma once
 #include "helpers.hpp"
 
-template<typename Config>
-struct CalibrationKernel {
+template <typename Config> struct CalibrationKernel {
     template <typename TAcc,
               typename TDetectorData,
               typename TInitPedestalMap,
@@ -17,16 +16,17 @@ struct CalibrationKernel {
                                   TNumFrames const numFrames) const -> void
     {
         constexpr auto PEDEMAPS = Config::PEDEMAPS;
-        
+
         auto id = getLinearIdx(acc);
 
         // check range
         if (id >= Config::MAPSIZE)
             return;
 
-        const std::size_t FRAMESPERSTAGE[] = {
-            Config::FRAMESPERSTAGE_G0, Config::FRAMESPERSTAGE_G1, Config::FRAMESPERSTAGE_G2};
-        
+        const std::size_t FRAMESPERSTAGE[] = {Config::FRAMESPERSTAGE_G0,
+                                              Config::FRAMESPERSTAGE_G1,
+                                              Config::FRAMESPERSTAGE_G2};
+
         // find expected gain stage
         char expectedGainStage;
         for (int i = 0; i < PEDEMAPS; ++i) {

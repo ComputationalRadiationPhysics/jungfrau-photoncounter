@@ -179,7 +179,7 @@ template <std::size_t MAPSIZE> struct CpuSerial {
     template <typename T>
     using HostView = alpaka::mem::view::ViewSubView<DevHost, T, Dim, Size>;
 
-    static constexpr std::size_t STREAMS_PER_DEV = 4;
+    static constexpr std::size_t STREAMS_PER_DEV = 1u;
     static constexpr Size elementsPerThread = 1u;
     static constexpr Size threadsPerBlock = 1u;
     static constexpr Size blocksPerGrid = MAPSIZE;
