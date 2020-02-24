@@ -13,7 +13,7 @@
 #ifdef ALPAKA_ACC_GPU_CUDA_ENABLED
 template <std::size_t TMapSize> using Accelerator = GpuCudaRt<TMapSize>;
 #else
-template <std::size_t TMapSize> using Accelerator = CpuOmp2Blocks<TMapSize>;
+template <std::size_t TMapSize> using Accelerator = CpuSerial<TMapSize>;
 #endif
 // CpuOmp2Blocks<MAPSIZE>;
 // CpuTbbRt<MAPSIZE>;
@@ -48,7 +48,7 @@ const std::string pedestalPath =
     "../../../data_pool/px_101016/allpede_250us_1243__B_000000.dat";
 const std::string gainPath = "../../../data_pool/px_101016/gainMaps_M022.bin";
 const std::string dataPath =
-  "../../../data_pool/px_101016/Insu100.dat";
+  "../../../data_pool/px_101016/Insu_6_tr_1_45d_250us__B_000000_3.dat";
 //"../../../data_pool/px_101016/Insu_6_tr_1_45d_250us__B_000000.dat";
 #endif
 
@@ -98,7 +98,7 @@ auto main(int argc, char* argv[]) -> int
 #endif
 
     // upload and calculate pedestal data
-    dispenser.uploadPedestaldata(pedestaldata);
+   dispenser.uploadPedestaldata(pedestaldata);
 
     // allocate space for output data
     FramePackage<typename Config::EnergyMap, ConcreteAcc> energy_data(
@@ -140,9 +140,9 @@ auto main(int argc, char* argv[]) -> int
 
     // set execution flags
     ExecutionFlags ef;
-    ef.mode = 3;
+    ef.mode = 0;
     ef.summation = 0;
-    ef.masking = 0;
+    ef.masking = 1;
     ef.maxValue = 0;
 
     using EnergyPackageView =
@@ -154,6 +154,49 @@ auto main(int argc, char* argv[]) -> int
     using MaxValuePackageView = FramePackageView_t<EnergyValue, ConcreteAcc>;
 
 
+
+
+    save_image<Config>("mask",
+                       dispenser.downloadMask(), 0);
+
+
+    save_image<Config>(
+        "pedestal", alpakaNativePtr(dispenser.downloadPedestaldata().data), 0);
+    
+  // download and save std dev of the initial pedestal map                                                                                                                                                                                                   
+  auto initPed = dispenser.downloadInitialPedestaldata();
+  std::ofstream outPede("pede_stddev.bin", std::ios::binary);
+  InitPedestal *pedePtr = alpakaNativePtr(initPed.data)->data;
+  for (unsigned int y = 0; y < Config::DIMY; ++y)
+    for (unsigned int x = 0; x < Config::DIMX; ++x)
+      outPede.write(reinterpret_cast<char *>(&(pedePtr[y * 1024 + x].stddev)),
+                    sizeof(double));
+  outPede.flush();
+  outPede.close();
+
+  outPede.open("pede_m.bin", std::ios::binary);
+  pedePtr = alpakaNativePtr(initPed.data)->data;
+  for (unsigned int y = 0; y < Config::DIMY; ++y)
+    for (unsigned int x = 0; x < Config::DIMX; ++x)
+      outPede.write(
+          reinterpret_cast<char *>(&(pedePtr[y * Config::DIMX + x].m)),
+          sizeof(pedePtr[y * Config::DIMX + x].m));
+  outPede.flush();
+  outPede.close();
+
+  outPede.open("pede_m2.bin", std::ios::binary);
+  pedePtr = alpakaNativePtr(initPed.data)->data;
+  for (unsigned int y = 0; y < Config::DIMY; ++y)
+    for (unsigned int x = 0; x < Config::DIMX; ++x)
+      outPede.write(
+          reinterpret_cast<char *>(&(pedePtr[y * Config::DIMX + x].m2)),
+          sizeof(pedePtr[y * Config::DIMX + x].m2));
+  outPede.flush();
+  outPede.close();
+    
+
+
+    
 
 
   std::ofstream energy_file("cluster_energy.bin", std::ios_base::binary);
@@ -285,40 +328,6 @@ auto main(int argc, char* argv[]) -> int
     }
 
 */
-
-    save_image<Config>(
-        "pedestal", alpakaNativePtr(dispenser.downloadPedestaldata().data), 0);
-    
-  // download and save std dev of the initial pedestal map                                                                                                                                                                                                   
-  auto initPed = dispenser.downloadInitialPedestaldata();
-  std::ofstream outPede("pede_stddev.bin", std::ios::binary);
-  InitPedestal *pedePtr = alpakaNativePtr(initPed.data)->data;
-  for (unsigned int y = 0; y < Config::DIMY; ++y)
-    for (unsigned int x = 0; x < Config::DIMX; ++x)
-      outPede.write(reinterpret_cast<char *>(&(pedePtr[y * 1024 + x].stddev)),
-                    sizeof(double));
-  outPede.flush();
-  outPede.close();
-
-  outPede.open("pede_m.bin", std::ios::binary);
-  pedePtr = alpakaNativePtr(initPed.data)->data;
-  for (unsigned int y = 0; y < Config::DIMY; ++y)
-    for (unsigned int x = 0; x < Config::DIMX; ++x)
-      outPede.write(
-          reinterpret_cast<char *>(&(pedePtr[y * Config::DIMX + x].m)),
-          sizeof(pedePtr[y * Config::DIMX + x].m));
-  outPede.flush();
-  outPede.close();
-
-  outPede.open("pede_m2.bin", std::ios::binary);
-  pedePtr = alpakaNativePtr(initPed.data)->data;
-  for (unsigned int y = 0; y < Config::DIMY; ++y)
-    for (unsigned int x = 0; x < Config::DIMX; ++x)
-      outPede.write(
-          reinterpret_cast<char *>(&(pedePtr[y * Config::DIMX + x].m2)),
-          sizeof(pedePtr[y * Config::DIMX + x].m2));
-  outPede.flush();
-  outPede.close();
 
     // save clusters (currently only used for debugging)
     if (clusters) {

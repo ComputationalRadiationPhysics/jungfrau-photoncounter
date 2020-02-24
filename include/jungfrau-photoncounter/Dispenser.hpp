@@ -60,11 +60,11 @@ public:
           deviceContainer(alpakaGetDevs<TAlpaka>())
     {
         initDevices();
-        
+
         // make room for live mask information
         if (!mask) {
-            alpakaMemSet(devices[devices.size() - 1].queue,
-                         devices[devices.size() - 1].mask,
+            alpakaMemSet(devices[0].queue,
+                         devices[0].mask,
                          1,
                          decltype(TConfig::SINGLEMAP)(TConfig::SINGLEMAP));
         }
@@ -117,8 +117,8 @@ public:
         initDevices();
 
         // clear mask
-        alpakaMemSet(devices[devices.size() - 1].queue,
-                     devices[devices.size() - 1].mask,
+        alpakaMemSet(devices[0].queue,
+                     devices[0].mask,
                      1,
                      decltype(TConfig::SINGLEMAP)(TConfig::SINGLEMAP));
 
@@ -127,7 +127,7 @@ public:
     }
 
     /**
-     * Tries to upload all data packages requiered for the inital offset.
+     * Tries to upload all data packages requiered for the initl offset.
      * Only stops after all data packages are uploaded.
      * @param Maps-Struct with datamaps
      * @param stdDevThreshold An standard deviation threshold above which pixels
@@ -144,6 +144,53 @@ public:
         while (offset <= data.numFrames - TConfig::DEV_FRAMES) {
             offset += calcPedestaldata(alpakaNativePtr(data.data) + offset,
                                        TConfig::DEV_FRAMES);
+
+            
+            /*
+            //! @todo: remove debugging code
+            if(offset >= 990 && offset < 1000) {
+                
+              // download and save std dev of the initial pedestal map                                                                                                                                                                                                   
+              auto initPed = downloadInitialPedestaldata();
+              std::ofstream outPede("pede/stddev_" + std::to_string(offset) + ".txt");
+              InitPedestal *pedePtr = alpakaNativePtr(initPed.data)->data;
+              for (unsigned int y = 0; y < TConfig::DIMY; ++y) {
+                outPede << "\t";
+                for (unsigned int x = 0; x < TConfig::DIMX; ++x) {
+                  outPede << pedePtr[y * TConfig::DIMX + x].stddev << " ";
+                }
+                outPede << "\n";
+              }
+              outPede.flush();
+              outPede.close();
+            
+              outPede.open("pede/m_" + std::to_string(offset) + ".txt");
+              pedePtr = alpakaNativePtr(initPed.data)->data;
+              for (unsigned int y = 0; y < TConfig::DIMY; ++y) {
+                outPede << "\t";
+                for (unsigned int x = 0; x < TConfig::DIMX; ++x) {
+                  outPede << pedePtr[y * TConfig::DIMX + x].m << " ";
+                }
+                outPede << "\n";
+              }
+              outPede.flush();
+              outPede.close();
+            
+              outPede.open("pede/m2_" + std::to_string(offset) + ".txt");
+              pedePtr = alpakaNativePtr(initPed.data)->data;
+              for (unsigned int y = 0; y < TConfig::DIMY; ++y) {
+                outPede << "\t";
+                for (unsigned int x = 0; x < TConfig::DIMX; ++x) {
+                  outPede << pedePtr[y * TConfig::DIMX + x].m2 << " ";
+                }
+                outPede << "\n";
+              }
+              outPede.flush();
+              outPede.close();
+            }
+            */
+
+            
         }
 
         // upload remaining frames
@@ -169,11 +216,15 @@ public:
     auto downloadPedestaldata()
         -> FramePackage<typename TConfig::PedestalMap, TAlpaka>
     {
+      //! @todo: find a more beautifil solution than this
+      // get current device number
+        uint64_t source = (nextFull + devices.size() - 1) % devices.size();
+        
         // create handle for the device with the current version of the pedestal
         // maps
-        auto current_device = devices[nextFree];
+        auto current_device = devices[source];
 
-        DEBUG("downloading pedestaldata from device", nextFree);
+        DEBUG("downloading pedestaldata from device", source);
 
         // get the pedestal data from the device
         alpakaCopy(current_device.queue,
@@ -196,11 +247,14 @@ public:
     auto downloadInitialPedestaldata()
         -> FramePackage<typename TConfig::InitPedestalMap, TAlpaka>
     {
+      //! @todo: find a more beautifil solution than this
+      // get current device number
+        uint64_t source = (nextFull + devices.size() - 1) % devices.size();
+        
         // create handle for the device with the current version of the pedestal
         // maps
-        auto current_device = devices[nextFree];
-
-        DEBUG("downloading pedestaldata from device", nextFree);
+        auto current_device = devices[source];        
+        DEBUG("downloading pedestaldata from device", source);
 
         // get the pedestal data from the device
         alpakaCopy(current_device.queue,
@@ -224,9 +278,13 @@ public:
     {
         DEBUG("downloading mask...");
 
+      //! @todo: find a more beautifil solution than this
+      // get current device number
+        uint64_t source = (nextFull + devices.size() - 1) % devices.size();
+        
         // create handle for the device with the current version of the pedestal
         // maps
-        auto current_device = devices[nextFree];
+        auto current_device = devices[source];
 
         // get the pedestal data from the device
         alpakaCopy(current_device.queue,
@@ -261,9 +319,13 @@ public:
     {
         DEBUG("downloading gain stage map...");
 
+      //! @todo: find a more beautifil solution than this
+      // get current device number
+        uint64_t source = (nextFull + devices.size() - 1) % devices.size();
+        
         // create handle for the device with the current version of the pedestal
         // maps
-        auto current_device = devices[nextFree];
+        auto current_device = devices[source];
 
         // mask gain stage maps
         GainStageMaskingKernel<TConfig> gainStageMasking;
@@ -310,9 +372,13 @@ public:
     {
         DEBUG("downloading drift map...");
 
+      //! @todo: find a more beautifil solution than this
+      // get current device number
+        uint64_t source = (nextFull + devices.size() - 1) % devices.size();
+        
         // create handle for the device with the current version of the pedestal
         // maps
-        auto current_device = devices[nextFree];
+        auto current_device = devices[source];
 
         // mask gain stage maps
         DriftMapKernel<TConfig> driftMapKernel;
@@ -368,7 +434,7 @@ public:
                                       clusters);
             offset += std::get<0>(result);
             DEBUG(offset, "/", data.numFrames, "frames uploaded");
-
+            
             return std::make_tuple(std::move(offset),
                                    std::move(std::get<1>(result)));
         }
@@ -397,7 +463,7 @@ public:
 
             flush();
         }
-
+        
         return std::make_tuple(
             offset, std::async(std::launch::async, []() { return true; }));
     }
@@ -450,7 +516,7 @@ private:
 
     double beamConst;
 
-    std::size_t nextFree, nextFull;
+  std::size_t nextFree, nextFull;
 
     /**
      * Initializes all devices. Uploads gain data and creates buffer.
@@ -460,6 +526,8 @@ private:
     {
         const GainmapInversionKernel<TConfig> gainmapInversionKernel{};
         std::size_t deviceCount = alpakaGetDevCount<TAlpaka>();
+
+        //! @todo: find all the other debug code
         devices.reserve(deviceCount * TAlpaka::STREAMS_PER_DEV);
 
         for (std::size_t num = 0; num < deviceCount * TAlpaka::STREAMS_PER_DEV; ++num) {
@@ -470,12 +538,25 @@ private:
                        devices[num].gain,
                        gain.data,
                        decltype(TConfig::GAINMAPS)(TConfig::GAINMAPS));
+            
             // compute reciprocals of gain maps
             auto const gainmapInversion(alpakaCreateKernel<TAlpaka>(
                 getWorkDiv<TAlpaka>(),
                 gainmapInversionKernel,
                 alpakaNativePtr(devices[num].gain)));
             alpakaEnqueueKernel(devices[num].queue, gainmapInversion);
+
+            // init cluster data to 0
+            alpakaMemSet(devices[num].queue,
+                         devices[num].cluster,
+                         0,
+                         decltype(TConfig::MAX_CLUSTER_NUM_USER)(TConfig::MAX_CLUSTER_NUM_USER) *
+                         decltype(TConfig::DEV_FRAMES)(TConfig::DEV_FRAMES));
+
+            // wait until everything is finished
+            alpakaWait(devices[num].queue);
+            
+            // place the initialized device into a ringbuffer
             if (!ringbuffer.push(&devices[num])) {
                 fputs("FATAL ERROR (RingBuffer): Unexpected size!\n", stderr);
                 exit(EXIT_FAILURE);
@@ -510,25 +591,29 @@ private:
                    alpakaViewPlainPtrHost<TAlpaka, TDetectorData>(
                        data, alpakaGetHost<TAlpaka>(), numMaps),
                    numMaps);
+        
+        // copy offset data from last initialized device (if needed)
+        if(init) {
+          auto prevDevice = (nextFull + devices.size() - 1) % devices.size();
+          alpakaWait(devices[prevDevice].queue);
 
-        // copy offset data from last initialized device
-        auto prevDevice = (nextFull + devices.size() - 1) % devices.size();
-        alpakaWait(devices[prevDevice].queue);
-        alpakaCopy(dev->queue,
-                   dev->pedestal,
-                   devices[prevDevice].pedestal,
-                   decltype(TConfig::PEDEMAPS)(TConfig::PEDEMAPS));
+          
+          alpakaCopy(dev->queue,
+                     dev->pedestal,
+                     devices[prevDevice].pedestal,
+                     decltype(TConfig::PEDEMAPS)(TConfig::PEDEMAPS));
 
-        alpakaCopy(dev->queue,
-                   dev->initialPedestal,
-                   devices[prevDevice].initialPedestal,
-                   decltype(TConfig::PEDEMAPS)(TConfig::PEDEMAPS));
+          alpakaCopy(dev->queue,
+                     dev->initialPedestal,
+                     devices[prevDevice].initialPedestal,
+                     decltype(TConfig::PEDEMAPS)(TConfig::PEDEMAPS));
 
-        alpakaCopy(dev->queue,
-                   dev->mask,
-                   devices[prevDevice].mask,
-                   decltype(TConfig::SINGLEMAP)(TConfig::SINGLEMAP));
-
+          alpakaCopy(dev->queue,
+                     dev->mask,
+                     devices[prevDevice].mask,
+                     decltype(TConfig::SINGLEMAP)(TConfig::SINGLEMAP));          
+        }
+        
         // increase nextFull and nextFree (because pedestal data isn't
         // downloaded like normal data)
         nextFull = (nextFull + 1) % devices.size();
@@ -539,11 +624,11 @@ private:
             alpakaMemSet(dev->queue,
                          dev->pedestal,
                          0,
-                         decltype(TConfig::SINGLEMAP)(TConfig::SINGLEMAP));
+                         decltype(TConfig::PEDEMAPS)(TConfig::PEDEMAPS));
             alpakaMemSet(dev->queue,
                          dev->initialPedestal,
                          0,
-                         decltype(TConfig::SINGLEMAP)(TConfig::SINGLEMAP));
+                         decltype(TConfig::PEDEMAPS)(TConfig::PEDEMAPS));
             alpakaWait(dev->queue);
             init = true;
         }
@@ -616,7 +701,7 @@ private:
      * all others.
      */
     auto distributeInitialPedestalMaps() -> void
-    {
+    { 
         uint64_t source = (nextFull + devices.size() - 1) % devices.size();
         DEBUG("distribute initial pedestal maps (from", source, ")");
         for (uint64_t i = 0; i < devices.size(); ++i) {
@@ -710,7 +795,7 @@ private:
                                dev->numClusters,
                                &dev->queue,
                                TConfig::SINGLEMAP);
-
+        
         // copy offset data from last device uploaded to current device
         auto prevDevice = (nextFull + devices.size() - 1) % devices.size();
         alpakaWait(dev->queue, devices[prevDevice].event);

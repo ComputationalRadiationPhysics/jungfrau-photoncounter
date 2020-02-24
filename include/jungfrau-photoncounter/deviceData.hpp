@@ -92,7 +92,7 @@ template <typename Config, typename TAlpaka> struct DeviceData {
           cluster(alpakaAlloc<typename Config::Cluster>(
               *device,
               decltype(Config::MAX_CLUSTER_NUM_USER)(
-                  Config::MAX_CLUSTER_NUM_USER) * 10 *
+                  Config::MAX_CLUSTER_NUM_USER) *
                   decltype(Config::DEV_FRAMES)(Config::DEV_FRAMES))),
           numClusters(alpakaAlloc<unsigned long long>(
               *device,

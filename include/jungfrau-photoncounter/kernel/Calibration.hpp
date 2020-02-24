@@ -32,8 +32,8 @@ template <typename Config> struct CalibrationKernel {
           expectedGainStage = i;
           break;
         }
-      }
-
+      }      
+      
       // determine expected gain stage
       for (TNumFrames i = 0; i < numFrames; ++i) {
         if (initPedestalMap[expectedGainStage][id].count ==

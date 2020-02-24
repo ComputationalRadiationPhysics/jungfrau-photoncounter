@@ -17,19 +17,18 @@ template <typename Config, typename AccConfig> struct ClusterFinderKernel {
       bool pedestalFallback, TNumStdDevs const c = Config::C) const -> void {
     unsigned long globalId = getLinearIdx(acc);
     unsigned long elementsPerThread = getLinearElementExtent(acc);
-    //AccConfig::elementsPerThread; // getLinearElementExtent(acc);
+      //AccConfig::elementsPerThread; // getLinearElementExtent(acc);
 
     constexpr auto n = Config::CLUSTER_SIZE;
 
     // iterate over all elements in the thread
-    //for (auto id = globalId * elementsPerThread;
-    //     id < (globalId + 1) * elementsPerThread; ++id) {
-    auto id = globalId;
+    for (auto id = globalId * elementsPerThread;
+         id < (globalId + 1) * elementsPerThread; ++id) {
 
       // check range
       if (id >= Config::MAPSIZE)
         return;
-
+      
       if (currentFrame) {
         auto adc = getAdc(detectorData[currentFrame - 1].data[id]);
         const auto &gainStage = gainStageMaps[currentFrame - 1].data[id];
@@ -40,7 +39,6 @@ template <typename Config, typename AccConfig> struct ClusterFinderKernel {
         if (indexQualifiesAsClusterCenter<Config>(id)) {
           findClusterSumAndMax<Config>(energyMaps[currentFrame - 1].data, id,
                                        sum, max);
-
           // check cluster conditions
           if ((energy > c * stddev || sum > n * c * stddev) && id == max) {
             auto &cluster = getClusterBuffer(acc, clusterArray, numClusters);
@@ -51,6 +49,7 @@ template <typename Config, typename AccConfig> struct ClusterFinderKernel {
                    !pedestalFallback) {
 
 
+            //! @todo: remove debugging code
             if(id == 0)
               printf("asdfasdfasdf\n");
 
@@ -65,6 +64,6 @@ template <typename Config, typename AccConfig> struct ClusterFinderKernel {
         processInput(acc, detectorData[currentFrame], gainMaps, pedestalMaps,
                      initPedestalMaps, gainStageMaps[currentFrame],
                      energyMaps[currentFrame], mask, id, pedestalFallback);
-      //}
+    }
   }
 };

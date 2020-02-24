@@ -33,7 +33,7 @@ constexpr auto framesPerStageG2 = Values<std::size_t, 999>();
 constexpr auto dimX = Values<std::size_t, 1024>();
 constexpr auto dimY = Values<std::size_t, 512>();
 constexpr auto sumFrames = Values<std::size_t, 2>(); //, 10, 20, 100>();
-constexpr auto devFrames = Values<std::size_t, 10>(); //, 100>(); //, 1000>();
+constexpr auto devFrames = Values<std::size_t, 1>(); //10, 100>(); //, 1000>();
 constexpr auto movingStatWindowSize = Values<std::size_t, 100>();
 constexpr auto clusterSize = Values<std::size_t, 2>(); //, 3, 7, 11>();
 constexpr auto cs = Values<std::size_t, 5>();
@@ -96,11 +96,86 @@ std::vector<Duration> benchmark(unsigned int iterations,
         if (benchmarkingInput.clusters)
             benchmarkingInput.clusters->used = 0;
         auto dispenser = calibrate(benchmarkingInput);
+
+
+        /*
+        //! @todo: remove all this debugging code
+          // download and save std dev of the initial pedestal map                                                                                                                                                                                                   
+  auto initPed = dispenser.downloadInitialPedestaldata();
+  std::ofstream outPede("pede_stddev.bin", std::ios::binary);
+  InitPedestal *pedePtr = alpakaNativePtr(initPed.data)->data;
+  for (unsigned int y = 0; y < Config::DIMY; ++y)
+    for (unsigned int x = 0; x < Config::DIMX; ++x)
+      outPede.write(reinterpret_cast<char *>(&(pedePtr[y * 1024 + x].stddev)),
+                    sizeof(double));
+  outPede.flush();
+  outPede.close();
+
+  outPede.open("pede_m.bin", std::ios::binary);
+  pedePtr = alpakaNativePtr(initPed.data)->data;
+  for (unsigned int y = 0; y < Config::DIMY; ++y)
+    for (unsigned int x = 0; x < Config::DIMX; ++x)
+      outPede.write(
+          reinterpret_cast<char *>(&(pedePtr[y * Config::DIMX + x].m)),
+          sizeof(pedePtr[y * Config::DIMX + x].m));
+  outPede.flush();
+  outPede.close();
+
+  outPede.open("pede_m2.bin", std::ios::binary);
+  pedePtr = alpakaNativePtr(initPed.data)->data;
+  for (unsigned int y = 0; y < Config::DIMY; ++y)
+    for (unsigned int x = 0; x < Config::DIMX; ++x)
+      outPede.write(
+          reinterpret_cast<char *>(&(pedePtr[y * Config::DIMX + x].m2)),
+          sizeof(pedePtr[y * Config::DIMX + x].m2));
+  outPede.flush();
+  outPede.close();
+        */
+
+        //! @todo: remove all this debugging code
+        //save_image<Config>("pedestal_start", alpakaNativePtr(dispenser.downloadPedestaldata().data), 0);
+
+
+        
         auto t0 = Timer::now();
         bench(dispenser, benchmarkingInput);
         auto t1 = Timer::now();
         results.push_back(std::chrono::duration_cast<Duration>(t1 - t0));
+
+
+        //! @todo: remove all this debugging code
+        //save_image<Config>("pedestal_end", alpakaNativePtr(dispenser.downloadPedestaldata().data), 0);
+
+               
+
+  //std::ofstream energy_file("/media/storage/schenk24/tmp/cluster_energy.bin", std::ios_base::binary);
+  //  
+  //if (!energy_file.is_open()) {
+  //  std::cerr << "Couldn't open energy output file!\n";
+  //  abort();
+  //  }
+  //
+  //    // save energy data if available                                                                                        //                                                                                                   
+  //    if (benchmarkingInput.energy)
+  //      energy_file.write(
+  //          reinterpret_cast<char *>(alpakaNativePtr(benchmarkingInput.energy->data)),
+  //          sizeof(typename Config::EnergyMap) * benchmarkingInput.energy->numFrames);
+  //
+  //  
+  //energy_file.flush();
+  //energy_file.close();
+
     }
+
+
+
+
+ 
+
+  
+
+
+    
     // check result if requested
     std::cout << "Checking energy if needed ..." << std::endl;
     if (!checkResult(benchmarkingInput.energy, resultCheck.energyPath))

@@ -84,7 +84,7 @@ template <std::size_t MAPSIZE> struct CpuTbbBlocks {
   template <typename T>
   using HostView = alpaka::mem::view::ViewSubView<DevHost, T, Dim, Size>;
 
-  static constexpr std::size_t STREAMS_PER_DEV = 4;
+  static constexpr std::size_t STREAMS_PER_DEV = 1u;
   static constexpr Size elementsPerThread = 1u;
   static constexpr Size threadsPerBlock = 1u;
   static constexpr Size blocksPerGrid = MAPSIZE;
@@ -141,9 +141,9 @@ template <std::size_t MAPSIZE> struct CpuOmp2Blocks {
   using HostView = alpaka::mem::view::ViewSubView<DevHost, T, Dim, Size>;
 
   static constexpr std::size_t STREAMS_PER_DEV = 1;
-  static constexpr Size elementsPerThread = 1u;//256u;
+  static constexpr Size elementsPerThread = 256u;
   static constexpr Size threadsPerBlock = 1u;
-  static constexpr Size blocksPerGrid = MAPSIZE;//(MAPSIZE + 255) / 256;
+  static constexpr Size blocksPerGrid = (MAPSIZE + 255) / 256;
 };
 
 template <typename T, typename TBuf, typename... TArgs>
@@ -178,7 +178,7 @@ template <std::size_t MAPSIZE> struct CpuOmp4 {
   template <typename T>
   using HostView = alpaka::mem::view::ViewSubView<DevHost, T, Dim, Size>;
 
-  static constexpr std::size_t STREAMS_PER_DEV = 4;
+  static constexpr std::size_t STREAMS_PER_DEV = 1u;
   static constexpr Size elementsPerThread = 1u;
   static constexpr Size threadsPerBlock = 1u;
   static constexpr Size blocksPerGrid = MAPSIZE;
@@ -216,9 +216,9 @@ template <std::size_t MAPSIZE> struct CpuSerial {
   using HostView = alpaka::mem::view::ViewSubView<DevHost, T, Dim, Size>;
 
   static constexpr std::size_t STREAMS_PER_DEV = 1;
-  static constexpr Size elementsPerThread = 1u;//256u;
+  static constexpr Size elementsPerThread = 256u;
   static constexpr Size threadsPerBlock = 1u;
-  static constexpr Size blocksPerGrid = MAPSIZE;//(MAPSIZE + 255) / 256;
+  static constexpr Size blocksPerGrid = (MAPSIZE + 255) / 256;
 };
 
 template <typename T, typename TBuf, typename... TArgs>
