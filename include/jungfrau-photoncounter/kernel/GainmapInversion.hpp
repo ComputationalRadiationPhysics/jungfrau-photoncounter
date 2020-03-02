@@ -7,15 +7,15 @@ template <typename Config> struct GainmapInversionKernel {
       -> void {
     auto globalId = getLinearIdx(acc);
     auto elementsPerThread = getLinearElementExtent(acc);
-
+    
     // iterate over all elements in the thread
     for (auto id = globalId * elementsPerThread;
          id < (globalId + 1) * elementsPerThread; ++id) {
       // check range
       if (id >= Config::MAPSIZE)
         break;
-
-      for (size_t i = 0; i < Config::GAINMAPS; ++i) {
+      
+     for (size_t i = 0; i < Config::GAINMAPS; ++i) {
         gainmaps[i][id] = 1.0 / gainmaps[i][id];
       }
     }

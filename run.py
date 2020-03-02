@@ -14,13 +14,13 @@ clusterFiles = ["JF", "CL0", "CL4", "CL8"]
 energyFiles = ["JF", "G0", "G13"]
 
 # create photon and energy configurations
-configurations = list(product(summation, devFrames, [0], [0, 1], masking, maxValue, energyFiles))
+configurations = list(product(summation, devFrames, [2], [0, 1], masking, maxValue, energyFiles))
 
 # add clustering configurations
 configurations += list(product([0], devFrames, clusterSizes, [2], masking, [0], clusterFiles))
 
 # remove impossible configurations
-configurations = [(s, d, c, m, mask, mv, files) for (s, d, c, m, mask, mv, files) in configurations if s < d]
+configurations = [(s, d, c, m, mask, mv, files) for (s, d, c, m, mask, mv, files) in configurations if s <= d]
 
 # read configuration index
 configID = int(sys.argv[1])
@@ -30,7 +30,7 @@ configID = int(sys.argv[1])
 
 # initialize values
 summationEnable = 0 if sumFrames == 0 else 1
-benchmarkID = (summation.index(sumFrames) - 1) * (len(devFrames) - 1) * len(clusterSizes) + devFrames.index(devFramesOption) * len(clusterSizes) + clusterSizes.index(clusterSize)
+benchmarkID = (max(summation.index(sumFrames) - 1, 0)) * len(devFrames) * len(clusterSizes) + devFrames.index(devFramesOption) * len(clusterSizes) + clusterSizes.index(clusterSize)
     
 iterationCount = 100
 beamConst = 12.4

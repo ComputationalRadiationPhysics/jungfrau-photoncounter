@@ -96,7 +96,7 @@ template <typename Config, typename TAlpaka> struct DeviceData {
                   decltype(Config::DEV_FRAMES)(Config::DEV_FRAMES))),
           numClusters(alpakaAlloc<unsigned long long>(
               *device,
-              decltype(Config::SINGLEMAP)(Config::SINGLEMAP)))
+              decltype(Config::SINGLEMAP)(Config::SINGLEMAP )))
     {
         // set cluster counter to 0
         alpakaMemSet(queue,

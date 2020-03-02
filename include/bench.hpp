@@ -114,11 +114,11 @@ auto setUp(ExecutionFlags flags, std::string pedestalPath, std::string gainPath,
     photon = photon_data;
   } else if (flags.mode == 2) {
     clusters = new typename Config::template ClusterArray<ConcreteAcc>(
-        maxClusterCount * Config::DEV_FRAMES);
+        maxClusterCount * data.numFrames);
   } else {
     energy = energy_data;
     clusters = new typename Config::template ClusterArray<ConcreteAcc>(
-        maxClusterCount * Config::DEV_FRAMES);
+        maxClusterCount * data.numFrames);
   }
 
   if (flags.summation)
@@ -201,6 +201,7 @@ auto bench(
     futures.emplace_back(dispenser.process(benchmarkingConfig.data, offset,
                                            benchmarkingConfig.ef, energy,
                                            photons, sum, maxValues, clusters));
+
     auto offset_diff = std::get<0>(*futures.rbegin()) - offset;
     offset = std::get<0>(*futures.rbegin());
     sum_offset += (offset_diff + Config::SUM_FRAMES - 1) / Config::SUM_FRAMES;

@@ -10,7 +10,7 @@
 template <typename TConfig, typename TAlpaka>
 void saveClusters(std::string path,
                   typename TConfig::template ClusterArray<TAlpaka> &clusters) {
-#if (NDEBUG)
+  //#if (NDEBUG)
   std::ofstream clusterFile;
   clusterFile.open(path);
   clusterFile << clusters.used << "\n";
@@ -36,12 +36,12 @@ void saveClusters(std::string path,
   }
 
   clusterFile.close();
-#endif
+  //#endif
 }
 
 template <typename TConfig, typename TBuffer>
 void save_image(std::string path, TBuffer *data, std::size_t frame_number) {
-#if (NDEBUG)
+  //#if (NDEBUG)
   std::ofstream img;
   img.open(path + ".txt");
   for (std::size_t j = 0; j < TConfig::DIMY; j++) {
@@ -52,12 +52,12 @@ void save_image(std::string path, TBuffer *data, std::size_t frame_number) {
     img << "\n";
   }
   img.close();
-#endif
+  //#endif
 }
 
 template <typename TConfig, typename TBuffer>
 void save_single_map(std::string path, TBuffer *data) {
-#if (NDEBUG)
+  //#if (NDEBUG)
   std::ofstream img;
   img.open(path + ".txt");
   for (std::size_t j = 0; j < TConfig::DIMY; j++) {
@@ -68,14 +68,14 @@ void save_single_map(std::string path, TBuffer *data) {
     img << "\n";
   }
   img.close();
-#endif
+  //#endif
 }
 
 template <typename TConfig, typename TAlpaka>
 void saveClusterArray(
     std::string path,
     std::vector<typename TConfig::template ClusterArray<TAlpaka>> &clusters) {
-#if (NDEBUG)
+  //#if (NDEBUG)
   std::ofstream clusterFile;
   clusterFile.open(path);
 
@@ -112,14 +112,14 @@ void saveClusterArray(
   }
 
   clusterFile.close();
-#endif
+  //#endif
 }
 
 template <typename TConfig, typename TAlpaka>
 void saveClustersBin(
     std::string path,
     typename TConfig::template ClusterArray<TAlpaka> &clusters) {
-#if (NDEBUG)
+//#if (NDEBUG)
   std::ofstream clusterFile(path.c_str(), std::ios::binary);
   typename TConfig::Cluster *clusterPtr =
       alpaka::mem::view::getPtrNative(clusters.clusters);
@@ -148,7 +148,7 @@ void saveClustersBin(
 
   clusterFile.flush();
   clusterFile.close();
-#endif
+  //#endif
 }
 
 struct Point {
