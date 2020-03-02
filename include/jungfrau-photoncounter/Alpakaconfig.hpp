@@ -289,6 +289,7 @@ template <std::size_t MAPSIZE> struct GpuCudaRt {
   using HostView = alpaka::mem::view::ViewSubView<DevHost, T, Dim, Size>;
 
   static constexpr std::size_t STREAMS_PER_DEV = 3;
+  //! @note: only one element per thread allowed for CUDA (see issue #66)
   static constexpr Size elementsPerThread = 1u;
   static constexpr Size threadsPerBlock = 256;
   static constexpr Size blocksPerGrid = (MAPSIZE + 255) / 256;
@@ -318,6 +319,7 @@ template <std::size_t MAPSIZE> struct GpuCudaRtSync {
   using HostView = alpaka::mem::view::ViewSubView<DevHost, T, Dim, Size>;
 
   static constexpr std::size_t STREAMS_PER_DEV = 1;
+  //! @note: only one element per thread allowed for CUDA (see issue #66)
   static constexpr Size elementsPerThread = 1u;
   static constexpr Size threadsPerBlock = 256;
   static constexpr Size blocksPerGrid = (MAPSIZE + 255) / 256;
