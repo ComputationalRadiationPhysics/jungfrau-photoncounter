@@ -11,8 +11,9 @@
 \usepackage{filecontents}
 \usepackage{changes}
 \usepackage{lipsum}% <- For dummy text
-\definechangesauthor[name={Heide}, color=blue]{Heide}
-\setremarkmarkup{(#2)}
+%\definechangesauthor[name={Heide}, color=blue]{Heide}
+%\definechangesauthor[name={Jonas}, color=magenta]{Jonas}
+%\setremarkmarkup{(#2)}
 
 \bibliography{database.bib}
 
@@ -30,7 +31,7 @@ Bernd Schmitt$^3$,
 Heide Mei{\ss}ner}
 
 \affil[1]{Helmholtz-Zentrum Dresden -- Rossendorf, Bautzner Landstra{\ss}e 400, 01328 Dresden, Germany}
-\affil[2]{Technische Universit\"at Dresden, 01069 Dresden}
+\affil[2]{Technische Universit\"at Dresden, 01069 Dresden, Germany}
 \affil[3]{Paul Scherrer Institut, 5232 Villigen-PSI,  Switzerland}
 
 
@@ -58,9 +59,98 @@ The JUNGFRAU detector is one such charge integrating photon detector~\cite{Mozza
 However, JUNGFRAU has also proved advantageous under challenging conditions at synchrotrons~\cite{Leonarski_2018} where the illumination is continuous, requiring a full duty cycle from the detector and hence much higher frame rates. Recent experimental setups have included a one Mpixel detector operated continuously at 1.1 kHz (2.3 GB/s) with online visualisation but slow offline data treatment~\cite{Leonarski_2018} and a four Mpixel detector operated at 1.1 kHz (9.2 GB/s) for short periods of time ($<200$ s) without visualisation but with fast data processing straight after acquisition (Japan, no ref yet). Our goal is to operate a 16 Mpixel detector continuously at 2.2 kHz, successfully receiving the raw data at 74 GB/s, providing an online visualisation, processing it online to convert the raw data into number of photons per pixel, and saving to disk. This necessitates specialised capability for receiving, processing and file writing, motivating this work.
 
 The increasing data rates during FEL experiments require dedicated detectors as well as advanced methods for fast data processing.
-At PSI, the Jungfrau detector (\cite{JFapplications}, \cite{JFcalibration}, \cite{JFoperation}, \cite{Mozzanica_2016}) was developed which is capable due to a gain switching scheme to register single photons as well as photon bunches in a charge integration mode. A conversion of the detector data to the energy and the number of registered photons already during data aquisition is beneficial for the analysis of the measurement and furthermore for the reduction of storage space. This online data conversion algorithm has to correct each pixel value using the gain maps and the continously updated pedestal maps following a lab-based calibration  procedure~\cite{JFcalibration}. The summation of a couple of frames and the cluster identification in the data maps further reduce the amount of data. The different modules of one detector system can be processed fully parallel, however, the data conversion itself is not data parallel. Therefore, and due to the need for an advanced parallel implementation which is independent of the computing hardware, an Alpaka~\cite{Matthes17} version was written and its performance was tested.\\
+At PSI, the Jungfrau detector (\cite{JFapplications}, \cite{JFcalibration}, \cite{JFoperation}, \cite{Mozzanica_2016}) was developed which is capable due to a gain switching scheme to register single photons as well as photon bunches in a charge integration mode. A conversion of the detector data to the energy and the number of registered photons already during data acquisition is beneficial for the analysis of the measurement and furthermore for the reduction of storage space. This online data conversion algorithm has to correct each pixel value using the gain maps and the continuously updated pedestal maps following a lab-based calibration  procedure~\cite{JFcalibration}. The summation of a couple of frames and the cluster identification in the data maps further reduce the amount of data. The different modules of one detector system can be processed fully parallel, however, the data conversion itself is not data parallel. Therefore, and due to the need for an advanced parallel implementation which is independent of the computing hardware, an Alpaka \cite{Matthes17} version was written and its performance was tested.\\
 
 \textcolor{blue}{TODO: Related work}\\
+\textcolor{magenta}{
+common pre-processing steps:
+\begin{itemize}
+	\item offset correction \& flat field correction [DSSC \cite{moch2014calibration}, JF \cite{JFcalibration}, EIGER\cite{tinti2018electron} / \cite{dinapoli2013eiger}, MOENCH \cite{cartier2016micrometer}, [MEDIPIX3RX \cite{ballabriga2013medipix3rx}]]
+	\item gain correction [DSSC \cite{moch2014calibration}, EIGER \cite{tinti2018electron} / \cite{dinapoli2013eiger}, MOENCH \cite{cartier2016micrometer}]
+	\item dynamic gain switching [AGIPD \cite{allahgholi2015agipd}, GOTTHARD \cite{mozzanica2012gotthard}, JF \cite{JFcalibration}, [MEDIPIX3RX \cite{ballabriga2013medipix3rx}]
+	\item pixel sorting (on FPGA)[AGPID \cite{becker2013high}]
+	\item discard uninteresting events (in readeout circuit)[DSSC \cite{erdinger2012dssc}]
+	\item photon counting [MEDIPIX3RX \cite{ballabriga2013medipix3rx}]
+	\item charge summing / interpolation (to counter charge sharing; on ASIC)[MEDIPIX3RX \cite{ballabriga2013medipix3rx}]
+	\item cluster finder [MOENCH \cite{cartier2016micrometer}]
+	\item sub pixel interpolation [MOENCH \cite{cartier2016micrometer}]
+\end{itemize}
+detector data processing libraries (with pre-processing stage):
+\begin{itemize}
+	\item Karabo \cite{fangohr2018data}
+	\begin{itemize}
+		\item developed to support experiments at the European XFEL
+		\item written in C++ and Python
+		\item pipelined design
+		\item supports offline and online operation and an additional rapid-feedback mode
+		\item can utilize multiple nodes
+		\item also implements file IO and a GUI
+		\item extensible through Karabo-Bridge
+		\item has OnDA interface
+		\item supports Jupytier notebook
+	\end{itemize}
+	\item Hummingbird \cite{daurer2016hummingbird}
+	\begin{itemize}
+		\item optimized for real-time usage
+		\item implemented in Python
+		\item main purpose: analysis of diffraction data at LCLS
+		\item achieves rates above 100 Hz
+		\item contains a GUI and supports multiple file streams at once
+		\item can utilize multiple computing nodes
+		\item can read data generated by psana
+	\end{itemize}
+	\item OnDA \cite{mariani2016onda}
+	\begin{itemize}
+		\item supports online \& offline operation
+		\item can utilize multiple computing nodes (via ZeroMQ and MPI)
+		\item master/worker architecture
+		\item one program instance per core
+		\item designed to give fast online feedback
+		\item main objective: real-time monitoring of X-ray imaging experiments
+		\item easily adaptable
+		\item contains a GUI
+		\item implemented in Python
+		\item can utilize a psana back end
+	\end{itemize}
+	\item psana \cite{damiani2016linac}
+	\begin{itemize}
+		\item = Photon Science ANAlysis
+		\item similar functionality to pyana (which is written entirely in Python), but implemented mostly in C++ with a Python interface
+		\item used to analyze data produced by SLAC National Laboratory
+		\item can utilize multiple compute nodes (via MPI)
+		\item supports online \& offline operation
+		\item contains detector calibration algorithms (e.g. pedestal calibration, bad-pixel determination, etc.) and GUI front end
+		\item designed to give fast online feedback
+	\end{itemize}
+	\item Cheetah \cite{barty2014cheetah}
+	\begin{itemize}
+		\item mode for XFEL applications
+		\item offline \& online processing
+		\item evaluates data quality metrics (e.g. number of Bragg peaks etc.)
+		\item retain only frames with high likelihood of being usable
+		\item --> main task: data reduction
+		\item additional pre-processing
+		\item also has a GUI
+		\item implemented in C++
+	\end{itemize}
+	\item CASS \cite{foucar2012cass}
+	\begin{itemize}
+		\item evaluate data acquired using the CFEL ASG Multi Purpose instrument (CAMP), specifically data collected at FLASH and the European XFEL
+		\item supports multiple detectors in online and offline scenarios
+		\item implemented in C++ with a Qt front end
+		\item consists of input ringbuffer and processing modules (which do pre- \& post-processing)
+		\item GUI implemented in two additional programs: joCASSView (plots data) \& luCASSView (interactive)
+		\item GUIs communicate with computation nodes via TCP/IP
+	\end{itemize}
+	\item XDS \cite{kabsch2010xds}
+	\begin{itemize}
+		\item in development since 1988
+		\item mainly deals with crystallography
+		\item also does pre-processing steps
+		\item no real-time/on-line capability
+	\end{itemize}
+\end{itemize}
+initialized data further used e.g. in crystallography \cite{kabsch2010integration} \cite{white2012crystfel} \cite{grosse2002computational}}\\
 
 In section~\ref{subsec:det}, we review the design of Jungfrau detectors, followed by the description of the dedicated data conversion algorithm~\ref{subsec:alg}, its hardware-independent implementation~\ref{subsec:alpaka} and benchmark tests in~\ref{subsec:benchmark}. The achieved results and conclusions are presented in sections~\ref{sec:results} and \ref{sec:conclusions}. 
 
@@ -129,9 +219,26 @@ Whether online or offline, whether implemented in CPU, GPU, FPGA or other hardwa
 \subsection{Alpaka implementation of fast data processing (Jonas, Florian)}
 \label{subsec:alpaka}
 
+requirements:
+ - realtime data processing (at least 1 detector at 2.5 kHz)
+ - simple and extensible design
+ - portable to other architectures (CPU OpenMP, TBB, ...) with minimal code changes
+
+optional requirements:
+ - easily adaptable to similar detectors (e.g. MÖNCH)
+
+design overview:
+ - wrap for most important alpaka functions (for ease of use)
+ - templated for maximal performance and configurability
+ - stream processing of data: upload data to GPU -> process -> download again
+ - multiple detectors and multiple GPUs usable in parallel
+
+
 \subsection{Benchmark tests (Jonas, Florian)}
 \label{subsec:benchmark}
 Design, objectives, and evaluation of tests
+
+benchmarked with google benchmark
 
 \section{Results}
 \label{sec:results}

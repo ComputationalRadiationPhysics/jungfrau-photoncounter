@@ -1,7 +1,8 @@
 #pragma once
 
-#include <alpaka/alpaka.hpp>
+#include "../AlpakaHelper.hpp"
 #include "../CheapArray.hpp"
+#include <alpaka/alpaka.hpp>
 
 //#############################################################################
 //! A reduction kernel.
@@ -30,25 +31,23 @@ template <uint32_t TBlockSize, typename T> struct ReduceKernel {
                                   TElem* destination,
                                   TIdx const& n) const -> void
     {
-        auto& sdata(
-            alpaka::block::shared::st::allocVar<CheapArray<T, TBlockSize>,
-                                                __COUNTER__>(acc));
+        auto& sdata(alpakaSharedMemory<CheapArray<T, TBlockSize>>(acc));
 
-        const uint32_t blockIndex(static_cast<uint32_t>(
-            alpaka::idx::getIdx<alpaka::Grid, alpaka::Blocks>(acc)[0]));
-        const uint32_t threadIndex(static_cast<uint32_t>(
-            alpaka::idx::getIdx<alpaka::Block, alpaka::Threads>(acc)[0]));
-        const uint32_t gridDimension(static_cast<uint32_t>(
-            alpaka::workdiv::getWorkDiv<alpaka::Grid, alpaka::Blocks>(acc)[0]));
+        const uint32_t blockIndex(
+            static_cast<uint32_t>(alpakaGetBlockIdx(acc)[0]));
+        const uint32_t threadIndex(
+            static_cast<uint32_t>(alpakaGetThreadIdx(acc)[0]));
+        const uint32_t gridDimension(
+            static_cast<uint32_t>(alpakaGetGridDim(acc)[0]));
 
         // equivalent to blockIndex * TBlockSize + threadIndex
-        const uint32_t linearizedIndex(static_cast<uint32_t>(
-            alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc)[0]));
+        const uint32_t linearizedIndex(
+            static_cast<uint32_t>(getLinearIdx(acc)));
 
         typename GetIterator<T, T, TAcc>::Iterator it(
             acc, source->data, linearizedIndex, gridDimension * TBlockSize, n);
 
-        auto func = [&](T a, T b) -> T { return alpaka::math::max(acc, a, b); };
+        auto func = [&](T a, T b) -> T { return alpakaMax(acc, a, b); };
 
         T result = 0; // suppresses compiler warnings
 
@@ -77,7 +76,7 @@ template <uint32_t TBlockSize, typename T> struct ReduceKernel {
         if (threadIndex < n)
             sdata[threadIndex] = result;
 
-        alpaka::block::sync::syncBlockThreads(acc);
+        alpakaSyncThreads(acc);
 
         // --------
         // Level 2: block + warp reduce, reading from shared memory
@@ -107,7 +106,7 @@ template <uint32_t TBlockSize, typename T> struct ReduceKernel {
                     func(sdata[threadIndex],
                          sdata[threadIndex + currentBlockSizeUp]);
 
-            alpaka::block::sync::syncBlockThreads(acc);
+            alpakaSyncThreads(acc);
         }
 
         // store block result to gmem

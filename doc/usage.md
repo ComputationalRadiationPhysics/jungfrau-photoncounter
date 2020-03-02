@@ -52,8 +52,7 @@ This is now a good time to allocate space for the output data:
     mask.numFrames = 0;
     
     // create empty, optional input mask
-    boost::optional<alpaka::mem::buf::
-                        Buf<typename Accelerator::DevHost, MaskMap, Dim, Size>>
+    boost::optional<typename Accelerator::HostBuf<MaskMap>>
         maskPtr;
     if (mask.numFrames == SINGLEMAP)
         maskPtr = mask.data;

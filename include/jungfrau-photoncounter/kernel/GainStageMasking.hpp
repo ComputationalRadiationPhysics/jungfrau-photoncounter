@@ -1,7 +1,7 @@
 #pragma once
-#include "../Config.hpp"
 #include "helpers.hpp"
 
+template<typename Config>
 struct GainStageMaskingKernel {
     template <typename TAcc,
               typename TGainStageMap,
@@ -13,20 +13,16 @@ struct GainStageMaskingKernel {
                                   TNumFrames const numFrame,
                                   TMask const* const mask) const -> void
     {
-        auto const globalThreadIdx =
-            alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc);
-        auto const globalThreadExtent =
-            alpaka::workdiv::getWorkDiv<alpaka::Grid, alpaka::Threads>(acc);
-
-        auto const linearizedGlobalThreadIdx =
-            alpaka::idx::mapIdx<1u>(globalThreadIdx, globalThreadExtent);
-
-        auto id = linearizedGlobalThreadIdx[0u];
-
+        auto id = getLinearIdx(acc);
+        
+        // check range
+        if (id >= Config::MAPSIZE)
+            return;
+        
         // use masks to check whether the channel is valid or masked out
         bool isValid = !mask ? 1 : mask->data[id];
 
         outputGainStageMaps->data[id] =
-            (isValid ? inputGainStageMaps[numFrame].data[id] : MASKED_VALUE);
+            (isValid ? inputGainStageMaps[numFrame].data[id] : Config::MASKED_VALUE);
     }
 };
