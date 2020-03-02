@@ -349,9 +349,9 @@ expected: up to 1000 Frames/s; 100 to 1000 Frames per stream \\
 	\item frame summing will speed up almost linearly on less frames on GPU, on CPU not so big differences
 	\item almost linear scaling with number of GPUs
 	\item almost linear scaling with number of cores on CPU
-	\item pedestal updates and masking doesn't effect performance mush
+	\item pedestal updates and masking doesn't effect performance much
 	\item exception: clustering (mainly on GPU): scales linearly with clusters to download \ calculate
-	\item multiple modules show weak scaling
+	\item multiple modules show weak scaling until bandwidth limit is reached
 	\item effects of cluster size???
 \end{itemize}
 }
@@ -376,7 +376,8 @@ applicable to data from similar sensors (rectangular sensor, consecutive in memo
 calculation on FPGAs in the future
 
 \textcolor{magenta}{
-more backends to come (SYCL, ...)
+more backends to come (SYCL, ...) \\
+AMD GPU support in light of Frontier HPC construction
 }
 
 \section{Acknowledges}
