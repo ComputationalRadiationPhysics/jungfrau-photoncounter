@@ -82,13 +82,13 @@ public:
      */
     Dispenser& operator=(const Dispenser& other) = delete;
 
+  /**
+   * move copy constructor
+   */
+  Dispenser(Dispenser&& other) = default;
+    
     /**
-     * move copy constructor
-     */
-    Dispenser(Dispenser&& other) = default;
-
-    /**
-     * move assign constructor
+     * move assign operator
      */
     Dispenser& operator=(Dispenser&& other) = default;
 

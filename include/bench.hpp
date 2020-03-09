@@ -211,3 +211,174 @@ auto bench(
 
   dispenser.synchronize();
 }
+
+//-------------------------------------
+// Code for handling multiple detectors
+//-------------------------------------
+
+// prepare and load data for the benchmark
+template <typename Config, typename ConcreteAcc>
+auto setUpMultiple(uint64_t detectorCount, ExecutionFlags flags, std::string pedestalPath,
+                   std::string gainPath, std::string dataPath, double beamConst,
+                   std::string maskPath = "", std::size_t cacheSize = 1024UL * 1024 * 1024 * 16,
+                   std::size_t maxClusterCount = Config::MAX_CLUSTER_NUM_USER)
+  -> std::vector<BenchmarkingInput<Config, ConcreteAcc>> {
+  t = Clock::now();
+
+  // create a file cache for all input files
+  Filecache<Config> fc(cacheSize);
+  DEBUG("filecache created");
+
+  // load maps
+  FramePackage<typename Config::DetectorData, ConcreteAcc> pedestalData(
+      fc.template loadMaps<typename Config::DetectorData, ConcreteAcc>(
+          pedestalPath, true));
+  DEBUG(pedestalData.numFrames, "pedestaldata maps loaded");
+
+  FramePackage<typename Config::DetectorData, ConcreteAcc> data(
+      fc.template loadMaps<typename Config::DetectorData, ConcreteAcc>(dataPath,
+                                                                       true));
+  DEBUG(data.numFrames, "data maps loaded");
+
+  FramePackage<typename Config::GainMap, ConcreteAcc> gain(
+      fc.template loadMaps<typename Config::GainMap, ConcreteAcc>(gainPath));
+  DEBUG(gain.numFrames, "gain maps loaded");
+
+  // create empty, optional input mask
+  FramePackage<typename Config::MaskMap, ConcreteAcc> mask(Config::SINGLEMAP);
+  mask.numFrames = 0;
+
+  if (maskPath != "") {
+    mask =
+        fc.template loadMaps<typename Config::MaskMap, ConcreteAcc>(maskPath);
+    DEBUG(mask.numFrames, "mask maps loaded");
+  }
+  
+  // create empty, optional input mask
+  using MaskMap = typename Config::MaskMap;
+  tl::optional<typename ConcreteAcc::template HostBuf<MaskMap>> maskPtr;
+  if (mask.numFrames == Config::SINGLEMAP)
+    maskPtr = mask.data;
+  
+  // allocate space for output data
+  FramePackage<typename Config::EnergyMap, ConcreteAcc> energy_data(
+      data.numFrames);
+  FramePackage<typename Config::PhotonMap, ConcreteAcc> photon_data(
+      data.numFrames);
+  FramePackage<typename Config::SumMap, ConcreteAcc> sum_data(
+      (data.numFrames + Config::SUM_FRAMES - 1) / Config::SUM_FRAMES);
+  FramePackage<EnergyValue, ConcreteAcc> maxValues_data(data.numFrames);
+
+  // create optional values
+  std::vector<tl::optional<FramePackage<typename Config::EnergyMap, ConcreteAcc>>> energies(detectorCount);
+  std::vector<tl::optional<FramePackage<typename Config::PhotonMap, ConcreteAcc>>> photons(detectorCount);
+  std::vector<tl::optional<FramePackage<typename Config::SumMap, ConcreteAcc>>> sums(detectorCount);
+  std::vector<typename Config::template ClusterArray<ConcreteAcc> *> cluster_vector(detectorCount, nullptr);
+  std::vector<tl::optional<FramePackage<EnergyValue, ConcreteAcc>>> maxValue_vector(detectorCount);
+
+  // set optional values according to supplied flags
+  if (flags.mode == 0) {
+    for(auto &e : energies)
+      e = energy_data;
+  } else if (flags.mode == 1) {
+    for(auto &p : photons)
+      p = photon_data;
+  } else if (flags.mode == 2) {
+    auto clusterPtr = new typename Config::template ClusterArray<ConcreteAcc>(
+        maxClusterCount * data.numFrames);
+    for(auto &c : cluster_vector)
+      c = clusterPtr;
+  } else {
+    for(auto &e : energies)
+      e = energy_data;
+    auto clusterPtr = new typename Config::template ClusterArray<ConcreteAcc>(
+        maxClusterCount * data.numFrames);
+    for(auto &c : cluster_vector)
+      c = clusterPtr;
+  }
+
+  if (flags.summation)
+    for(auto &s : sums)
+      s = sum_data;
+  if (flags.maxValue)
+    for(auto &m : maxValue_vector)
+      m = maxValues_data;
+
+  std::vector<BenchmarkingInput<Config, ConcreteAcc>> results;
+  results.reserve(detectorCount);
+
+  for(uint64_t i = 0; i < detectorCount; ++i)
+    results.emplace_back(pedestalData, data, gain, beamConst, maskPtr, energies[i], photons[i], sums[i], cluster_vector[i], maxValue_vector[i], flags);
+
+  return results;
+}
+
+// main part for benchmarking
+template <typename Config, template <std::size_t> typename Accelerator>
+auto benchMultiple(std::vector<Dispenser<Config, Accelerator>> &dispensers,
+                   std::vector<BenchmarkingInput<Config, Accelerator<Config::MAPSIZE>>> &benchmarkingConfigs)
+    -> void {
+  using ConcreteAcc = Accelerator<Config::MAPSIZE>;
+  using EnergyPackageView =
+      FramePackageView_t<typename Config::EnergyMap, ConcreteAcc>;
+  using PhotonPackageView =
+      FramePackageView_t<typename Config::PhotonMap, ConcreteAcc>;
+  using SumPackageView =
+      FramePackageView_t<typename Config::SumMap, ConcreteAcc>;
+  using MaxValuePackageView = FramePackageView_t<EnergyValue, ConcreteAcc>;
+
+  std::vector<std::size_t> offsets(dispensers.size(), 0);
+  std::vector<std::size_t> sum_offsets(dispensers.size(), 0);;
+  std::vector<std::vector<std::tuple<std::size_t, std::future<bool>>>> futures(dispensers.size());;
+
+  uint64_t minOffset = 0;
+  uint64_t numFrames = benchmarkingConfigs[0].data.numFrames;
+
+  // process data maps
+  while (minOffset < numFrames) {
+
+    for(uint64_t i = 0; i < dispensers.size(); ++i) {
+      // define views
+      typename Config::template ClusterArray<ConcreteAcc> *clusters =
+        benchmarkingConfigs[i].clusters;
+
+      auto energy([&]() -> tl::optional<EnergyPackageView> {
+          if (benchmarkingConfigs[i].energy)
+            return benchmarkingConfigs[i].energy->getView(offsets[i], Config::DEV_FRAMES);
+          return tl::nullopt;
+        }());
+      auto photons([&]() -> tl::optional<PhotonPackageView> {
+          if (benchmarkingConfigs[i].photons)
+            return benchmarkingConfigs[i].photons->getView(offsets[i], Config::DEV_FRAMES);
+          return tl::nullopt;
+        }());
+      auto sum([&]() -> tl::optional<SumPackageView> {
+          if (benchmarkingConfigs[i].sum)
+            return benchmarkingConfigs[i].sum->getView(sum_offsets[i], Config::SUM_FRAMES);
+          return tl::nullopt;
+        }());
+      auto maxValues([&]() -> tl::optional<MaxValuePackageView> {
+          if (benchmarkingConfigs[i].maxValues)
+            return benchmarkingConfigs[i].maxValues->getView(offsets[i],
+                                                         Config::DEV_FRAMES);
+          return tl::nullopt;
+        }());
+
+      // process data and store results
+      futures[i].emplace_back(dispensers[i].process(benchmarkingConfigs[i].data, offsets[i],
+                                             benchmarkingConfigs[i].ef, energy,
+                                             photons, sum, maxValues, clusters));
+
+      auto offset_diff = std::get<0>(*futures[i].rbegin()) - offsets[i];
+      offsets[i] = std::get<0>(*futures[i].rbegin());
+      sum_offsets[i] += (offset_diff + Config::SUM_FRAMES - 1) / Config::SUM_FRAMES;
+
+      DEBUG(offsets[i], "/", benchmarkingConfigs[i].data.numFrames, "enqueued");;
+    }
+
+    minOffset = *std::min_element(offsets.begin(), offsets.end());
+  }
+
+  for(auto &d : dispensers)
+    d.synchronize();
+}
