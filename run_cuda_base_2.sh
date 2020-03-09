@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=CUDA_Run_base_1
+#SBATCH --job-name=CUDA_Run_base_2
 #SBATCH --partition=gpu
 #SBATCH --time=1:00:00
 #SBATCH --nodes=1
@@ -12,17 +12,14 @@
 #SBATCH --array=0-9
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=j.schenke@hzdr.de
-#SBATCH -o log.slurm-cuda_%A_%a.out
-#SBATCH -e err.slurm-cuda_%A_%a.out
+#SBATCH -o log.cb2.slurm-%A_%a.out
+#SBATCH -e err.cb2.slurm-%A_%a.out
 
 set -x
-
-# only use on GPU
-export CUDA_VISIBLE_DEVICES=0
 
 # load modules
 export alpaka_DIR=/home/schenk24/workspace/alpaka/
 module load git gcc cmake cuda boost python
 
-cd build_cuda_1
+cd build_cuda_2
 python ../run_base.py $SLURM_ARRAY_TASK_ID

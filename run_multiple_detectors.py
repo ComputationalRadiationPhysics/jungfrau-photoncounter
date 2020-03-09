@@ -12,21 +12,28 @@ summation = [0, 2, 10, 20, 100]
 clusterSizes = [2, 3, 7, 11]
 clusterFiles = ["JF", "CL0", "CL4", "CL8"]
 energyFiles = ["JF", "G0", "G13"]
+detectors = [2, 4, 8]
 
+
+# all configurations
+#configurations = list(product(summation, devFrames, [2], [0, 1], masking, maxValue, energyFiles))
+#configurations += list(product([0], devFames, clusterSizes, [2], masking, [0], clusterFiles))
+
+
+# base configurations
 # create photon and energy configurations
-configurations = list(product(summation, devFrames, [2], [0, 1], masking, maxValue, energyFiles))
-
+configurations = list(product(detectors, [0], [100], [2], [0, 1], [1], [0], energyFiles))
 # add clustering configurations
-configurations += list(product([0], devFrames, clusterSizes, [2], masking, [0], clusterFiles))
+configurations += list(product(detectors, [0], [100], [2], [2], [1], [0], clusterFiles))
 
 # remove impossible configurations
-configurations = [(s, d, c, m, mask, mv, files) for (s, d, c, m, mask, mv, files) in configurations if s <= d]
+configurations = [(dc, s, d, c, m, mask, mv, files) for (dc, s, d, c, m, mask, mv, files) in configurations if s <= d]
 
 # read configuration index
 configID = int(sys.argv[1])
 
 # get config
-(sumFrames, devFramesOption, clusterSize, mode, maskingEnable, maxValueEnable, inputFile) = configurations[configID]
+(detectorCount, sumFrames, devFramesOption, clusterSize, mode, maskingEnable, maxValueEnable, inputFile) = configurations[configID]
 
 # initialize values
 summationEnable = 0 if sumFrames == 0 else 1
@@ -99,5 +106,5 @@ else:
 
 '''
     
-print("./bench " + str(benchmarkID) + " " + str(iterationCount) + " " + str(beamConst) + " " + str(mode) + " " + str(maskingEnable) + " " + str(maxValueEnable) + " " + str(summationEnable) + " " + str(pedestalPath) + " " + str(gainPath) + " " + str(dataPath))
-os.system("./bench " + str(benchmarkID) + " " + str(iterationCount) + " " + str(beamConst) + " " + str(mode) + " " + str(maskingEnable) + " " + str(maxValueEnable) + " " + str(summationEnable) + " " + str(pedestalPath) + " " + str(gainPath) + " " + str(dataPath))
+print("./benchMultiple " + str(benchmarkID) + " " + str(detectorCount) + " " + str(iterationCount) + " " + str(beamConst) + " " + str(mode) + " " + str(maskingEnable) + " " + str(maxValueEnable) + " " + str(summationEnable) + " " + str(pedestalPath) + " " + str(gainPath) + " " + str(dataPath) + " det" + str(detectorCount))
+os.system("./benchMultiple " + str(benchmarkID) + " " + str(detectorCount) + " " + str(iterationCount) + " " + str(beamConst) + " " + str(mode) + " " + str(maskingEnable) + " " + str(maxValueEnable) + " " + str(summationEnable) + " " + str(pedestalPath) + " " + str(gainPath) + " " + str(dataPath) + " det" + str(detectorCount))

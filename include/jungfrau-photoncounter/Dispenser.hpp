@@ -127,7 +127,7 @@ public:
     }
 
     /**
-     * Tries to upload all data packages requiered for the initl offset.
+     * Tries to upload all data packages requiered for the init offset.
      * Only stops after all data packages are uploaded.
      * @param Maps-Struct with datamaps
      * @param stdDevThreshold An standard deviation threshold above which pixels

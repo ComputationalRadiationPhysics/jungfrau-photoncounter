@@ -12,8 +12,8 @@
 #SBATCH --array=0-9
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=j.schenke@hzdr.de
-#SBATCH -o log.slurm-cuda_%A_%a.out
-#SBATCH -e err.slurm-cuda_%A_%a.out
+#SBATCH -o log.cb1.slurm-%A_%a.out
+#SBATCH -e err.cb1.slurm-%A_%a.out
 
 set -x
 
