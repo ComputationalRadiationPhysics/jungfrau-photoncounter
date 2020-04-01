@@ -36,7 +36,9 @@ public:
      */
     Dispenser(FramePackage<typename TConfig::GainMap, TAlpaka> gainMap,
               double beamConst,
-              tl::optional<typename TAlpaka::template HostBuf<MaskMap>> mask)
+              tl::optional<typename TAlpaka::template HostBuf<MaskMap>> mask,
+			  unsigned int moduleNumber = 0,
+			  unsigned int moduleCount = 1)
         : gain(gainMap),
           mask((mask ? *mask
                      : alpakaAlloc<typename TConfig::MaskMap>(
@@ -57,7 +59,9 @@ public:
           beamConst(beamConst),
           nextFull(0),
           nextFree(0),
-          deviceContainer(alpakaGetDevs<TAlpaka>())
+          deviceContainer(alpakaGetDevs<TAlpaka>()),
+		  moduleNumber(moduleNumber),
+		  moduleCount(moduleCount)
     {
         initDevices();
 
@@ -470,6 +474,7 @@ private:
     double beamConst;
 
   std::size_t nextFree, nextFull;
+	unsigned int moduleNumber, moduleCount;
 
     /**
      * Initializes all devices. Uploads gain data and creates buffer.
@@ -478,15 +483,14 @@ private:
     auto initDevices() -> void
     {
         const GainmapInversionKernel<TConfig> gainmapInversionKernel{};
-        std::size_t deviceCount = alpakaGetDevCount<TAlpaka>();
+        std::size_t deviceCount = static_cast<unsigned int>(std::ceil(static_cast<double>(alpakaGetDevCount<TAlpaka>() * TAlpaka::STREAMS_PER_DEV) / static_cast<double>(moduleCount)));
 
         //! @todo: find all the other debug code
-        devices.reserve(deviceCount * TAlpaka::STREAMS_PER_DEV);
+        devices.reserve(deviceCount);
 
-        for (std::size_t num = 0; num < deviceCount * TAlpaka::STREAMS_PER_DEV; ++num) {
+        for (std::size_t num = 0; num < deviceCount; ++num) {
             // initialize variables
-            devices.emplace_back(
-                num, &deviceContainer[num / TAlpaka::STREAMS_PER_DEV]);        
+            devices.emplace_back(num + moduleNumber * deviceCount, &deviceContainer[num / TAlpaka::STREAMS_PER_DEV]);
             alpakaCopy(devices[num].queue,
                        devices[num].gain,
                        gain.data,
@@ -514,7 +518,7 @@ private:
                 fputs("FATAL ERROR (RingBuffer): Unexpected size!\n", stderr);
                 exit(EXIT_FAILURE);
             }
-            DEBUG("Device #", (num + 1), "initialized!");
+            DEBUG("Device #", (num + moduleNumber * deviceCount + 1), "initialized!");
         }        
     }
 

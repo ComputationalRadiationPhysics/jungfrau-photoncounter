@@ -6,7 +6,7 @@
 #SBATCH --ntasks=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --gres=gpu:2
-#SBATCH --mem=300000
+#SBATCH --mem=350000
 #SBATCH --cpus-per-task=24
 #SBATCH --exclusive
 #SBATCH --array=0-9

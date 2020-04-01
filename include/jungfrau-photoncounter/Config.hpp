@@ -389,7 +389,7 @@ template <typename... TArgs> void printArgs() { std::cout << std::endl; }
 template <typename TFirst, typename... TArgs>
 void printArgs(TFirst first, TArgs... args)
 {
-    std::cerr << first << " ";
+    std::cout << first << " ";
     printArgs(args...);
 }
 
@@ -397,7 +397,7 @@ void printArgs(TFirst first, TArgs... args)
 template <typename... TArgs>
 void debugPrint(const char* file, unsigned int line, TArgs... args)
 {
-    std::cerr << file << "[" << line << "]:\n\t"
+    std::cout << file << "[" << line << "]:\n\t"
               << (std::chrono::duration_cast<ms>((Clock::now() - t))).count()
               << " ms\n\t";
     printArgs(args...);

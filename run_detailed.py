@@ -20,17 +20,17 @@ energyFiles = ["JF", "G0", "G13"]
 
 
 # base configurations with only 10 frames per device
-configurations = list(product([0], [10], [2], [0, 1], [1], [0], energyFiles))
-configurations += list(product([0], [10], [2], [2], [1], [0], clusterFiles))
+configurations = list(product([0], [10], [3], [0, 1], [1], [0], energyFiles))
+configurations += list(product([0], [10], [3], [2], [1], [0], clusterFiles))
 
 # different sum frames
-configurations += list(product([2], [100], [2], [0, 1], [1], [0], energyFiles))
-configurations += list(product([10], [100], [2], [0, 1], [1], [0], energyFiles))
-configurations += list(product([20], [100], [2], [0, 1], [1], [0], energyFiles))
-configurations += list(product([100], [100], [2], [0, 1], [1], [0], energyFiles))
+configurations += list(product([2], [100], [3], [0, 1], [1], [0], energyFiles))
+configurations += list(product([10], [100], [3], [0, 1], [1], [0], energyFiles))
+configurations += list(product([20], [100], [3], [0, 1], [1], [0], energyFiles))
+configurations += list(product([100], [100], [3], [0, 1], [1], [0], energyFiles))
 
 # max value
-configurations += list(product([0], [100], [2], [0, 1], [1], [1], energyFiles))
+configurations += list(product([0], [100], [3], [0, 1], [1], [1], energyFiles))
 
 # different cluster sizes
 configurations += list(product([0], [100], [3], [2], [1], [0], clusterFiles))
@@ -38,8 +38,8 @@ configurations += list(product([0], [100], [7], [2], [1], [0], clusterFiles))
 configurations += list(product([0], [100], [11], [2], [1], [0], clusterFiles))
 
 # no masking
-configurations += list(product([0], [100], [2], [0, 1], [0], [0], energyFiles))
-configurations += list(product([0], [100], [2], [2], [0], [0], clusterFiles))
+configurations += list(product([0], [100], [3], [0, 1], [0], [0], energyFiles))
+configurations += list(product([0], [100], [3], [2], [0], [0], clusterFiles))
 
 # remove impossible configurations
 configurations = [(s, d, c, m, mask, mv, files) for (s, d, c, m, mask, mv, files) in configurations if s <= d]

@@ -22,9 +22,9 @@ detectors = [2, 4, 8]
 
 # base configurations
 # create photon and energy configurations
-configurations = list(product(detectors, [0], [100], [2], [0, 1], [1], [0], energyFiles))
+configurations = list(product(detectors, [0], [10], [2], [0, 1], [1], [0], energyFiles))
 # add clustering configurations
-configurations += list(product(detectors, [0], [100], [2], [2], [1], [0], clusterFiles))
+configurations += list(product(detectors, [0], [10], [2], [2], [1], [0], clusterFiles))
 
 # remove impossible configurations
 configurations = [(dc, s, d, c, m, mask, mv, files) for (dc, s, d, c, m, mask, mv, files) in configurations if s <= d]

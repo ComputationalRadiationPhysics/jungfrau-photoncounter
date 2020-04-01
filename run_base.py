@@ -21,9 +21,9 @@ energyFiles = ["JF", "G0", "G13"]
 
 # base configurations
 # create photon and energy configurations
-configurations = list(product([0], [100], [2], [0, 1], [1], [0], energyFiles))
+configurations = list(product([0], [100], [3], [0, 1], [1], [0], energyFiles))
 # add clustering configurations
-configurations += list(product([0], [100], [2], [2], [1], [0], clusterFiles))
+configurations += list(product([0], [100], [3], [2], [1], [0], clusterFiles))
 
 # remove impossible configurations
 configurations = [(s, d, c, m, mask, mv, files) for (s, d, c, m, mask, mv, files) in configurations if s <= d]

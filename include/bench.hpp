@@ -106,7 +106,7 @@ auto setUp(ExecutionFlags flags, std::string pedestalPath, std::string gainPath,
   tl::optional<FramePackage<typename Config::SumMap, ConcreteAcc>> sum;
   typename Config::template ClusterArray<ConcreteAcc> *clusters = nullptr;
   tl::optional<FramePackage<EnergyValue, ConcreteAcc>> maxValues;
-
+  
   // set optional values according to supplied flags
   if (flags.mode == 0) {
     energy = energy_data;
@@ -118,13 +118,15 @@ auto setUp(ExecutionFlags flags, std::string pedestalPath, std::string gainPath,
   } else {
     energy = energy_data;
     clusters = new typename Config::template ClusterArray<ConcreteAcc>(
-        maxClusterCount * data.numFrames);
+        maxClusterCount * data.numFrames);  
   }
 
   if (flags.summation)
     sum = sum_data;
   if (flags.maxValue)
     maxValues = maxValues_data;
+  
+  DEBUG("Initialization done!");  
   
   // return configuration
   return BenchmarkingInput<Config, ConcreteAcc>(
