@@ -137,10 +137,11 @@ auto setUp(ExecutionFlags flags, std::string pedestalPath, std::string gainPath,
 // calibrate the detector
 template <typename Config, template <std::size_t> typename Accelerator>
 auto calibrate(const BenchmarkingInput<Config, Accelerator<Config::MAPSIZE>>
-                   &benchmarkingConfig) -> Dispenser<Config, Accelerator> {  
+			   &benchmarkingConfig, unsigned int moduleNumber = 0,
+			   unsigned int moduleCount = 1) -> Dispenser<Config, Accelerator> {  
   Dispenser<Config, Accelerator> dispenser(benchmarkingConfig.gain,
                                            benchmarkingConfig.beamConst,
-                                           benchmarkingConfig.maskPtr);
+                                           benchmarkingConfig.maskPtr, moduleNumber, moduleCount);
 
   // reset dispenser to get rid of artefacts from previous runs
   dispenser.reset();

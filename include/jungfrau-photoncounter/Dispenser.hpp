@@ -483,14 +483,16 @@ private:
     auto initDevices() -> void
     {
         const GainmapInversionKernel<TConfig> gainmapInversionKernel{};
-        std::size_t deviceCount = static_cast<unsigned int>(std::ceil(static_cast<double>(alpakaGetDevCount<TAlpaka>() * TAlpaka::STREAMS_PER_DEV) / static_cast<double>(moduleCount)));
+		std::size_t maxQueues = alpakaGetDevCount<TAlpaka>() * TAlpaka::STREAMS_PER_DEV;
+        std::size_t deviceCount = static_cast<unsigned int>(std::ceil(static_cast<double>(maxQueues) / static_cast<double>(moduleCount)));
 
         //! @todo: find all the other debug code
         devices.reserve(deviceCount);
 
         for (std::size_t num = 0; num < deviceCount; ++num) {
             // initialize variables
-            devices.emplace_back(num + moduleNumber * deviceCount, &deviceContainer[num / TAlpaka::STREAMS_PER_DEV]);
+			std::size_t selectedQueue = (num + moduleNumber * deviceCount);
+            devices.emplace_back(selectedQueue, &deviceContainer[(selectedQueue % maxQueues) / TAlpaka::STREAMS_PER_DEV]);
             alpakaCopy(devices[num].queue,
                        devices[num].gain,
                        gain.data,
