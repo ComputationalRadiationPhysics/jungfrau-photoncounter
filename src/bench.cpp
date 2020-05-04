@@ -1,82 +1,80 @@
-#include "bench.hpp"
-#include "check.hpp"
-#include "confgen.hpp"
-
-#include "jungfrau-photoncounter/Alpakaconfig.hpp"
-#include "jungfrau-photoncounter/Config.hpp"
 #include "jungfrau-photoncounter/Dispenser.hpp"
 
-#include "jungfrau-photoncounter/Debug.hpp"
 #include <chrono>
-#include <unordered_map>
 #include <vector>
+#include <fstream>
+#include <memory>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 /**
  * only change this line to change the backend
  * see Alpakaconfig.hpp for all available
  */
 
-#ifdef ALPAKA_ACC_GPU_CUDA_ENABLED
+#if defined (ALPAKA_ACC_GPU_CUDA_ENABLED)
+const char* dvstr = "CUDA";
 template <std::size_t TMapSize> using Accelerator = GpuCudaRt<TMapSize>;
-#else
+#elif defined (ALPAKA_ACC_CPU_B_OMP2_T_SEQ_ENABLED)
+const char* dvstr = "OMP";
 template <std::size_t TMapSize> using Accelerator = CpuOmp2Blocks<TMapSize>;
+#else
+const char* dvstr = "Serial";
+template <std::size_t TMapSize> using Accelerator = CpuSerial<TMapSize>;
 #endif
+
 // CpuOmp2Blocks<MAPSIZE>;
 // CpuTbbRt<MAPSIZE>;
 // CpuSerial<MAPSIZE>;
 // GpuCudaRt<MAPSIZE>;
 // GpuHipRt<MAPSIZE>;
 
-constexpr auto framesPerStageG0 = Values<std::size_t, 1000>();
-constexpr auto framesPerStageG1 = Values<std::size_t, 1000>();
-constexpr auto framesPerStageG2 = Values<std::size_t, 999>();
-constexpr auto dimX = Values<std::size_t, 1024>();
-constexpr auto dimY = Values<std::size_t, 512>();
-constexpr auto sumFrames = Values<std::size_t, 2, 10, 20, 100>();
-constexpr auto devFrames = Values<std::size_t, 10, 100>(); //, 1000>();
-constexpr auto movingStatWindowSize = Values<std::size_t, 100>();
-constexpr auto clusterSize = Values<std::size_t, 2, 3, 7, 11>();
-constexpr auto cs = Values<std::size_t, 5>();
-
-constexpr auto parameterSpace =
-    framesPerStageG0 * framesPerStageG1 * framesPerStageG2 * dimX * dimY *
-    sumFrames * devFrames * movingStatWindowSize * clusterSize * cs;
-
-template <class Tuple> struct ConfigFrom {
-    using G0 = Get_t<0, Tuple>;
-    using G1 = Get_t<1, Tuple>;
-    using G2 = Get_t<2, Tuple>;
-    using DimX = Get_t<3, Tuple>;
-    using DimY = Get_t<4, Tuple>;
-    using SumFrames = Get_t<5, Tuple>;
-    using DevFrames = Get_t<6, Tuple>;
-    using MovingStatWinSize = Get_t<7, Tuple>;
-    using ClusterSize = Get_t<8, Tuple>;
-    using C = Get_t<9, Tuple>;
-    using Result = DetectorConfig<G0::value,
-                                  G1::value,
-                                  G2::value,
-                                  DimX::value,
-                                  DimY::value,
-                                  SumFrames::value,
-                                  DevFrames::value,
-                                  MovingStatWinSize::value,
-                                  ClusterSize::value,
-                                  C::value>;
-};
 using Duration = std::chrono::nanoseconds;
 using Timer = std::chrono::high_resolution_clock;
 
-template <class Tuple>
-std::vector<Duration> benchmark(unsigned int iterations,
+template <typename TData, typename TAlpaka>
+auto loadMaps(const std::string &path)
+      -> FramePackage<TData, TAlpaka> {
+    // get file size
+    struct stat fileStat;
+    stat(path.c_str(), &fileStat);
+     auto fileSize = fileStat.st_size;
+    std::size_t numFrames = fileSize / sizeof(TData);
+
+    // check for empty files
+    if (fileSize == 0) {
+      std::cerr << "Error: Nothing loaded! Is the file path correct?\n";
+      exit(EXIT_FAILURE);
+    }
+
+    // allocate space for data
+    FramePackage<TData, TAlpaka> maps(numFrames);
+
+    // load file content
+    std::ifstream file;
+    file.open(path, std::ios::in | std::ios::binary);
+    if (!file.is_open()) {
+      std::cerr << "Error: Couldn't open file " << path << "!\n";
+      exit(EXIT_FAILURE);
+    }
+
+    file.read(reinterpret_cast<char *>(alpakaNativePtr(maps.data)), fileSize);
+    file.close();
+    
+    return maps;
+  }
+
+
+void benchmark(unsigned int iterations,
                                 ExecutionFlags flags,
                                 const std::string& pedestalPath,
                                 const std::string& gainPath,
                                 const std::string& dataPath,
-                                double beamConst,
-                                ResultCheck resultCheck)
+                                double beamConst)
 {
-    using Config = typename ConfigFrom<Tuple>::Result;
+    //using Config = typename ConfigFrom<Tuple>::Result;
+    using Config = DetectorConfig<1000, 1000, 999, 1024, 512, 2, 1, 100, 7, 5>;
     using ConcreteAcc = Accelerator<Config::MAPSIZE>;
 
     std::cout << "Parameters: sumFrames=" << Config::SUM_FRAMES
@@ -87,64 +85,100 @@ std::vector<Duration> benchmark(unsigned int iterations,
               << "; masking=" << static_cast<int>(flags.masking)
               << "; maxValue=" << static_cast<int>(flags.maxValue) << "\n";
 
-    auto benchmarkingInput = setUp<Config, ConcreteAcc>(
-        flags, pedestalPath, gainPath, dataPath, beamConst);
-    std::vector<Duration> results;
-    results.reserve(iterations);
-    for (unsigned int i = 0; i < iterations; ++i) {
-        if (benchmarkingInput.clusters)
-            benchmarkingInput.clusters->used = 0;
-        auto dispenser = calibrate(benchmarkingInput);        
-        auto t0 = Timer::now();
-        bench(dispenser, benchmarkingInput);
-        auto t1 = Timer::now();
-        results.push_back(std::chrono::duration_cast<Duration>(t1 - t0));
+    std::string maskPath = "mask.dat";
+    std::size_t maxClusterCount = Config::MAX_CLUSTER_NUM_USER;
+
+    t = Clock::now();
+
+    // load maps
+    FramePackage<typename Config::DetectorData, ConcreteAcc> pedestalData(loadMaps<typename Config::DetectorData, ConcreteAcc>(
+                                                                                                                               pedestalPath));
+    DEBUG(pedestalData.numFrames, "pedestaldata maps loaded");
+
+    FramePackage<typename Config::DetectorData, ConcreteAcc> data(loadMaps<typename Config::DetectorData, ConcreteAcc>(dataPath));
+    DEBUG(data.numFrames, "data maps loaded");
+
+    FramePackage<typename Config::GainMap, ConcreteAcc> gain(loadMaps<typename Config::GainMap, ConcreteAcc>(gainPath));
+    DEBUG(gain.numFrames, "gain maps loaded");
+
+    // create empty, optional input mask
+    FramePackage<typename Config::MaskMap, ConcreteAcc> mask(Config::SINGLEMAP);
+    mask.numFrames = 0;
+
+    if (maskPath != "") {
+      mask =
+        loadMaps<typename Config::MaskMap, ConcreteAcc>(maskPath);
+      DEBUG(mask.numFrames, "mask maps loaded");
     }
+  
+    // create empty, optional input mask
+    using MaskMap = typename Config::MaskMap;
+    tl::optional<typename ConcreteAcc::template HostBuf<MaskMap>> maskPtr;
+    if (mask.numFrames == Config::SINGLEMAP)
+      maskPtr = mask.data;
+  
+    // allocate space for output data
+    FramePackage<typename Config::EnergyMap, ConcreteAcc> energy_data(data.numFrames);
 
-    // check result if requested
-    std::cout << "Checking energy if needed ..." << std::endl;
-    if (!checkResult(benchmarkingInput.energy, resultCheck.energyPath))
-        std::cerr << "Energy result mismatch!\n";
+    // create optional values
+    tl::optional<FramePackage<typename Config::EnergyMap, ConcreteAcc>> energy;
+    typename Config::template ClusterArray<ConcreteAcc> *clusters = nullptr;
+  
 
-    std::cout << "Checking photons if needed ..." << std::endl;
-    if (!checkResult(benchmarkingInput.photons, resultCheck.photonPath))
-        std::cerr << "Photon result mismatch!\n";
+    energy = energy_data;
+    clusters = new typename Config::template ClusterArray<ConcreteAcc>(maxClusterCount * data.numFrames);  
+  
+    DEBUG("Initialization done!");  
 
-    std::cout << "Checking sums if needed ..." << std::endl;
-    if (!checkResult(benchmarkingInput.sum, resultCheck.sumPath))
-        std::cerr << "Sum result mismatch!\n";
+    if (clusters)
+      clusters->used = 0;
 
-    std::cout << "Checking max values if needed ..." << std::endl;
-    if (!checkResultRaw(benchmarkingInput.maxValues, resultCheck.maxValuesPath))
-        std::cerr << "Maximum value result mismatch!\n";
+    unsigned int moduleNumber = 0;
+    unsigned int moduleCount = 1;
 
-    std::cout << "Checking clusters if needed ..." << std::endl;
-    if (!checkClusters<Config, ConcreteAcc>(benchmarkingInput.clusters,
-                                            resultCheck.clusterPath))
-        std::cerr << "Cluster result mismatch!\n";
+    FramePackage<typename Config::InitPedestalMap, ConcreteAcc> initialPedestals(loadMaps<typename Config::InitPedestalMap, ConcreteAcc>("init_pedestal.dat"));
+    DEBUG(initialPedestals.numFrames, "initial pedestal maps loaded");
 
-    return results;
-}
+    Dispenser<Config, Accelerator> dispenser(gain,
+                                             beamConst,
+                                             maskPtr, moduleNumber, moduleCount);
 
-using BenchmarkFunction = std::vector<Duration> (*)(unsigned int,
-                                                    ExecutionFlags,
-                                                    const std::string&,
-                                                    const std::string&,
-                                                    const std::string&,
-                                                    double,
-                                                    ResultCheck resultCheck);
+    // reset dispenser to get rid of artefacts from previous runs
+    dispenser.reset();
+    // upload and calculate pedestal data
+    //dispenser.uploadRawPedestals(initialPedestals);
+    dispenser.uploadPedestaldata(pedestalData);
+    dispenser.synchronize();
 
-static std::unordered_map<int, BenchmarkFunction> benchmarks;
+    using EnergyPackageView =
+      FramePackageView_t<typename Config::EnergyMap, ConcreteAcc>;
+    using PhotonPackageView =
+      FramePackageView_t<typename Config::PhotonMap, ConcreteAcc>;
+    using SumPackageView =
+      FramePackageView_t<typename Config::SumMap, ConcreteAcc>;
+    using MaxValuePackageView = FramePackageView_t<EnergyValue, ConcreteAcc>;
 
-void registerBenchmarks(int, Empty) {}
+    std::tuple<std::size_t, std::future<bool>> future;
 
-template <class List> void registerBenchmarks(int x, const List&)
-{
-    using H = typename List::Head;
-    using T = typename List::Tail;
-    using F = typename Flatten<Tuple<>, H>::Result;
-    benchmarks[x] = benchmark<F>;
-    registerBenchmarks(x + 1, T{});
+    // define views
+    auto oenergy([&]() -> tl::optional<EnergyPackageView> {
+        return energy->getView(0, 1);
+      }());
+    auto ophotons([&]() -> tl::optional<PhotonPackageView> {
+        return tl::nullopt;
+      }());
+    auto osum([&]() -> tl::optional<SumPackageView> {
+        return tl::nullopt;
+      }());
+    auto omaxValues([&]() -> tl::optional<MaxValuePackageView> {
+        return tl::nullopt;
+      }());
+
+    // process data and store results
+    future = dispenser.process(data, 0, oenergy,
+                               ophotons, clusters);
+
+    dispenser.synchronize();
 }
 
 int main(int argc, char* argv[])
@@ -175,65 +209,37 @@ int main(int argc, char* argv[])
     std::string dataPath(argv[10]);
     std::string outputPath((argc >= 12) ? std::string(argv[11]) + "_" : "");
 
-    // create output path suffix
-    outputPath +=
-        std::to_string(benchmarkID) + "_" + std::to_string(iterationCount) +
-        "_" + std::to_string(ef.mode) + "_" + std::to_string(ef.masking) + "_" +
-        std::to_string(ef.maxValue) + "_" + std::to_string(ef.summation) + "_" +
-        pedestalPath + "_" + gainPath + "_" + dataPath + ".txt";
-
-    // escape suffix
-    std::transform(outputPath.begin(),
-                   outputPath.end(),
-                   outputPath.begin(),
-                   [](char c) -> char { return (c == '/') ? ' ' : c; });
-
-    // store reference result pathes (enter "_" for none)
-    ResultCheck resultCheck;
-    if (argc > 12)
-        resultCheck.energyPath = argv[12];
-    if (argc > 13)
-        resultCheck.photonPath = argv[13];
-    if (argc > 14)
-        resultCheck.maxValuesPath = argv[14];
-    if (argc > 15)
-        resultCheck.sumPath = argv[15];
-    if (argc > 16)
-        resultCheck.clusterPath = argv[16];
-
-    // register benchmarks
-    registerBenchmarks(0, parameterSpace);
-    std::cout << "Registered " << benchmarks.size() << " benchmarks. \n";
-
-    // check benchmark ID
-    if (benchmarkID < 0 ||
-        static_cast<unsigned int>(benchmarkID) >= benchmarks.size()) {
-        std::cerr << "Benchmark ID out of range. \n";
-        abort();
-    }
-
-    // open output file
-    std::ofstream outputFile(outputPath);
-    if (!outputFile.is_open()) {
-        std::cerr << "Couldn't open output file " << outputPath << "\n";
-        abort();
-    }
-
     // run benchmark
-    auto results = benchmarks[benchmarkID](iterationCount,
-                                           ef,
-                                           pedestalPath,
-                                           gainPath,
-                                           dataPath,
-                                           beamConst,
-                                           resultCheck);
+    //using Config = DetectorConfig<1000, 1000, 999, 1024, 512, 2, 1, 100, 7, 5>;
+    //using ConcreteAcc = Accelerator<Config::MAPSIZE>;
 
-    // store results
-    for (const auto& r : results)
-        outputFile << r.count() << " ";
+    //std::cout << "Parameters: sumFrames=" << Config::SUM_FRAMES
+    //          << "; devFrames=" << Config::DEV_FRAMES
+    //          << "; clusterSize=" << Config::CLUSTER_SIZE << "\n";
+    //std::cout << "Flags: mode=" << static_cast<int>(ef.mode)
+    //          << "; summation=" << static_cast<int>(ef.summation)
+    //          << "; masking=" << static_cast<int>(ef.masking)
+    //          << "; maxValue=" << static_cast<int>(ef.maxValue) << "\n";
 
-    outputFile.flush();
-    outputFile.close();
+    //auto benchmarkingInput = setUp<Config, ConcreteAcc>(
+    //    ef, pedestalPath, gainPath, dataPath, beamConst);
+    //if (benchmarkingInput.clusters)
+    //    benchmarkingInput.clusters->used = 0;
+    //auto dispenser = calibrate(benchmarkingInput);
+    //auto t0 = Timer::now();
+    //bench(dispenser, benchmarkingInput);
+    //auto t1 = Timer::now();
+
+    //DEBUG(std::chrono::duration_cast<Duration>(t1 - t0).count());
+
+    benchmark(iterationCount, 
+              ef,
+              pedestalPath,
+              gainPath,
+              dataPath,
+              beamConst);
+
+    DEBUG(dvstr);
 
     return 0;
 }

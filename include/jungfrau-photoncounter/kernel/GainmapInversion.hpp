@@ -16,7 +16,8 @@ template <typename Config> struct GainmapInversionKernel {
         break;
       
      for (size_t i = 0; i < Config::GAINMAPS; ++i) {
-        gainmaps[i][id] = 1.0 / gainmaps[i][id];
+	const auto invers =  1.0 / gainmaps[i][id];
+        gainmaps[i][id] = invers;
       }
     }
   }

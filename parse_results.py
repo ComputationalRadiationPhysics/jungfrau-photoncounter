@@ -24,17 +24,23 @@ def decodeBenchmarkID(benchmarkID):
 
 def parseFilename(name):
     det = 1
-    if name[0:3] == "det2":
+    if name[0:5] == "det2_":
         det = 2
-    elif name[0:3] == "det4":
+    elif name[0:5] == "det4_":
         det = 4
-    elif name[0:3] == "det8":
+    elif name[0:5] == "det8_":
         det = 8
-
-    if det != 1:
-        name = name[4:]
+    elif name[0:5] == "det16":
+        det = 16
+    elif name[0:5] == "det32":
+        det = 32
+    elif name[0:5] == "det64":
+        det = 64
 
     filename = name
+
+    if det != 1:
+        name = name[5:]
     
     benchmarkID = int(re.search(r'\d+', name).group())
     offset = len(str(benchmarkID)) + 1
