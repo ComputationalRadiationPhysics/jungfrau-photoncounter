@@ -2,7 +2,6 @@
 
 #include "Alpakaconfig.hpp"
 #include "Config.hpp"
-#include "Ringbuffer.hpp"
 #include "deviceData.hpp"
 
 #include "kernel/Calibration.hpp"
