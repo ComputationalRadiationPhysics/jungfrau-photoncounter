@@ -25,20 +25,6 @@ struct InitPedestal {
     double stddev;
 };
 
-// execution flags to select the various kernels
-struct ExecutionFlags {
-    // 0 = only energy output, 1 = photon (and energy) output, 2 =
-    // clustering (and energy) output, 3 = clustering and explicit energy
-    // output (used in benchmarks)
-    uint8_t mode : 2;
-    // 0 = off, 1 = on
-    uint8_t summation : 1;
-    // 0 = off, 1 = on
-    uint8_t masking : 1;
-    // 0 = off, 1 = on
-    uint8_t maxValue : 1;
-};
-
 // a struct to hold a view of multiple frames (on host and device)
 template <typename T, typename TAlpaka, typename TBufView>
 struct FramePackageView {
@@ -361,9 +347,6 @@ struct DetectorConfig {
     };
 
     using DetectorData = Frame<std::uint16_t>;
-    using PhotonMap = DetectorData;
-    using SumMap = Frame<double>;
-    using DriftMap = Frame<double>;
     using GainStageMap = Frame<char>;
     using MaskMap = Frame<bool>;
     using EnergyMap = Frame<EnergyValue>;
@@ -377,9 +360,6 @@ typedef std::chrono::high_resolution_clock Clock;
 typedef std::chrono::milliseconds ms;
 static Clock::time_point t;
 
-#define VERBOSE
-
-#ifdef VERBOSE
 #include <iostream>
 
 // empty print to end recursion
@@ -404,11 +384,6 @@ void debugPrint(const char* file, unsigned int line, TArgs... args)
 }
 
 #define DEBUG(...) debugPrint(__FILE__, __LINE__, ##__VA_ARGS__)
-#else
-#define DEBUG(...)
-#endif
 
-// predefine detector configurations
 using JungfrauConfig =
     DetectorConfig<1000, 1000, 999, 1024, 512, 2, 1, 100, 2, 5>;
-using MoenchConfig = DetectorConfig<1000, 0, 0, 400, 400, 10, 300, 100, 3, 5>;

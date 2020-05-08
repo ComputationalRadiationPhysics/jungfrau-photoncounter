@@ -1,30 +1,73 @@
 #pragma once
 
 #include "Alpakaconfig.hpp"
-#include "Config.hpp"
-#include "deviceData.hpp"
 
-#include "kernel/Calibration.hpp"
 #include "kernel/ClusterFinder.hpp"
-#include "kernel/GainStageMasking.hpp"
 #include "kernel/GainmapInversion.hpp"
 
 #include <optional.hpp>
 
-#include <future>
 #include <iostream>
 
+#include "Config.hpp"
 
-template<typename T>
-void write_img(std::string path, T* data, std::size_t header, std::size_t elemSize = sizeof(T)) {
-  std::ofstream img(path + ".dat", std::ios::binary);
-  std::size_t size = 1024 * 512 * elemSize + header;
-  
-  img.write(reinterpret_cast<const char*>(data), size);
-    
-  img.flush();
-  img.close();
-}
+template <typename Config, typename TAlpaka> struct DeviceData {
+    typename TAlpaka::DevAcc* device;
+    typename TAlpaka::Queue queue;
+
+    // device maps
+    typename TAlpaka::template AccBuf<typename Config::DetectorData> data;
+    typename TAlpaka::template AccBuf<typename Config::GainMap> gain;
+    typename TAlpaka::template AccBuf<typename Config::InitPedestalMap>
+        initialPedestal;
+    typename TAlpaka::template AccBuf<typename Config::PedestalMap> pedestal;
+    typename TAlpaka::template AccBuf<typename Config::MaskMap> mask;
+    typename TAlpaka::template AccBuf<typename Config::GainStageMap> gainStage;
+    typename TAlpaka::template AccBuf<typename Config::EnergyMap> energy;
+    typename TAlpaka::template AccBuf<typename Config::Cluster> cluster;
+    typename TAlpaka::template AccBuf<unsigned long long> numClusters;
+
+    DeviceData(typename TAlpaka::DevAcc* devPtr)
+        : device(devPtr),
+          queue(*device),
+          data(alpakaAlloc<typename Config::DetectorData>(
+              *device,
+              decltype(Config::DEV_FRAMES)(Config::DEV_FRAMES))),
+          gain(alpakaAlloc<typename Config::GainMap>(
+              *device,
+              decltype(Config::GAINMAPS)(Config::GAINMAPS))),
+          pedestal(alpakaAlloc<typename Config::PedestalMap>(
+              *device,
+              decltype(Config::PEDEMAPS)(Config::PEDEMAPS))),
+          initialPedestal(alpakaAlloc<typename Config::InitPedestalMap>(
+              *device,
+              decltype(Config::PEDEMAPS)(Config::PEDEMAPS))),
+          gainStage(alpakaAlloc<typename Config::GainStageMap>(
+              *device,
+              decltype(Config::DEV_FRAMES)(Config::DEV_FRAMES))),
+          energy(alpakaAlloc<typename Config::EnergyMap>(
+              *device,
+              decltype(Config::DEV_FRAMES)(Config::DEV_FRAMES))),
+          mask(alpakaAlloc<typename Config::MaskMap>(
+              *device,
+              decltype(Config::SINGLEMAP)(Config::SINGLEMAP))),
+          cluster(alpakaAlloc<typename Config::Cluster>(
+              *device,
+              decltype(Config::MAX_CLUSTER_NUM_USER)(
+                  Config::MAX_CLUSTER_NUM_USER) *
+                  decltype(Config::DEV_FRAMES)(Config::DEV_FRAMES))),
+          numClusters(alpakaAlloc<unsigned long long>(
+              *device,
+              decltype(Config::SINGLEMAP)(Config::SINGLEMAP )))
+    {
+        // set cluster counter to 0
+        alpakaMemSet(queue,
+                     numClusters,
+                     0,
+                     decltype(Config::SINGLEMAP)(Config::SINGLEMAP));
+    }
+};
+
 
 
 template <typename TConfig, template <std::size_t> typename TAccelerator>
@@ -32,208 +75,71 @@ class Dispenser {
 public:
     // use types defined in the config struct
     using TAlpaka = TAccelerator<TConfig::MAPSIZE>;
-    using MaskMap = typename TConfig::MaskMap;
 
-    /**
-     * Dispenser constructor
-     * @param Maps-Struct with initial gain
-     */
-    Dispenser(FramePackage<typename TConfig::GainMap, TAlpaka> gainMap,
-              double beamConst,
-              tl::optional<typename TAlpaka::template HostBuf<MaskMap>> mask,
-			  unsigned int moduleNumber = 0,
-			  unsigned int moduleCount = 1)
-        : gain(gainMap),
-          mask((mask ? *mask
-                     : alpakaAlloc<typename TConfig::MaskMap>(
-                           alpakaGetHost<TAlpaka>(),
-                           decltype(TConfig::SINGLEMAP)(TConfig::SINGLEMAP)))),
-          gainStage(decltype(TConfig::DEV_FRAMES)(TConfig::DEV_FRAMES)),
-          init(false),
-          pedestal(TConfig::PEDEMAPS, alpakaGetHost<TAlpaka>()),
-          initPedestal(TConfig::PEDEMAPS, alpakaGetHost<TAlpaka>()),
-          beamConst(beamConst),
-          deviceContainer(alpakaGetDevs<TAlpaka>()),
-          device(0, &deviceContainer[0])
+    Dispenser(FramePackage<typename TConfig::GainMap, TAlpaka> gain,
+              FramePackage<typename TConfig::MaskMap, TAlpaka> mask,
+	      FramePackage<typename TConfig::InitPedestalMap, TAlpaka> initialPedestals, 
+	      FramePackage<typename TConfig::PedestalMap, TAlpaka> pedestals)
+        : device(&alpakaGetDevs<TAlpaka>()[0])
     {
-        initDevices();
+        const GainmapInversionKernel<TConfig> gainmapInversionKernel{};
 
-        if (!mask) {
-          DEBUG("Creating new mask map on device", 0);
-          alpakaMemSet(device.queue,
-                       device.mask,
-                       1,
-                       decltype(TConfig::SINGLEMAP)(TConfig::SINGLEMAP));
-        } else {
-          DEBUG("Loading existing mask map on device", 0);
-          alpakaCopy(device.queue,
-                     device.mask,
-                     *mask,
-                     decltype(TConfig::SINGLEMAP)(TConfig::SINGLEMAP));
-        }
+        alpakaCopy(device.queue,
+                   device.gain,
+                   gain.data,
+                   decltype(TConfig::GAINMAPS)(TConfig::GAINMAPS));
+            
+        // compute reciprocals of gain maps
+        auto const gainmapInversion(alpakaCreateKernel<TAlpaka>(getWorkDiv<TAlpaka>(),
+                                                                gainmapInversionKernel,
+                                                                alpakaNativePtr(device.gain)));
+        alpakaEnqueueKernel(device.queue, gainmapInversion);
 
-        alpakaWait(device.queue);
-    }
-
-    auto synchronize() -> void
-    {
-        alpakaWait(device.queue);
-    }
-
-    auto reset() -> void
-    {
-        // reset variables
-        init = false;
-        
-        // init devices
-        initDevices();
-
-        // clear mask
+        // init cluster data to 0
         alpakaMemSet(device.queue,
-                     device.mask,
-                     1,
-                     decltype(TConfig::SINGLEMAP)(TConfig::SINGLEMAP));
+                     device.cluster,
+                     0,
+                     decltype(TConfig::MAX_CLUSTER_NUM_USER)(TConfig::MAX_CLUSTER_NUM_USER) *
+                     decltype(TConfig::DEV_FRAMES)(TConfig::DEV_FRAMES));
 
-        // synchronize
+        // wait until everything is finished
         alpakaWait(device.queue);
-    }
 
-  auto uploadPedestaldata(
-        FramePackage<typename TConfig::DetectorData, TAlpaka> data,
-        double stdDevThreshold = 0) -> void
-    {
-        std::size_t offset = 0;
-        DEBUG("uploading pedestaldata...");
+        DEBUG("Loading existing mask map on device", 0);
+        alpakaCopy(device.queue,
+                   device.mask,
+                   mask.data,
+                   decltype(TConfig::SINGLEMAP)(TConfig::SINGLEMAP));
 
-        // upload all frames cut into smaller packages
-        while (offset <= data.numFrames - TConfig::DEV_FRAMES) {
-            offset += calcPedestaldata(alpakaNativePtr(data.data) + offset,
-                                       TConfig::DEV_FRAMES);
-        }
-
-        // upload remaining frames
-        if (offset != data.numFrames) {
-            offset += calcPedestaldata(alpakaNativePtr(data.data) + offset,
-                                       data.numFrames % TConfig::DEV_FRAMES);
-        }
-    }
-
-  auto uploadRawPedestals(FramePackage<typename TConfig::InitPedestalMap, TAlpaka> data) -> void
-    {
         DEBUG("distribute raw pedestal maps");
         alpakaCopy(device.queue,
                    device.initialPedestal,
-                   data.data,
+                   initialPedestals.data,
                    decltype(TConfig::PEDEMAPS)(TConfig::PEDEMAPS));
-        alpakaWait(device.queue);
-    }
-
-  auto downloadPedestaldata()
-        -> FramePackage<typename TConfig::PedestalMap, TAlpaka>
-    {
-        DEBUG("downloading pedestaldata from device", 0);
-
-        // get the pedestal data from the device
         alpakaCopy(device.queue,
-                   pedestal.data,
                    device.pedestal,
+                   pedestals.data,
                    decltype(TConfig::PEDEMAPS)(TConfig::PEDEMAPS));
 
-        // wait for copy to finish
         alpakaWait(device.queue);
 
-        pedestal.numFrames = TConfig::PEDEMAPS;
-
-        return pedestal;
+        DEBUG("Device #", 0, "initialized!");
     }
 
-    auto downloadInitialPedestaldata()
-        -> FramePackage<typename TConfig::InitPedestalMap, TAlpaka>
-    {   
-        DEBUG("downloading pedestaldata from device", 0);
-
-        // get the pedestal data from the device
-        alpakaCopy(device.queue,
-                   initPedestal.data,
-                   device.initialPedestal,
-                   decltype(TConfig::PEDEMAPS)(TConfig::PEDEMAPS));
-
-        // wait for copy to finish
-        alpakaWait(device.queue);
-
-        initPedestal.numFrames = TConfig::PEDEMAPS;
-
-        return initPedestal;
-    }
-
-    auto downloadMask() -> typename TConfig::MaskMap*
-    {
-        DEBUG("downloading mask...");
-
-        // get the pedestal data from the device
-        alpakaCopy(device.queue,
-                   mask,
-                   device.mask,
-                   decltype(TConfig::SINGLEMAP)(TConfig::SINGLEMAP));
-
-        // wait for copy to finish
-        alpakaWait(device.queue);
-
-        return alpakaNativePtr(mask);
-    }
-
-    auto downloadGainStages()
-        -> FramePackage<typename TConfig::GainStageMap, TAlpaka>
-    {
-        DEBUG("downloading gain stage map...");
-
-        // mask gain stage maps
-        GainStageMaskingKernel<TConfig> gainStageMasking;
-        auto const gainStageMasker(alpakaCreateKernel<TAlpaka>(
-            getWorkDiv<TAlpaka>(),
-            gainStageMasking,
-            alpakaNativePtr(device.gainStage),
-            alpakaNativePtr(device.gainStageOutput),
-            device.numMaps,
-            alpakaNativePtr(device.mask)));
-
-        alpakaEnqueueKernel(device.queue, gainStageMasker);
-
-        // get the pedestal data from the device
-        alpakaCopy(device.queue,
-                   gainStage.data,
-                   device.gainStageOutput,
-                   device.numMaps);
-
-        // wait for copy to finish
-        alpakaWait(device.queue);
-
-        gainStage.numFrames = device.numMaps;
-
-        return gainStage;
-    }
-
-    template <typename TFramePackageEnergyMap,
-              typename TFramePackagePhotonMap>
+  template <typename TFramePackageEnergyMap>
     auto process(FramePackage<typename TConfig::DetectorData, TAlpaka> data,
                  std::size_t offset,
                  tl::optional<TFramePackageEnergyMap> energy,
-                 tl::optional<TFramePackagePhotonMap> photon,
                  typename TConfig::template ClusterArray<TAlpaka>* clusters)
-        -> std::tuple<std::size_t, std::future<bool>>
-    {
+        -> void {
 
       auto numMaps = data.numFrames % (TConfig::DEV_FRAMES + 1);
 
         using ClusterView =
             typename TAlpaka::template HostView<typename TConfig::Cluster>;
 
-        //! @todo: pass numMaps through data.numFrames??
-        device.numMaps = numMaps;
-
         // create a shadow buffer on the device and upload data if required
         FramePackageDoubleBuffer<TAlpaka,
-                                 //TFramePackageDetectorData,
                                  FramePackage<typename TConfig::DetectorData, TAlpaka>,
                                  decltype(device.data)>
             dataBuffer(data, device.data, &device.queue, numMaps);
@@ -283,7 +189,6 @@ public:
         
         // reset the number of clusters
         alpakaMemSet(device.queue,
-                     //usedClusters,
                      usedClusters,
                      0,
                      decltype(TConfig::SINGLEMAP)(TConfig::SINGLEMAP));
@@ -304,21 +209,12 @@ public:
                                                                alpakaNativePtr(clustersBufferResult),
                                                                alpakaNativePtr(usedClusters),
                                                                local_mask,
-                                                               device.numMaps,
+                                                               numMaps,
                                                                i,
                                                                false));
 
           alpakaEnqueueKernel(device.queue, clusterEnergy);
           alpakaWait(device.queue);	
-
-
-          //write_img("gain", alpakaNativePtr(gain.data), 0, 3 * sizeof(double));
-          //write_img("init_pedestal", alpakaNativePtr(downloadInitialPedestaldata().data), 0, 3 * sizeof(InitPedestal));
-          //write_img("pedestal", alpakaNativePtr(downloadPedestaldata().data), 0, 3 * sizeof(Pedestal));
-          //write_img("gainstage", alpakaNativePtr(downloadGainStages().data), 16, sizeof(char));
-          //write_img("energy", alpakaNativePtr(energy), 16, sizeof(double));
-          //write_img("mask2", downloadMask(), 16, sizeof(bool));
-
 
           // execute cluster finder
           ClusterFinderKernel<TConfig, TAlpaka> clusterFinderKernel{};
@@ -333,7 +229,7 @@ public:
                                                                alpakaNativePtr(clustersBufferResult),
                                                                alpakaNativePtr(usedClusters),
                                                                local_mask,
-                                                               device.numMaps,
+                                                               numMaps,
                                                                i,
                                                                false));
 
@@ -361,101 +257,10 @@ public:
         }
 
         energyBuffer.download();
-        //write_img("energy", alpakaNativePtr(energy->data), 16, sizeof(double));
 
-        auto wait = [](decltype(device) device) {
-            alpakaWait(device.queue);
-            return true;
-        };
-
-        return std::make_tuple(0, std::async(std::launch::async, []() { return true; }));
+        alpakaWait(device.queue);
     }
 
 private:
-    FramePackage<typename TConfig::GainMap, TAlpaka> gain;
-    typename TAlpaka::template HostBuf<typename TConfig::MaskMap> mask;
-    FramePackage<typename TConfig::GainStageMap, TAlpaka> gainStage;
-
-    FramePackage<typename TConfig::PedestalMap, TAlpaka> pedestal;
-    FramePackage<typename TConfig::InitPedestalMap, TAlpaka> initPedestal;
-
-    std::vector<typename TAlpaka::DevAcc> deviceContainer;
   DeviceData<TConfig, TAlpaka> device;
-
-    bool init;    
-    double beamConst;
-
-    auto initDevices() -> void
-    {
-        const GainmapInversionKernel<TConfig> gainmapInversionKernel{};
-
-        alpakaCopy(device.queue,
-                   device.gain,
-                   gain.data,
-                   decltype(TConfig::GAINMAPS)(TConfig::GAINMAPS));
-            
-        // compute reciprocals of gain maps
-        auto const gainmapInversion(alpakaCreateKernel<TAlpaka>(getWorkDiv<TAlpaka>(),
-                                                                gainmapInversionKernel,
-                                                                alpakaNativePtr(device.gain)));
-        alpakaEnqueueKernel(device.queue, gainmapInversion);
-
-        // init cluster data to 0
-        alpakaMemSet(device.queue,
-                     device.cluster,
-                     0,
-                     decltype(TConfig::MAX_CLUSTER_NUM_USER)(TConfig::MAX_CLUSTER_NUM_USER) *
-                     decltype(TConfig::DEV_FRAMES)(TConfig::DEV_FRAMES));
-
-        // wait until everything is finished
-        alpakaWait(device.queue);
-            
-        DEBUG("Device #", 0, "initialized!");\
-    }
-
-    template <typename TDetectorData>
-    auto calcPedestaldata(TDetectorData* data, std::size_t numMaps)
-        -> std::size_t
-    {
-        // set the state to processing
-        device.numMaps = numMaps;
-
-        // upload the data to the device
-        alpakaCopy(device.queue,
-                   device.data,
-                   alpakaViewPlainPtrHost<TAlpaka, TDetectorData>(
-                       data, alpakaGetHost<TAlpaka>(), numMaps),
-                   numMaps);
-        
-        
-        // zero out initial pedestal maps and normal pedestal maps
-        if (!init) {
-            alpakaMemSet(device.queue,
-                         device.pedestal,
-                         0,
-                         decltype(TConfig::PEDEMAPS)(TConfig::PEDEMAPS));
-            alpakaMemSet(device.queue,
-                         device.initialPedestal,
-                         0,
-                         decltype(TConfig::PEDEMAPS)(TConfig::PEDEMAPS));
-            alpakaWait(device.queue);
-            init = true;
-        }
-
-        // execute the calibration kernel
-        CalibrationKernel<TConfig> calibrationKernel{};
-        auto const calibration(
-            alpakaCreateKernel<TAlpaka>(getWorkDiv<TAlpaka>(),
-                                        calibrationKernel,
-                                        alpakaNativePtr(device.data),
-                                        alpakaNativePtr(device.initialPedestal),
-                                        alpakaNativePtr(device.pedestal),
-                                        alpakaNativePtr(device.mask),
-                                        device.numMaps));
-
-        alpakaEnqueueKernel(device.queue, calibration);
-        alpakaWait(device.queue);
-
-        return numMaps;
-    }
 };
