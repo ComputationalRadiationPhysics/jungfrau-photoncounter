@@ -14,7 +14,7 @@ set(VERBOSE ON CACHE BOOL "Show debug/status messages. ")
 
 # build benchmarks
 alpaka_add_executable(bench src/bench.cpp)
-target_include_directories(bench PUBLIC include/ PUBLIC optional/include/tl/)
+target_include_directories(bench PUBLIC include/)
 target_link_libraries(bench PUBLIC alpaka PRIVATE ${CMAKE_PROJECT_NAME})
 if(${VERBOSE})
   target_compile_definitions(bench PRIVATE "-DVERBOSE")

@@ -60,25 +60,63 @@ auto loadMaps(const std::string &path)
     return maps;
   }
 
+template <typename TData, typename TAlpaka>
+auto loadMap(const std::string &path)
+  -> typename TAlpaka::template HostBuf<TData> {
+    // get file size
+    struct stat fileStat;
+    stat(path.c_str(), &fileStat);
+     auto fileSize = fileStat.st_size;
+
+    // check for empty files
+    if (fileSize == 0 || fileSize < sizeof(TData)) {
+      std::cerr << "Error: Nothing loaded! Is the file path correct (" << path << ")?\n";
+      exit(EXIT_FAILURE);
+    }
+
+    // allocate space for data
+    typename TAlpaka::template HostBuf<TData> map(alpakaAlloc<TData>(alpakaGetHost<TAlpaka>(), (std::size_t)1));
+
+    // load file content
+    std::ifstream file;
+    file.open(path, std::ios::in | std::ios::binary);
+    if (!file.is_open()) {
+      std::cerr << "Error: Couldn't open file " << path << "!\n";
+      exit(EXIT_FAILURE);
+    }
+
+    file.read(reinterpret_cast<char *>(alpakaNativePtr(map)), sizeof(TData));
+    file.close();
+    
+    return map;
+  }
+
 int main(int argc, char* argv[])
 {    
     std::string gainPath("../../../data_pool/px_101016/gainMaps_M022.bin");
     std::string dataPath("../../../data_pool/px_101016/Insu1.dat");
 
-    using Config = DetectorConfig<1000, 1000, 999, 1024, 512, 2, 1, 100, 7, 5>;
+    using Config = DetectorConfig<1024, 512, 1, 7>;
     using ConcreteAcc = Accelerator<Config::MAPSIZE>;
 
-    std::cout << "Parameters: sumFrames=" << Config::SUM_FRAMES
-              << "; devFrames=" << Config::DEV_FRAMES
+    std::cout << "Parameters: devFrames=" << Config::DEV_FRAMES
               << "; clusterSize=" << Config::CLUSTER_SIZE << "\n";
 
     std::string maskPath = "mask.dat";
-    std::size_t maxClusterCount = Config::MAX_CLUSTER_NUM_USER;
 
     t = Clock::now();
 
-    FramePackage<typename Config::DetectorData, ConcreteAcc> data(loadMaps<typename Config::DetectorData, ConcreteAcc>(dataPath));
+    FramePackage<typename Config::DetectorData, ConcreteAcc> data(1);
+    data.data = loadMap<typename Config::DetectorData, ConcreteAcc>(dataPath);
     DEBUG(data.numFrames, "data maps loaded");
+    
+    FramePackage<typename Config::EnergyMap, ConcreteAcc> energydata(1);
+    energydata.data = loadMap<typename Config::EnergyMap, ConcreteAcc>("energy.dat");
+    DEBUG(data.numFrames, "energy maps loaded");
+    
+    FramePackage<typename Config::GainStageMap, ConcreteAcc> gainstagedata(1);
+    gainstagedata.data = loadMap<typename Config::GainStageMap, ConcreteAcc>("gainstage_raw.dat");
+    DEBUG(data.numFrames, "gainstage maps loaded");
 
     FramePackage<typename Config::GainMap, ConcreteAcc> gain(loadMaps<typename Config::GainMap, ConcreteAcc>(gainPath));
     DEBUG(gainPath);
@@ -100,18 +138,7 @@ int main(int argc, char* argv[])
     // allocate space for output data
     FramePackage<typename Config::EnergyMap, ConcreteAcc> energy_data(data.numFrames);
 
-    // create optional values
-    tl::optional<FramePackage<typename Config::EnergyMap, ConcreteAcc>> energy;
-    typename Config::template ClusterArray<ConcreteAcc> *clusters = nullptr;
-  
-
-    energy = energy_data;
-    clusters = new typename Config::template ClusterArray<ConcreteAcc>(maxClusterCount * data.numFrames);  
-  
     DEBUG("Initialization done!");  
-
-    if (clusters)
-      clusters->used = 0;
 
     FramePackage<typename Config::InitPedestalMap, ConcreteAcc> initialPedestals(loadMaps<typename Config::InitPedestalMap, ConcreteAcc>("init_pedestal.dat"));
     DEBUG(initialPedestals.numFrames, "initial pedestal maps loaded");
@@ -121,16 +148,8 @@ int main(int argc, char* argv[])
 
     Dispenser<Config, Accelerator> dispenser(gain, mask, initialPedestals, pedestals);
 
-    using EnergyPackageView =
-      FramePackageView_t<typename Config::EnergyMap, ConcreteAcc>;
-
-    // define views
-    auto oenergy([&]() -> tl::optional<EnergyPackageView> {
-        return energy->getView(0, 1);
-      }());
-
     // process data and store results
-    dispenser.process(data, 0, oenergy, clusters);
+    dispenser.process(loadMap<typename Config::DetectorData, ConcreteAcc>(dataPath), 0, energy_data, energydata, gainstagedata);
 
     DEBUG(dvstr);
 
