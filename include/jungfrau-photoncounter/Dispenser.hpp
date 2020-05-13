@@ -128,33 +128,14 @@ ALPAKA_FN_ACC ALPAKA_FN_INLINE auto getLinearIdx(const TAcc &acc)
   return linearizedGlobalThreadIdx[0u];
 }
 
-template <typename TDataword>
-ALPAKA_FN_ACC ALPAKA_FN_INLINE auto getGainStage(TDataword dataword)
-    -> uint8_t {
-  auto g = (dataword & 0xc000) >> 14;
-  // map gain stages 0, 1, 3 to 0, 1, 2
-  if (g == 3)
-    g = 2;
-  return g;
-}
-
-template <typename TConfig, typename TThreadIndex>
-ALPAKA_FN_ACC ALPAKA_FN_INLINE auto
-indexQualifiesAsClusterCenter(TThreadIndex id) -> bool {
-  // To future self: We checked this multiple times. This should be correct.
-  constexpr auto n = TConfig::CLUSTER_SIZE;
-  return (id % TConfig::DIMX >= n / 2 &&
-          id % TConfig::DIMX <= TConfig::DIMX - (n + 1) / 2 &&
-          id / TConfig::DIMX >= n / 2 &&
-          id / TConfig::DIMX <= TConfig::DIMY - (n + 1) / 2);
-}
-
 template <typename TConfig, typename TMap, typename TThreadIndex, typename TSum>
 ALPAKA_FN_ACC ALPAKA_FN_INLINE auto
 findClusterSumAndMax(TMap const &map, TThreadIndex const id, TSum &sum,
                      TThreadIndex &max) -> void {
   TThreadIndex it = 0;
   max = 0;
+  // bug might be here
+  //sum = 0; // when commenting in this line all accelerators give the same result
   constexpr int n = TConfig::CLUSTER_SIZE;
   for (int y = -n / 2; y < (n + 1) / 2; ++y) {
     for (int x = -n / 2; x < (n + 1) / 2; ++x) {
@@ -259,7 +240,10 @@ template <typename Config, typename AccConfig> struct ClusterFinderKernel {
       decltype(id) max;
       const auto &energy = energyMaps->data[id];
       const auto &stddev = initPedestalMaps[gainStage][id].stddev;
-      if (indexQualifiesAsClusterCenter<Config>(id)) {
+      if ((id % Config::DIMX >= n / 2 &&
+          id % Config::DIMX <= Config::DIMX - (n + 1) / 2 &&
+          id / Config::DIMX >= n / 2 &&
+          id / Config::DIMX <= Config::DIMY - (n + 1) / 2)) {
         findClusterSumAndMax<Config>(energyMaps->data, id,
                                      sum, max);
         // check cluster conditions
