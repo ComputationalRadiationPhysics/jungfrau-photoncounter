@@ -215,7 +215,9 @@ template <typename Config, typename AccConfig> struct ClusterEnergyKernel {
   	auto adc = dataword & 0x3fff;
 
   	auto &gainStage = gainStageMaps[0].data[id];
-  	gainStage = getGainStage(dataword);
+  	gainStage = (dataword & 0xc000) >> 14;
+        if (gainStage == 3)
+            gainStage = 2;
 
   	const auto &pedestal = pedestalMaps[gainStage][id];
   	const auto &gain = gainMaps[gainStage][id];
