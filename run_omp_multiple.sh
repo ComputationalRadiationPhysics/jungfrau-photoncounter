@@ -8,7 +8,7 @@
 #SBATCH --mem=200000
 #SBATCH --cpus-per-task=40
 #SBATCH --exclusive
-#SBATCH --array=0-9
+#SBATCH --array=0-11
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=j.schenke@hzdr.de
 #SBATCH -o log.om.slurm-%A_%a.out

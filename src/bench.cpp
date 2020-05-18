@@ -21,6 +21,14 @@ template <std::size_t TMapSize> using Accelerator = GpuCudaRt<TMapSize>;
 #else
 template <std::size_t TMapSize> using Accelerator = CpuOmp2Blocks<TMapSize>;
 #endif
+
+/*
+#ifdef ALPAKA_ACC_GPU_CUDA_ENABLED
+template <std::size_t TMapSize> using Accelerator = GpuCudaRtSync<TMapSize>;
+#else
+template <std::size_t TMapSize> using Accelerator = CpuSerial<TMapSize>;
+#endif*/
+
 // CpuOmp2Blocks<MAPSIZE>;
 // CpuTbbRt<MAPSIZE>;
 // CpuSerial<MAPSIZE>;
@@ -94,12 +102,30 @@ std::vector<Duration> benchmark(unsigned int iterations,
     for (unsigned int i = 0; i < iterations; ++i) {
         if (benchmarkingInput.clusters)
             benchmarkingInput.clusters->used = 0;
-        auto dispenser = calibrate(benchmarkingInput);        
+        auto dispenser = calibrate(benchmarkingInput);
+
+
+        
+        //! @todo: remove debugging code
+        save_image<Config>("initpedestal" + std::to_string(i), alpakaNativePtr(dispenser.downloadPedestaldata().data), 0);
+
+        
         auto t0 = Timer::now();
         bench(dispenser, benchmarkingInput);
         auto t1 = Timer::now();
         results.push_back(std::chrono::duration_cast<Duration>(t1 - t0));
+
+        
+
+        //! @todo: remove debugging code
+        save_image<Config>("pedestal" + std::to_string(i), alpakaNativePtr(dispenser.downloadPedestaldata().data), 0);
     }
+
+
+    
+
+
+    
 
     // check result if requested
     std::cout << "Checking energy if needed ..." << std::endl;

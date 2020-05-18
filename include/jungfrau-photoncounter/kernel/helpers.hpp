@@ -102,6 +102,7 @@ findClusterSumAndMax(TMap const &map, TThreadIndex const id, TSum &sum,
                      TThreadIndex &max) -> void {
   TThreadIndex it = 0;
   max = 0;
+  sum = 0;
   constexpr int n = TConfig::CLUSTER_SIZE;
   for (int y = -n / 2; y < (n + 1) / 2; ++y) {
     for (int x = -n / 2; x < (n + 1) / 2; ++x) {
