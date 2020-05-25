@@ -53,6 +53,8 @@ template <typename Config> struct PhotonFinderKernel {
         const auto &pedestal = pedestalMaps[gainStage][id];
         const auto &stddev = initPedestalMaps[gainStage][id].stddev;
 
+	//! @todo: dark condition should only occur in gain stages > 0
+
         // check "dark pixel" condition
         if (pedestal - c * stddev <= adc && pedestal + c * stddev >= adc &&
             !pedestalFallback) {

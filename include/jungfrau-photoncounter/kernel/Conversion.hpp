@@ -37,6 +37,9 @@ template <typename Config> struct ConversionKernel {
         const auto &pedestal = pedestalMaps[gainStage][id];
         const auto &stddev = initPedestalMaps[gainStage][id].stddev;
 
+	//! @todo: for all pixels in gain stage > 0 the dark pixel condition should
+	// never be satisfied
+
         // check "dark pixel" condition
         if (pedestal - c * stddev <= adc && pedestal + c * stddev >= adc &&
             !pedestalFallback) {

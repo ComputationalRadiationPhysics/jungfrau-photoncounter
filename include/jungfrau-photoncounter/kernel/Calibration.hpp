@@ -26,7 +26,7 @@ template <typename Config> struct CalibrationKernel {
                                             Config::FRAMESPERSTAGE_G2};
 
       // find expected gain stage
-      char expectedGainStage;
+      char expectedGainStage = 0;
       for (int i = 0; i < PEDEMAPS; ++i) {
         if (initPedestalMap[i][id].count != FRAMESPERSTAGE[i]) {
           expectedGainStage = i;

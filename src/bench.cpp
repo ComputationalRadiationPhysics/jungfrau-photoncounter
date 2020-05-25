@@ -100,8 +100,10 @@ std::vector<Duration> benchmark(unsigned int iterations,
     std::vector<Duration> results;
     results.reserve(iterations);
     for (unsigned int i = 0; i < iterations; ++i) {
-        if (benchmarkingInput.clusters)
+        if (benchmarkingInput.clusters) {
             benchmarkingInput.clusters->used = 0;
+	    alpakaNativePtr(benchmarkingInput.clusters->usedPinned)[0] = 0;
+	}
         auto dispenser = calibrate(benchmarkingInput);
         
         auto t0 = Timer::now();
