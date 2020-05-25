@@ -152,12 +152,6 @@ auto calibrate(const BenchmarkingInput<Config, Accelerator<Config::MAPSIZE>>
   return dispenser;
 }
 
-
-
-
-
-
-
 // main part for benchmarking
 template <typename Config, template <std::size_t> typename Accelerator>
 auto bench(

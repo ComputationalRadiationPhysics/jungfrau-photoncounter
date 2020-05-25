@@ -103,29 +103,12 @@ std::vector<Duration> benchmark(unsigned int iterations,
         if (benchmarkingInput.clusters)
             benchmarkingInput.clusters->used = 0;
         auto dispenser = calibrate(benchmarkingInput);
-
-
-        
-        //! @todo: remove debugging code
-        save_image<Config>("initpedestal" + std::to_string(i), alpakaNativePtr(dispenser.downloadPedestaldata().data), 0);
-
         
         auto t0 = Timer::now();
         bench(dispenser, benchmarkingInput);
         auto t1 = Timer::now();
         results.push_back(std::chrono::duration_cast<Duration>(t1 - t0));
-
-        
-
-        //! @todo: remove debugging code
-        save_image<Config>("pedestal" + std::to_string(i), alpakaNativePtr(dispenser.downloadPedestaldata().data), 0);
-    }
-
-
-    
-
-
-    
+   }
 
     // check result if requested
     std::cout << "Checking energy if needed ..." << std::endl;

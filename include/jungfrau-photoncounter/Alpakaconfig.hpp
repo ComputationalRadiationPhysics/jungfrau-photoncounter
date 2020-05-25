@@ -141,9 +141,9 @@ template <std::size_t MAPSIZE> struct CpuOmp2Blocks {
   using HostView = alpaka::mem::view::ViewSubView<DevHost, T, Dim, Size>;
 
   static constexpr std::size_t STREAMS_PER_DEV = 1;
-  static constexpr Size elementsPerThread = 2u;//256u;
+  static constexpr Size elementsPerThread = 256u;
   static constexpr Size threadsPerBlock = 1u;
-  static constexpr Size blocksPerGrid = MAPSIZE / 2;//(MAPSIZE + 255) / 256;
+  static constexpr Size blocksPerGrid = (MAPSIZE + 255) / 256;
 };
 
 template <typename T, typename TBuf, typename... TArgs>

@@ -32,10 +32,10 @@ constexpr auto framesPerStageG1 = Values<std::size_t, 1000>();
 constexpr auto framesPerStageG2 = Values<std::size_t, 999>();
 constexpr auto dimX = Values<std::size_t, 1024>();
 constexpr auto dimY = Values<std::size_t, 512>();
-constexpr auto sumFrames = Values<std::size_t, 2>(); //, 10, 20, 100>();
-constexpr auto devFrames = Values<std::size_t, 100>(); //10, 100>(); // , 1000>();
+constexpr auto sumFrames = Values<std::size_t, 2, 10, 20, 100>();
+constexpr auto devFrames = Values<std::size_t, 10, 100>(); // , 1000>();
 constexpr auto movingStatWindowSize = Values<std::size_t, 100>();
-constexpr auto clusterSize = Values<std::size_t, 7, 11>(); //2, 3, 7, 11>();
+constexpr auto clusterSize = Values<std::size_t, 2, 3, 7, 11>();
 constexpr auto cs = Values<std::size_t, 5>();
 
 constexpr auto parameterSpace =
