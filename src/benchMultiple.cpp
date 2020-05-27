@@ -99,7 +99,7 @@ std::vector<Duration> benchmark(unsigned int iterations,
       for(uint64_t j = 0; j < detectorCount; ++j) {
         if (benchmarkingInputs[j].clusters) {
           benchmarkingInputs[j].clusters->used = 0;
-	  alpakaNativePtr(benchmarkingInput.clusters->usedPinned)[0] = 0;
+	  alpakaNativePtr(benchmarkingInputs[j].clusters->usedPinned)[0] = 0;
 	}
         dispensers.emplace_back(std::move(calibrate(benchmarkingInputs[j], j, detectorCount)));
       }
