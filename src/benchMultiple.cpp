@@ -32,10 +32,10 @@ constexpr auto framesPerStageG1 = Values<std::size_t, 1000>();
 constexpr auto framesPerStageG2 = Values<std::size_t, 999>();
 constexpr auto dimX = Values<std::size_t, 1024>();
 constexpr auto dimY = Values<std::size_t, 512>();
-constexpr auto sumFrames = Values<std::size_t, 2, 10, 20, 100>();
-constexpr auto devFrames = Values<std::size_t, 10, 100>(); // , 1000>();
+constexpr auto sumFrames = Values<std::size_t, 2>();//, 10, 20, 100>();
+constexpr auto devFrames = Values<std::size_t, 100>();//10, 100>(); // , 1000>();
 constexpr auto movingStatWindowSize = Values<std::size_t, 100>();
-constexpr auto clusterSize = Values<std::size_t, 2, 3, 7, 11>();
+constexpr auto clusterSize = Values<std::size_t, 3>();// 2, 3, 7, 11>();
 constexpr auto cs = Values<std::size_t, 5>();
 
 constexpr auto parameterSpace =
@@ -99,7 +99,7 @@ std::vector<Duration> benchmark(unsigned int iterations,
       for(uint64_t j = 0; j < detectorCount; ++j) {
         if (benchmarkingInputs[j].clusters) {
           benchmarkingInputs[j].clusters->used = 0;
-	  alpakaNativePtr(benchmarkingInput.clusters->usedPinned)[0] = 0;
+	  alpakaNativePtr(benchmarkingInputs[j].clusters->usedPinned)[0] = 0;
 	}
         dispensers.emplace_back(std::move(calibrate(benchmarkingInputs[j], j, detectorCount)));
       }

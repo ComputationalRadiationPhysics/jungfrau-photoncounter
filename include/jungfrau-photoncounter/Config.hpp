@@ -230,8 +230,8 @@ struct GetDoubleBuffer {
         TAccelerator,
         TBufferHost,
         TBufferDevice,
-        std::is_same<typename TAccelerator::Acc,
-                     typename TAccelerator::Host>::value>;
+        std::is_same<alpaka::dev::Dev<typename TAccelerator::Acc>, 
+		alpaka::dev::Dev<typename TAccelerator::Host>>::value>;
 };
 
 // extend the double buffer to FramePackages

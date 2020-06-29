@@ -67,12 +67,15 @@ bool checkResult(tl::optional<T> result, std::string referencePath) {
   // compare data
   bool exactly_identical = true;
   bool very_close = true;
+  int closeCount = 0;
+  int oneCount = 0;
   for (std::size_t frameNumber = 0; frameNumber < extent; ++frameNumber) {
     for (std::size_t index = 0; index < mapSize; ++index) {
       // check if data is exactly identical
       if (alpakaNativePtr(result->data)[frameNumber].data[index] !=
           alpakaNativePtr(reference.data)[frameNumber].data[index]) {
         exactly_identical = false;
+        ++closeCount;
       }
 
       // check if data is very close
@@ -80,6 +83,7 @@ bool checkResult(tl::optional<T> result, std::string referencePath) {
                    alpakaNativePtr(reference.data)[frameNumber].data[index]) >
           0.001) {
         very_close = false;
+        ++oneCount;
       }
 
       // check if data is of by at most one
@@ -111,9 +115,9 @@ bool checkResult(tl::optional<T> result, std::string referencePath) {
   if (exactly_identical)
     std::cout << "Data is completely identical. \n";
   else if (very_close)
-    std::cout << "Data is very close. \n";
+    std::cout << "Data is very close (" << closeCount << " not identical). \n";
   else
-    std::cout << "Data is at most off by one. \n";
+    std::cout << "Data is at most off by one (" << closeCount << " not identical, " << oneCount << " off by at most one). \n";
 
   return true;
 }

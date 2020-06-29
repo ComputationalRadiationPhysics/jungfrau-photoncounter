@@ -100,12 +100,13 @@ template <typename TConfig, typename TMap, typename TThreadIndex, typename TSum>
 ALPAKA_FN_ACC ALPAKA_FN_INLINE auto
 findClusterSumAndMax(TMap const &map, TThreadIndex const id, TSum &sum,
                      TThreadIndex &max) -> void {
+  constexpr int n = TConfig::CLUSTER_SIZE;
+
   // initialize max index with first value of the cluster
   max = id - n / 2 * TConfig::DIMX - n / 2;
 
   // initialize sum to 0
   sum = 0;
-  constexpr int n = TConfig::CLUSTER_SIZE;
   for (int y = -n / 2; y < (n + 1) / 2; ++y) {
     for (int x = -n / 2; x < (n + 1) / 2; ++x) {
       TThreadIndex it = id + y * TConfig::DIMX + x;

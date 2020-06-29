@@ -91,8 +91,8 @@ template <std::size_t MAPSIZE> struct CpuTbbBlocks {
 };
 
 template <typename T, typename TBuf, typename... TArgs>
-struct GetIterator<T, TBuf, alpaka::acc::AccCpuOmp4<TArgs...>> {
-  using Iterator = IteratorCpu<alpaka::acc::AccCpuOmp4<TArgs...>, T, TBuf>;
+struct GetIterator<T, TBuf, alpaka::acc::AccCpuTbbBlocks<TArgs...>> {
+  using Iterator = IteratorCpu<alpaka::acc::AccCpuTbbBlocks<TArgs...>, T, TBuf>;
 };
 #endif
 #endif
@@ -190,7 +190,6 @@ struct GetIterator<T, TBuf, alpaka::acc::AccCpuOmp4<TArgs...>> {
 };
 #endif
 #endif
-
 
 #ifdef ALPAKA_ACC_CPU_B_SEQ_T_SEQ_ENABLED
 //#############################################################################
