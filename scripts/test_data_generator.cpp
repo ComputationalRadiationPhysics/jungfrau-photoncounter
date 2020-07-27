@@ -1,8 +1,10 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <deque>
 #include <fstream>
 #include <iostream>
+#include <random>
 #include <string>
 #include <vector>
 
@@ -10,7 +12,20 @@
 struct DetectorValue {
   uint16_t adc : 14;
   uint8_t gainStage : 2;
+
+  bool operator==(const DetectorValue &other) const {
+    return adc == other.adc && gainStage == other.gainStage;
+  }
+
+  bool operator!=(const DetectorValue &other) const {
+    return adc != other.adc || gainStage != other.gainStage;
+  }
 };
+
+// define values to fill clusters with
+constexpr DetectorValue value{1015u, 0u};
+constexpr DetectorValue centerValue{1020u, 0u};
+constexpr DetectorValue empty{1000u, 0u};
 
 // frame header struct
 struct FrameHeader {
@@ -64,9 +79,9 @@ void generateCalibration(std::string path) {
       out.write(reinterpret_cast<char *>(&bunchID), sizeof(bunchID));
 
       // iterate over rows
-      for (unsigned int y = 0; y < 1024; ++y) {
+      for (unsigned int y = 0; y < Frame::width; ++y) {
         // iterate over cells
-        for (unsigned int x = 0; x < 512; ++x) {
+        for (unsigned int x = 0; x < Frame::height; ++x) {
           // write value
           DetectorValue value{static_cast<uint16_t>(1000 * (gainStage + 1)),
                               gainStage};
@@ -98,9 +113,9 @@ void generateMainG0(std::string path,
     out.write(reinterpret_cast<char *>(&bunchID), sizeof(bunchID));
 
     // iterate over rows
-    for (unsigned int y = 0; y < 1024; ++y) {
+    for (unsigned int y = 0; y < Frame::width; ++y) {
       // iterate over cells
-      for (unsigned int x = 0; x < 512; ++x) {
+      for (unsigned int x = 0; x < Frame::height; ++x) {
         // write value
         DetectorValue value{static_cast<uint16_t>(1000), 0u};
         out.write(reinterpret_cast<char *>(&value), sizeof(value));
@@ -130,9 +145,9 @@ void generateMainG13(std::string path, unsigned int frameCount = 10000) {
     out.write(reinterpret_cast<char *>(&bunchID), sizeof(bunchID));
 
     // iterate over rows
-    for (unsigned int y = 0; y < 1024; ++y) {
+    for (unsigned int y = 0; y < Frame::width; ++y) {
       // iterate over cells
-      for (unsigned int x = 0; x < 512; ++x) {
+      for (unsigned int x = 0; x < Frame::height; ++x) {
         // set the first half to gain stage 1 and the other half to gain stage 3
         uint8_t gainStage = ((frame < frameCount / 2) ? 1u : 3u);
 
@@ -191,20 +206,106 @@ std::vector<Point> makeClusterCenters(std::uint16_t width, std::uint16_t height,
   return centers;
 }
 
+bool isClose(Point p1, Point p2, int n) {
+  std::int16_t diffx = std::max(p1.x, p2.x) - std::min(p1.x, p2.x);
+  std::int16_t diffy = std::max(p1.y, p2.y) - std::min(p1.y, p2.y);
+
+  std::int16_t diffx2 = diffx * diffx;
+  std::int16_t diffy2 = diffy * diffy;
+
+  std::int16_t diff = diffx2 + diffy2;
+  std::int16_t cmp = (n * n + 3) / 4;
+
+  return diff < cmp;
+}
+
+template <int N, typename TRng>
+Point getValidRandomCenter(TRng rng, std::vector<Point> centers,
+                           std::uint16_t width, std::uint16_t height,
+                           bool allowOverlapping = true) {
+  // calculate maximal number of possible cluster centers
+  int n = (allowOverlapping ? N : N * 2);
+  int pixelCount = (width - N + 1) * (height - N + 1);
+
+  // check if all are already taken
+  if (!pixelCount)
+    return Point{0, 0};
+
+  // select random cluster center
+  int randIdx = rng() % pixelCount;
+
+  // skip over all previous clusters
+  for (const Point &c : centers) {
+    // get position
+    std::uint16_t x = N / 2 + randIdx % (width - N + 1);
+    std::uint16_t y = N / 2 + randIdx / (width - N + 1);
+
+    int cycleCounter = 0;
+
+    // cluster lies entirely above
+    if (c.y + (n + 1) / 2 < y) {
+      // add full cluster size
+      randIdx = (randIdx + n * n) % ((width - N + 1) * (height - N + 1));
+    } else
+      while (cycleCounter < pixelCount &&
+             std::any_of(centers.begin(), centers.end(),
+                         [&x, &y, &n](const Point &c) {
+                           return isClose(Point{x, y}, c, n);
+                         })) {
+        // cluster lies partially above
+        randIdx = (randIdx + 1) % ((width - N + 1) * (height - N + 1));
+
+        x = N / 2 + randIdx % (width - N + 1);
+        y = N / 2 + randIdx / (width - N + 1);
+
+        ++cycleCounter;
+      }
+  }
+
+  // calculate final position and return
+  std::uint16_t finalx = N / 2 + randIdx % (width - N + 1);
+  std::uint16_t finaly = N / 2 + randIdx / (width - N + 1);
+
+  return Point{finalx, finaly};
+}
+
+// function to generate cluster centers
+template <unsigned N>
+std::vector<Point>
+makeRandomClusterCenters(std::uint16_t width, std::uint16_t height,
+                         unsigned int n, bool allowOverlapping = false) {
+  // init
+  if (n <= 0)
+    return std::vector<Point>();
+  std::vector<Point> centers;
+  std::mt19937 gen;
+  gen.seed(0);
+
+  // pick one out randomly and remove cluster from possible centers
+  for (unsigned int i = 0; i < n; ++i) {
+    // take random point and store it
+    Point p =
+        getValidRandomCenter<N>(gen, centers, width, height, allowOverlapping);
+    centers.emplace_back(p);
+    std::sort(centers.begin(), centers.end(),
+              [](const Point &p1, const Point &p2) {
+                return p1.y * Frame::width + p1.x < p2.y * Frame::width + p2.x;
+              });
+  }
+
+  return centers;
+}
+
 // function to add clusters
 template <unsigned TCLusterSize>
 void addClusters(Frame &frame, const std::vector<Point> &centers,
                  std::vector<Cluster<TCLusterSize>> &clusters) {
-    // init variables
+  // init variables
   static constexpr auto N = Cluster<TCLusterSize>::N;
   const auto upper = N / 2 + (N % 2 > 0);
   const auto lower = N / 2;
   Cluster<TCLusterSize> cluster;
   cluster.frameNumber = frame.header.frameNumber;
-
-  // define values to fill clusters with
-  DetectorValue value{1015u, 0u};
-  DetectorValue centerValue{1012u, 0u};
 
   // clear the frame
   std::fill(std::begin(cluster.data), std::end(cluster.data), 1010u);
@@ -217,13 +318,176 @@ void addClusters(Frame &frame, const std::vector<Point> &centers,
     for (unsigned int l = p.x - lower; l <= p.x + upper - 1; ++l) {
       for (unsigned int m = p.y - lower; m <= p.y + upper - 1; ++m) {
         if (l == p.x && m == p.y)
-          frame.data[m * frame.width + l] = value;
-        else
           frame.data[m * frame.width + l] = centerValue;
+        else
+          frame.data[m * frame.width + l] = value;
       }
     }
     clusters.push_back(cluster);
   }
+}
+
+// function to add clusters
+template <unsigned TCLusterSize>
+void addCluster(Frame &frame, Point center,
+                std::vector<Cluster<TCLusterSize>> &clusters) {
+  // init variables
+  static constexpr auto N = Cluster<TCLusterSize>::N;
+  const auto upper = N / 2 + (N % 2 > 0);
+  const auto lower = N / 2;
+  Cluster<TCLusterSize> cluster;
+  cluster.frameNumber = frame.header.frameNumber;
+
+  // clear the frame
+  std::fill(std::begin(cluster.data), std::end(cluster.data), 1010u);
+  cluster.data[(N / 2) * N + N / 2] = 1012u;
+
+  // insert clusters around centers
+  cluster.x = center.x;
+  cluster.y = center.y;
+  for (unsigned int l = center.x - lower; l <= center.x + upper - 1; ++l) {
+    for (unsigned int m = center.y - lower; m <= center.y + upper - 1; ++m) {
+      if (l == center.x && m == center.y)
+        frame.data[m * frame.width + l] = centerValue;
+      else
+        frame.data[m * frame.width + l] = value;
+    }
+  }
+  clusters.push_back(cluster);
+}
+
+template <unsigned TCLusterSize>
+void generateRandomCluster(std::string path, float clusterAmount,
+                           unsigned int frameCount = 10000,
+                           bool allowOverlapping = false) {
+  // open output file
+  std::ofstream out(path.c_str(), std::ios::binary);
+  if (!out.is_open()) {
+    std::cerr << "Couldn't open pedestal output file!\n";
+    return;
+  }
+
+  // iterate over frames
+  for (uint64_t frameNumber = 0; frameNumber < frameCount; ++frameNumber) {
+    // clear frame
+    Frame frame;
+    std::fill(std::begin(frame.data), std::end(frame.data), empty);
+    unsigned int clusterCount =
+        static_cast<unsigned int>(frame.width * frame.height * clusterAmount);
+
+    // add clusters
+    std::vector<Cluster<TCLusterSize>> clusters;
+    auto centers = makeRandomClusterCenters<TCLusterSize>(
+        frame.width, frame.height, clusterCount, allowOverlapping);
+    addClusters<TCLusterSize>(frame, centers, clusters);
+
+    // write ouptut
+    out.write(reinterpret_cast<char *>(&frame), sizeof(frame));
+  }
+
+  // close file
+  out.flush();
+  out.close();
+}
+
+template <int N>
+bool checkCluster(Point p, const Frame &f, bool allowOverlapping) {
+  // check boundary condition
+  if (p.x < N / 2 || p.x > Frame::width - N + (N % 2 > 0) || p.y < N / 2 ||
+      p.y > Frame::height - N / 2 + (N % 2 > 0))
+    return false;
+
+  // iterate over cluster
+  for (unsigned int y = p.y - N / 2; y < p.y + N / 2 + (N % 2 > 0); ++y) {
+    for (unsigned int x = p.x - N / 2; x < p.x + N / 2 + (N % 2 > 0); ++x) {
+      unsigned int idx = y * Frame::width + x;
+
+      // skip empty pixels
+      if (f.data[idx] == empty)
+        continue;
+
+      // other cluster center found
+      else if (f.data[idx] == centerValue)
+        return false;
+
+      // part of other cluster found
+      else if (f.data[idx] == value && !allowOverlapping)
+        return false;
+    }
+  }
+
+  // no other cluster found
+  return true;
+}
+
+/*
+class PRand {
+public:
+  PRand(int seed) : notRandom(seed) {}
+  int operator()() { return ++notRandom; }
+
+private:
+  int notRandom;
+};*/
+
+class PRand {
+public:
+  PRand(int seed) { gen.seed(seed); }
+  int operator()() { return gen(); }
+
+private:
+  std::mt19937 gen;
+};
+
+template <unsigned TCLusterSize>
+void generateRandomClusterFast(std::string path, float clusterAmount,
+                               unsigned int frameCount = 10000,
+                               bool allowOverlapping = false) {
+  // open output file
+  std::ofstream out(path.c_str(), std::ios::binary);
+  if (!out.is_open()) {
+    std::cerr << "Couldn't open pedestal output file!\n";
+    return;
+  }
+
+  PRand gen(0);
+  unsigned int clusterCount =
+      static_cast<unsigned int>(Frame::width * Frame::height * clusterAmount);
+  int pixelCount =
+      (Frame::width - TCLusterSize + 1) * (Frame::height - TCLusterSize + 1);
+
+  // iterate over frames
+  for (uint64_t frameNumber = 0; frameNumber < frameCount; ++frameNumber) {
+    // clear frame
+    Frame frame;
+    std::fill(std::begin(frame.data), std::end(frame.data), empty);
+    std::vector<Cluster<TCLusterSize>> clusters;
+
+    // add clusters
+    for (unsigned int c = 0; c < clusterCount; ++c) {
+      Point center;
+      // try at most 200 times to find a new cluster center
+      for (int i = 0; i < 1000; ++i) {
+        // randomly generate cluster center
+        unsigned int idx = gen() % pixelCount;
+        center.x = TCLusterSize / 2 + idx % (Frame::width - TCLusterSize + 1);
+        center.y = TCLusterSize / 2 + idx / (Frame::width - TCLusterSize + 1);
+
+        // check if the cluster center is valid
+        if (checkCluster<TCLusterSize>(center, frame, allowOverlapping)) {
+          addCluster<TCLusterSize>(frame, center, clusters);
+          break;
+        }
+      }
+    }
+
+    // write ouptut
+    out.write(reinterpret_cast<char *>(&frame), sizeof(frame));
+  }
+
+  // close file
+  out.flush();
+  out.close();
 }
 
 // cluster test data generator
@@ -241,10 +505,9 @@ void generateCluster(std::string path, float clusterAmount,
   for (uint64_t frameNumber = 0; frameNumber < frameCount; ++frameNumber) {
     // clear frame
     Frame frame;
-    DetectorValue empty{1000u, 0u};
     std::fill(std::begin(frame.data), std::end(frame.data), empty);
     unsigned int clusterCount =
-        static_cast<unsigned int>(1024 * 512 * clusterAmount);
+        static_cast<unsigned int>(Frame::width * Frame::height * clusterAmount);
 
     // add clusters
     std::vector<Cluster<TCLusterSize>> clusters;
@@ -262,11 +525,18 @@ void generateCluster(std::string path, float clusterAmount,
 }
 
 int main() {
-	//generateCalibration("/bigdata/hplsim/production/jungfrau-photoncounter/data_pool/synthetic/pede.bin");
-	//generateMainG0("/bigdata/hplsim/production/jungfrau-photoncounter/data_pool/synthetic/g0.bin", 10000);
-	//generateMainG13("/bigdata/hplsim/production/jungfrau-photoncounter/data_pool/synthetic/g13.bin", 10000);
-  generateCluster<3>("/bigdata/hplsim/production/jungfrau-photoncounter/data_pool/synthetic/cluster_0.bin", 0.f, 10000);
-  generateCluster<3>("/bigdata/hplsim/production/jungfrau-photoncounter/data_pool/synthetic/cluster_4.bin", 0.04f, 10000);
-  generateCluster<3>("/bigdata/hplsim/production/jungfrau-photoncounter/data_pool/synthetic/cluster_8.bin", 0.08f, 10000);
+  // generateCalibration("/bigdata/hplsim/production/jungfrau-photoncounter/data_pool/synthetic/pede.bin");
+  // generateMainG0("/bigdata/hplsim/production/jungfrau-photoncounter/data_pool/synthetic/g0.bin",
+  // 10000);
+  // generateMainG13("/bigdata/hplsim/production/jungfrau-photoncounter/data_pool/synthetic/g13.bin",
+  // 10000);
+  // generateCluster<3>("/bigdata/hplsim/production/jungfrau-photoncounter/data_pool/synthetic/cluster_0.bin",
+  // 0.f, 10000);
+  // generateCluster<3>("/bigdata/hplsim/production/jungfrau-photoncounter/data_pool/synthetic/cluster_4.bin",
+  // 0.04f, 10000);
+  // generateCluster<3>("/bigdata/hplsim/production/jungfrau-photoncounter/data_pool/synthetic/cluster_8.bin",
+  // 0.08f, 10000);
+  generateRandomClusterFast<3>("c8.bin", 0.08f, 2, false);
+  generateRandomClusterFast<3>("c8o.bin", 0.08f, 2, true);
   return 0;
 }
