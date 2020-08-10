@@ -91,7 +91,7 @@ template <typename Config, typename TAlpaka> struct DeviceData {
                   Config::SUM_FRAMES)),
           cluster(alpakaAlloc<typename Config::Cluster>(
               *device,
-              decltype(Config::MAX_CLUSTER_NUM)(Config::MAX_CLUSTER_NUM) *
+              decltype(Config::MAX_CLUSTER_NUM_USER)(Config::MAX_CLUSTER_NUM_USER) *
                   decltype(Config::GAINMAPS)(Config::DEV_FRAMES))),
           numClusters(alpakaAlloc<unsigned long long>(
               *device,
