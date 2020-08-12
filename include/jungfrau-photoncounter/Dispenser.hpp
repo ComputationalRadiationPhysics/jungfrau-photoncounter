@@ -441,9 +441,9 @@ private:
     for (std::size_t num = 0; num < deviceCount; ++num) {
       // initialize variables
       std::size_t selectedQueue = (num + moduleNumber * deviceCount);
-      devices.emplace_back(selectedQueue,
-                           &deviceContainer[(selectedQueue % maxQueues) /
-                                            TAlpaka::STREAMS_PER_DEV]);
+      devices.emplace_back(
+          selectedQueue,
+          &deviceContainer[selectedQueue / TAlpaka::STREAMS_PER_DEV]);
       alpakaCopy(devices[num].queue, devices[num].gain, gain.data,
                  decltype(TConfig::GAINMAPS)(TConfig::GAINMAPS));
 
