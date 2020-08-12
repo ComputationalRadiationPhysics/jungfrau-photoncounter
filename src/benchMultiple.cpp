@@ -19,7 +19,11 @@
 #ifdef ALPAKA_ACC_GPU_CUDA_ENABLED
 template <std::size_t TMapSize> using Accelerator = GpuCudaRt<TMapSize>;
 #else
+#ifdef ALPAKA_ACC_CPU_B_OMP2_T_SEQ_ENABLED
 template <std::size_t TMapSize> using Accelerator = CpuOmp2Blocks<TMapSize>;
+#else
+template <std::size_t TMapSize> using Accelerator = CpuSerial<TMapSize>;
+#endif
 #endif
 // CpuOmp2Blocks<MAPSIZE>;
 // CpuTbbRt<MAPSIZE>;

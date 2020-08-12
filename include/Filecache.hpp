@@ -58,7 +58,7 @@ public:
 
     FramePackage<TData, TAlpaka> maps(numFrames);
 
-    CpuSyncQueue streamBuf = alpakaGetHost<TAlpaka>();
+    CpuSyncQueue streamBuf = static_cast<CpuSyncQueue>(alpakaGetHost<TAlpaka>());
 
     TData *dataBuf = reinterpret_cast<TData *>(bufferPointer);
 

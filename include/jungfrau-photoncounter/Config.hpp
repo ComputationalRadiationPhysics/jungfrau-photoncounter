@@ -77,7 +77,7 @@ template <typename T, typename TAlpaka> struct FramePackage {
         return FramePackageView<T,
                                 TAlpaka,
                                 typename TAlpaka::template HostView<T>>(
-            data, offset, numFrames);
+            static_cast<typename TAlpaka::template HostView<T>>(data), offset, numFrames);
     }
 };
 // define void_t
