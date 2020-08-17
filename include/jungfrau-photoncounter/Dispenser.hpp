@@ -151,6 +151,10 @@ public:
     // pedestal map from the current device to all others
     distributeMaskMaps();
     distributeInitialPedestalMaps();
+
+    // signal that no clusters need to be downloaded
+    for (auto &d : devices)
+      d.clusterDownload = std::async(std::launch::async, []() {});
   }
 
   /**
@@ -165,7 +169,7 @@ public:
 
     // create handle for the device with the current version of the pedestal
     // maps
-    auto current_device = devices[source];
+    auto &current_device = devices[source];
 
     DEBUG("downloading pedestaldata from device", source);
 
@@ -193,7 +197,7 @@ public:
 
     // create handle for the device with the current version of the pedestal
     // maps
-    auto current_device = devices[source];
+    auto &current_device = devices[source];
     DEBUG("downloading pedestaldata from device", source);
 
     // get the pedestal data from the device
@@ -222,7 +226,7 @@ public:
 
     // create handle for the device with the current version of the pedestal
     // maps
-    auto current_device = devices[source];
+    auto &current_device = devices[source];
 
     // get the pedestal data from the device
     alpakaCopy(current_device.queue, mask, current_device.mask,
@@ -259,7 +263,7 @@ public:
 
     // create handle for the device with the current version of the pedestal
     // maps
-    auto current_device = devices[source];
+    auto &current_device = devices[source];
 
     // mask gain stage maps
     GainStageMaskingKernel<TConfig> gainStageMasking;
@@ -306,7 +310,7 @@ public:
 
     // create handle for the device with the current version of the pedestal
     // maps
-    auto current_device = devices[source];
+    auto &current_device = devices[source];
 
     // mask gain stage maps
     DriftMapKernel<TConfig> driftMapKernel;
@@ -646,6 +650,11 @@ private:
                              decltype(dev->maxValues)>
         maxValuesBuffer(maxValues, dev->maxValues, &dev->queue, numMaps);
 
+    // wait for clusters to be downloaded
+    auto prevDevice = (nextFull + devices.size() - 1) % devices.size();
+    if (clusters)
+      devices[prevDevice].clusterDownload.wait();
+
     // convert pointer to tl::optional
     tl::optional<ClusterView> optionalClusters;
     tl::optional<decltype(clusters->usedPinned)> optionalNumClusters;
@@ -670,7 +679,6 @@ private:
                            TConfig::SINGLEMAP);
 
     // copy offset data from last device uploaded to current device
-    auto prevDevice = (nextFull + devices.size() - 1) % devices.size();
     alpakaWait(dev->queue, devices[prevDevice].event);
     DEBUG("device", devices[prevDevice].id, "finished");
 
@@ -690,18 +698,36 @@ private:
 
     // download the data
     if (clusters) {
+
+      // download the number of found clusters
       clustersUsedBuffer.download();
+      typename TAlpaka::Event event(*dev->device);
+      alpakaEnqueueKernel(dev->queue, event);
 
-      // wait for completion of copy operations
-      alpakaWait(dev->queue);
-      auto clustersToDownload = alpakaNativePtr(clusters->usedPinned)[0];
-      clusters->used += clustersToDownload;
+      // download clusters asynchronously
+      dev->clusterDownload = std::async(
+          std::launch::async,
+          [dev, clusters](decltype(clustersUsedBuffer) &&clustersUsedBuffer,
+                          decltype(clusterBuffer) &&clusterBuffer,
+                          typename TAlpaka::Event &&event) {
+            // wait for completion of copy operations
+            // record event and then wait for is (this is more efficient
+            // than a synchronization since the synchronization is blocking)
+            alpakaWait(event);
 
-      DEBUG("Downloading ", clustersToDownload, "clusters (", clusters->used,
-            "in total). ");
+            // alpakaWait(dev->queue);
+            auto clustersToDownload = alpakaNativePtr(clusters->usedPinned)[0];
+            clusters->used += clustersToDownload;
 
-      clusterBuffer.resize(clustersToDownload);
-      clusterBuffer.download();
+            DEBUG("Downloading ", clustersToDownload, "clusters (",
+                  clusters->used, "in total) from device", dev->id);
+
+            clusterBuffer.resize(clustersToDownload);
+            clusterBuffer.download();
+          },
+          clustersUsedBuffer, clusterBuffer, event);
+
+      // dev->clusterDownload.wait();
     }
 
     energyBuffer.download();
@@ -714,11 +740,13 @@ private:
 
     auto wait = [](decltype(dev) dev) {
       alpakaWait(dev->queue);
+      dev->clusterDownload.wait();
       return true;
     };
 
     //! @todo: no need to return the numMaps here
-    return std::make_tuple(numMaps, std::async(std::launch::async, wait, dev));
+    return std::make_tuple(numMaps,
+                           std::async(std::launch::deferred, wait, dev));
   }
 
   template <typename TData, typename TOptionalEnergy, typename TOptionalPhoton,
