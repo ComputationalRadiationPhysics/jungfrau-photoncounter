@@ -669,10 +669,12 @@ private:
 
     // temporarily set clusterBuffer size to 0 because the correct number of
     // clusters to download is not yet known
-    typename GetDoubleBuffer<TAlpaka, ClusterView,
-                             decltype(dev->cluster)>::Buffer
-        clusterBuffer(optionalClusters, dev->cluster, &dev->queue,
-                      static_cast<std::size_t>(0));
+    using ClusterBufferType =
+        typename GetDoubleBuffer<TAlpaka, ClusterView,
+                                 decltype(dev->cluster)>::Buffer;
+    auto clusterBuffer = std::make_shared<ClusterBufferType>(
+        optionalClusters, dev->cluster, &dev->queue,
+        static_cast<std::size_t>(0));
     typename GetDoubleBuffer<TAlpaka, decltype(clusters->usedPinned),
                              decltype(dev->numClusters)>::Buffer
         clustersUsedBuffer(optionalNumClusters, dev->numClusters, &dev->queue,
@@ -691,7 +693,7 @@ private:
     // enqueue the kernels
     enqueueKernels(dev, numMaps, flags, dataBuffer.get(), energyBuffer.get(),
                    photonBuffer.get(), sumBuffer.get(), maxValuesBuffer.get(),
-                   clusterBuffer.get(), clustersUsedBuffer.get());
+                   clusterBuffer->get(), clustersUsedBuffer.get());
 
     // the event is used to wait for pedestal data
     alpakaEnqueueKernel(dev->queue, dev->event);
@@ -701,33 +703,20 @@ private:
 
       // download the number of found clusters
       clustersUsedBuffer.download();
-      typename TAlpaka::Event event(*dev->device);
-      alpakaEnqueueKernel(dev->queue, event);
 
-      // download clusters asynchronously
-      dev->clusterDownload = std::async(
-          std::launch::async,
-          [dev, clusters](decltype(clustersUsedBuffer) &&clustersUsedBuffer,
-                          decltype(clusterBuffer) &&clusterBuffer,
-                          typename TAlpaka::Event &&event) {
-            // wait for completion of copy operations
-            // record event and then wait for is (this is more efficient
-            // than a synchronization since the synchronization is blocking)
-            alpakaWait(event);
+      auto l = [dev, clusters, clusterBuffer]() {
+        auto clustersToDownload = alpakaNativePtr(clusters->usedPinned)[0];
+        clusters->used += clustersToDownload;
 
-            // alpakaWait(dev->queue);
-            auto clustersToDownload = alpakaNativePtr(clusters->usedPinned)[0];
-            clusters->used += clustersToDownload;
+        DEBUG("Downloading ", clustersToDownload, "clusters (", clusters->used,
+              "in total) from device", dev->id);
 
-            DEBUG("Downloading ", clustersToDownload, "clusters (",
-                  clusters->used, "in total) from device", dev->id);
+        clusterBuffer->resize(clustersToDownload);
+        clusterBuffer->download();
+      };
 
-            clusterBuffer.resize(clustersToDownload);
-            clusterBuffer.download();
-          },
-          clustersUsedBuffer, clusterBuffer, event);
-
-      // dev->clusterDownload.wait();
+      // enqueue download of actual cluster data
+      alpakaEnqueueKernel(dev->queue, l);
     }
 
     energyBuffer.download();

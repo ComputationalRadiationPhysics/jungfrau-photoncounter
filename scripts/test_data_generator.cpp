@@ -432,12 +432,28 @@ private:
 
 class PRand {
 public:
+  PRand(int seed) : n(seed) {}
+  int operator()() {
+    n = (multiplier * n + increment) % modulo;
+    return n;
+  }
+
+private:
+  int n;
+
+  static constexpr uint32_t modulo = 512 * 1024;
+  static constexpr uint32_t multiplier = 5;
+  static constexpr uint32_t increment = 1;
+};
+
+/*class PRand {
+public:
   PRand(int seed) { gen.seed(seed); }
   int operator()() { return gen(); }
 
 private:
   std::mt19937 gen;
-};
+};*/
 
 template <unsigned TCLusterSize>
 void generateRandomClusterFast(std::string path, float clusterAmount,
@@ -466,8 +482,9 @@ void generateRandomClusterFast(std::string path, float clusterAmount,
     // add clusters
     for (unsigned int c = 0; c < clusterCount; ++c) {
       Point center;
-      // try at most 200 times to find a new cluster center
-      for (int i = 0; i < 1000; ++i) {
+      bool added_successfully = false;
+      // try at most 1000 times to find a new cluster center
+      for (int i = 0; i < 1024; ++i) {
         // randomly generate cluster center
         unsigned int idx = gen() % pixelCount;
         center.x = TCLusterSize / 2 + idx % (Frame::width - TCLusterSize + 1);
@@ -476,9 +493,13 @@ void generateRandomClusterFast(std::string path, float clusterAmount,
         // check if the cluster center is valid
         if (checkCluster<TCLusterSize>(center, frame, allowOverlapping)) {
           addCluster<TCLusterSize>(frame, center, clusters);
+          added_successfully = true;
           break;
         }
       }
+
+      if (!added_successfully)
+        std::cout << "Couldn't place cluster\n";
     }
 
     // write ouptut
@@ -536,7 +557,72 @@ int main() {
   // 0.04f, 10000);
   // generateCluster<3>("/bigdata/hplsim/production/jungfrau-photoncounter/data_pool/synthetic/cluster_8.bin",
   // 0.08f, 10000);
-  generateRandomClusterFast<3>("c8.bin", 0.08f, 2, false);
-  generateRandomClusterFast<3>("c8o.bin", 0.08f, 2, true);
+
+  // generate random overlapping clusters
+  /*generateRandomClusterFast<3>(
+      "/bigdata/hplsim/production/jungfrau-photoncounter/data_pool/synthetic/"
+      "random_clusters_overlapping/cluster_0.bin",
+      0.f, 10000, true);
+  generateRandomClusterFast<3>(
+      "/bigdata/hplsim/production/jungfrau-photoncounter/data_pool/synthetic/"
+      "random_clusters_overlapping/cluster_1.bin",
+      0.01f, 10000, true);
+  generateRandomClusterFast<3>(
+      "/bigdata/hplsim/production/jungfrau-photoncounter/data_pool/synthetic/"
+      "random_clusters_overlapping/cluster_2.bin",
+      0.02f, 10000, true);
+  generateRandomClusterFast<3>(
+      "/bigdata/hplsim/production/jungfrau-photoncounter/data_pool/synthetic/"
+      "random_clusters_overlapping/cluster_3.bin",
+      0.03f, 10000, true);
+  generateRandomClusterFast<3>(
+      "/bigdata/hplsim/production/jungfrau-photoncounter/data_pool/synthetic/"
+      "random_clusters_overlapping/cluster_4.bin",
+      0.04f, 10000, true);
+  generateRandomClusterFast<3>(
+      "/bigdata/hplsim/production/jungfrau-photoncounter/data_pool/synthetic/"
+      "random_clusters_overlapping/cluster_5.bin",
+      0.05f, 10000, true);
+  generateRandomClusterFast<3>(
+      "/bigdata/hplsim/production/jungfrau-photoncounter/data_pool/synthetic/"
+      "random_clusters_overlapping/cluster_6.bin",
+      0.06f, 10000, true);
+  generateRandomClusterFast<3>(
+      "/bigdata/hplsim/production/jungfrau-photoncounter/data_pool/synthetic/"
+      "random_clusters_overlapping/cluster_7.bin",
+      0.07f, 10000, true);
+  generateRandomClusterFast<3>(
+      "/bigdata/hplsim/production/jungfrau-photoncounter/data_pool/synthetic/"
+      "random_clusters_overlapping/cluster_8.bin",
+      0.08f, 10000, true);
+
+  // generate random non-overlapping clusters
+  generateRandomClusterFast<3>(
+      "/bigdata/hplsim/production/jungfrau-photoncounter/data_pool/synthetic/"
+      "random_clusters/cluster_4.bin",
+      0.04f, 10000, false);*/
+  /*generateRandomClusterFast<3>(
+      "/bigdata/hplsim/production/jungfrau-photoncounter/data_pool/synthetic/"
+      "random_clusters/cluster_8.bin",
+      0.08f, 2, false);*/
+
+  // generate test data for other cluster sizes
+  generateRandomClusterFast<2>(
+      "/bigdata/hplsim/production/jungfrau-photoncounter/data_pool/synthetic/"
+      "random_clusters_overlapping/cluster2.bin",
+      0.0075f, 10000, true);
+  generateRandomClusterFast<3>(
+      "/bigdata/hplsim/production/jungfrau-photoncounter/data_pool/synthetic/"
+      "random_clusters_overlapping/cluster3.bin",
+      0.0075f, 10000, true);
+  generateRandomClusterFast<7>(
+      "/bigdata/hplsim/production/jungfrau-photoncounter/data_pool/synthetic/"
+      "random_clusters_overlapping/cluster7.bin",
+      0.0075f, 10000, true);
+  generateRandomClusterFast<11>(
+      "/bigdata/hplsim/production/jungfrau-photoncounter/data_pool/synthetic/"
+      "random_clusters_overlapping/cluster11.bin",
+      0.0075f, 10000, true);
+
   return 0;
 }

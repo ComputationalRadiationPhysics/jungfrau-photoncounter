@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=OpenMP_Run_detailed
-#SBATCH --partition=intel_32
+#SBATCH --partition=defq
 #SBATCH --time=8:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
