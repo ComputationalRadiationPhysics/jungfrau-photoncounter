@@ -85,9 +85,10 @@ template <std::size_t MAPSIZE> struct CpuTbbBlocks {
   using HostView = alpaka::mem::view::ViewSubView<DevHost, T, Dim, Size>;
 
   static constexpr std::size_t STREAMS_PER_DEV = 1u;
-  static constexpr Size elementsPerThread = 1u;
+  static constexpr Size elementsPerThread = 8u;
   static constexpr Size threadsPerBlock = 1u;
-  static constexpr Size blocksPerGrid = MAPSIZE;
+  static constexpr Size blocksPerGrid =
+      (MAPSIZE + elementsPerThread) / elementsPerThread;
 };
 
 template <typename T, typename TBuf, typename... TArgs>
@@ -115,7 +116,7 @@ template <typename THost, typename TAcc, typename TQueue> struct AccTraits {
     using HostView = alpaka::mem::view::ViewSubView<DevHost, T, Dim, Size>;
 };
 */
-  
+
 #ifdef ALPAKA_ACC_CPU_B_OMP2_T_SEQ_ENABLED
 #ifdef ALPAKA_ACC_CPU_B_SEQ_T_SEQ_ENABLED
 //#############################################################################
@@ -141,9 +142,10 @@ template <std::size_t MAPSIZE> struct CpuOmp2Blocks {
   using HostView = alpaka::mem::view::ViewSubView<DevHost, T, Dim, Size>;
 
   static constexpr std::size_t STREAMS_PER_DEV = 1;
-  static constexpr Size elementsPerThread = 256u;
+  static constexpr Size elementsPerThread = 1920u;
   static constexpr Size threadsPerBlock = 1u;
-  static constexpr Size blocksPerGrid = (MAPSIZE + 255) / 256;
+  static constexpr Size blocksPerGrid =
+      (MAPSIZE + elementsPerThread - 1) / elementsPerThread;
 };
 
 template <typename T, typename TBuf, typename... TArgs>
@@ -179,9 +181,10 @@ template <std::size_t MAPSIZE> struct CpuOmp4 {
   using HostView = alpaka::mem::view::ViewSubView<DevHost, T, Dim, Size>;
 
   static constexpr std::size_t STREAMS_PER_DEV = 1u;
-  static constexpr Size elementsPerThread = 1u;
+  static constexpr Size elementsPerThread = 8u;
   static constexpr Size threadsPerBlock = 1u;
-  static constexpr Size blocksPerGrid = MAPSIZE;
+  static constexpr Size blocksPerGrid =
+      (MAPSIZE + elementsPerThread - 1) / elementsPerThread;
 };
 
 template <typename T, typename TBuf, typename... TArgs>
@@ -215,9 +218,10 @@ template <std::size_t MAPSIZE> struct CpuSerial {
   using HostView = alpaka::mem::view::ViewSubView<DevHost, T, Dim, Size>;
 
   static constexpr std::size_t STREAMS_PER_DEV = 1;
-  static constexpr Size elementsPerThread = 256u;
+  static constexpr Size elementsPerThread = 1920u;
   static constexpr Size threadsPerBlock = 1u;
-  static constexpr Size blocksPerGrid = (MAPSIZE + 255) / 256;
+  static constexpr Size blocksPerGrid =
+      (MAPSIZE + elementsPerThread - 1) / elementsPerThread;
 };
 
 template <typename T, typename TBuf, typename... TArgs>
@@ -251,9 +255,10 @@ template <std::size_t MAPSIZE> struct CpuThreads {
   using HostView = alpaka::mem::view::ViewSubView<DevHost, T, Dim, Size>;
 
   static constexpr std::size_t STREAMS_PER_DEV = 1;
-  static constexpr Size elementsPerThread = 1u;
+  static constexpr Size elementsPerThread = 8u;
   static constexpr Size threadsPerBlock = 1u;
-  static constexpr Size blocksPerGrid = MAPSIZE;
+  static constexpr Size blocksPerGrid =
+      (MAPSIZE + elementsPerThread - 1) / elementsPerThread;
 };
 
 template <typename T, typename TBuf, typename... TArgs>
@@ -290,7 +295,8 @@ template <std::size_t MAPSIZE> struct GpuCudaRt {
   static constexpr std::size_t STREAMS_PER_DEV = 3;
   static constexpr Size elementsPerThread = 1u;
   static constexpr Size threadsPerBlock = 256;
-  static constexpr Size blocksPerGrid = (MAPSIZE + 255) / 256;
+  static constexpr Size blocksPerGrid =
+      (MAPSIZE + threadsPerBlock - 1) / threadsPerBlock;
 };
 
 template <typename T, typename TBuf, typename... TArgs>
@@ -319,7 +325,8 @@ template <std::size_t MAPSIZE> struct GpuCudaRtSync {
   static constexpr std::size_t STREAMS_PER_DEV = 1;
   static constexpr Size elementsPerThread = 1u;
   static constexpr Size threadsPerBlock = 256;
-  static constexpr Size blocksPerGrid = (MAPSIZE + 255) / 256;
+  static constexpr Size blocksPerGrid =
+      (MAPSIZE + threadsPerBlock - 1) / threadsPerBlock;
 };
 #endif
 #endif
@@ -351,7 +358,8 @@ template <std::size_t MAPSIZE> struct GpuHipRt {
   static constexpr std::size_t STREAMS_PER_DEV = 3;
   static constexpr Size elementsPerThread = 1u;
   static constexpr Size threadsPerBlock = 256;
-  static constexpr Size blocksPerGrid = (MAPSIZE + 255) / 256;
+  static constexpr Size blocksPerGrid =
+      (MAPSIZE + threadsPerBlock - 1) / threadsPerBlock;
 };
 
 template <typename T, typename TBuf, typename... TArgs>

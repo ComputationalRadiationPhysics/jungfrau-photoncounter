@@ -166,6 +166,15 @@ ALPAKA_FN_ACC ALPAKA_FN_INLINE static auto alpakaAtomicAdd(TArgs &&... args)
       std::forward<TArgs>(args)...);
 }
 
+// rename alpaka atomic max
+template <typename... TArgs>
+ALPAKA_FN_ACC ALPAKA_FN_INLINE static auto alpakaAtomicMax(TArgs &&... args)
+    -> decltype(alpaka::atomic::atomicOp<alpaka::atomic::op::Max>(
+        std::forward<TArgs>(args)...)) {
+  return alpaka::atomic::atomicOp<alpaka::atomic::op::Max>(
+      std::forward<TArgs>(args)...);
+}
+
 // rename alpaka shared memory
 template <typename TData, typename... TArgs>
 ALPAKA_FN_ACC ALPAKA_FN_INLINE static auto alpakaSharedMemory(TArgs &&... args)

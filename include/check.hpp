@@ -50,7 +50,6 @@ bool checkResult(tl::optional<T> result, std::string referencePath) {
   reference_file.read(reinterpret_cast<char *>(alpakaNativePtr(reference.data)),
                       dataSize);
   std::size_t readBytes = reference_file.gcount();
-
   if (reference_file.bad() || reference_file.fail()) {
     std::cerr << "Read failed!\n";
     return false;
@@ -67,9 +66,18 @@ bool checkResult(tl::optional<T> result, std::string referencePath) {
   // compare data
   bool exactly_identical = true;
   bool very_close = true;
-  int closeCount = 0;
-  int oneCount = 0;
+  std::size_t closeCount = 0;
+  std::size_t oneCount = 0;
   for (std::size_t frameNumber = 0; frameNumber < extent; ++frameNumber) {
+    // check header
+    if (alpakaNativePtr(result->data)[frameNumber].header.frameNumber !=
+            alpakaNativePtr(reference.data)[frameNumber].header.frameNumber &&
+        alpakaNativePtr(result->data)[frameNumber].header.bunchId !=
+            alpakaNativePtr(reference.data)[frameNumber].header.bunchId) {
+      std::cout << "Header mismatch in frame " << frameNumber << "\n";
+      return false;
+    }
+
     for (std::size_t index = 0; index < mapSize; ++index) {
       // check if data is exactly identical
       if (alpakaNativePtr(result->data)[frameNumber].data[index] !=

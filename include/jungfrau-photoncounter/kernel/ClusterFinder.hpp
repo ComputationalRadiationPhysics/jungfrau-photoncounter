@@ -1,6 +1,7 @@
 #pragma once
-#include "helpers.hpp"
 #include "Config.hpp"
+#include "ForEach.hpp"
+#include "helpers.hpp"
 
 // original implementation
 template <typename Config, typename AccConfig> struct ClusterFinderKernel {
@@ -17,24 +18,15 @@ template <typename Config, typename AccConfig> struct ClusterFinderKernel {
       TNumClusters *const numClusters, TMask *const mask,
       TNumFrames const numFrames, TCurrentFrame const currentFrame,
       bool pedestalFallback, TNumStdDevs const c = Config::C) const -> void {
-    unsigned long globalId = getLinearIdx(acc);
-    unsigned long elementsPerThread = AccConfig::elementsPerThread;
 
     constexpr auto n = Config::CLUSTER_SIZE;
 
-    // iterate over all elements in the thread
-    for (auto id = globalId * elementsPerThread;
-         id < (globalId + 1) * elementsPerThread; ++id) {
-
-      // check range
-      if (id >= Config::MAPSIZE)
-        return;
-      
+    auto clusterLambda = [&](const uint64_t id) {
       if (currentFrame) {
         auto adc = getAdc(detectorData[currentFrame - 1].data[id]);
         const auto &gainStage = gainStageMaps[currentFrame - 1].data[id];
         float sum;
-        decltype(id) max;
+        uint64_t max;
         const auto &energy = energyMaps[currentFrame - 1].data[id];
         const auto &stddev = initPedestalMaps[gainStage][id].stddev;
         if (indexQualifiesAsClusterCenter<Config>(id)) {
@@ -54,11 +46,22 @@ template <typename Config, typename AccConfig> struct ClusterFinderKernel {
         }
       }
 
-      if (currentFrame < numFrames)
+      if (currentFrame < numFrames) {
+        // first thread copies frame header to output
+        if (getLinearIdx(acc) == 0) {
+          copyFrameHeader(detectorData[currentFrame], energyMaps[currentFrame]);
+          copyFrameHeader(detectorData[currentFrame],
+                          gainStageMaps[currentFrame]);
+        }
+
         processInput(acc, detectorData[currentFrame], gainMaps, pedestalMaps,
                      initPedestalMaps, gainStageMaps[currentFrame],
                      energyMaps[currentFrame], mask, id, pedestalFallback);
-    }
+      }
+    };
+
+    // execute double loop to take advantage of SIMD
+    forEach(getLinearIdx(acc), AccConfig::elementsPerThread, Config::MAPSIZE,
+            clusterLambda);
   }
 };
-

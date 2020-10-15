@@ -163,7 +163,7 @@ public:
    */
   auto downloadPedestaldata()
       -> FramePackage<typename TConfig::PedestalMap, TAlpaka> {
-    //! @todo: find a more beautifil solution than this
+    //! @todo: find a more beautiful solution than this
     // get current device number
     uint64_t source = (nextFull + devices.size() - 1) % devices.size();
 
@@ -693,10 +693,7 @@ private:
     // enqueue the kernels
     enqueueKernels(dev, numMaps, flags, dataBuffer.get(), energyBuffer.get(),
                    photonBuffer.get(), sumBuffer.get(), maxValuesBuffer.get(),
-                   clusterBuffer->get(), clustersUsedBuffer.get());
-
-    // the event is used to wait for pedestal data
-    alpakaEnqueueKernel(dev->queue, dev->event);
+                   clusterBuffer.get()->get(), clustersUsedBuffer.get());
 
     // download the data
     if (clusters) {
@@ -704,7 +701,9 @@ private:
       // download the number of found clusters
       clustersUsedBuffer.download();
 
-      auto l = [dev, clusters, clusterBuffer]() {
+      /* TODO: unfortunately this deadlocks with the CUDA backend
+      // enqueue download of actual cluster data
+      alpakaEnqueueKernel(dev->queue, [dev, clusters, clusterBuffer]() {
         auto clustersToDownload = alpakaNativePtr(clusters->usedPinned)[0];
         clusters->used += clustersToDownload;
 
@@ -712,12 +711,43 @@ private:
               "in total) from device", dev->id);
 
         clusterBuffer->resize(clustersToDownload);
-        clusterBuffer->download();
-      };
 
-      // enqueue download of actual cluster data
-      alpakaEnqueueKernel(dev->queue, l);
+        DEBUG("Resizing");
+
+        clusterBuffer->download();
+        DEBUG("Download finished");
+      });*/
+
+      typename TAlpaka::Event event(*dev->device);
+      alpakaEnqueueKernel(dev->queue, event);
+
+      // download clusters asynchronously
+      dev->clusterDownload = std::async(
+          std::launch::async,
+          [dev, clusters](decltype(clusterBuffer) &&clusterBuffer,
+                          typename TAlpaka::Event &&event) {
+            // wait for completion of copy operations
+            // record event and then wait for is (this is more efficient
+            // than a synchronization since the synchronization is blocking)
+            alpakaWait(event);
+
+            auto clustersToDownload = alpakaNativePtr(clusters->usedPinned)[0];
+            clusters->used += clustersToDownload;
+
+            DEBUG("Downloading ", clustersToDownload, "clusters (",
+                  clusters->used, "in total) from device", dev->id);
+
+            clusterBuffer->resize(clustersToDownload);
+            clusterBuffer->download();
+          },
+          clusterBuffer, event);
     }
+
+    DEBUG("Enqueueing event");
+
+    // the event is used to wait for pedestal data and the cluster array
+    // resizing
+    alpakaEnqueueKernel(dev->queue, dev->event);
 
     energyBuffer.download();
     photonBuffer.download();
@@ -777,11 +807,17 @@ private:
       alpakaEnqueueKernel(dev->queue, photonFinder);
     } else {
       // clustering (and conversion to energy)
-      DEBUG("enqueueing clustering kernel");
+      // DEBUG("enqueueing clustering kernel");
+
+      // synchronize();
+      // DEBUG("memset");
 
       // reset the number of clusters
       alpakaMemSet(dev->queue, usedClusters, 0,
                    decltype(TConfig::SINGLEMAP)(TConfig::SINGLEMAP));
+
+      // synchronize();
+      // DEBUG("start kernel");
 
       for (uint32_t i = 0; i < numMaps + 1; ++i) {
         // execute the clusterfinder with the pedestal update on every
@@ -796,7 +832,12 @@ private:
             alpakaNativePtr(usedClusters), local_mask, dev->numMaps, i,
             pedestalFallback));
 
+        // DEBUG("enqueue");
+
         alpakaEnqueueKernel(dev->queue, clusterFinder);
+
+        // synchronize();
+        // DEBUG("ran");
       }
     }
 

@@ -31,6 +31,14 @@ constexpr DetectorValue empty{1000u, 0u};
 struct FrameHeader {
   std::uint64_t frameNumber;
   std::uint64_t bunchId;
+
+  //! @todo: remove this later; only for alignment performance tests
+  //std::uint64_t dummy1;
+  //std::uint64_t dummy2;
+  //std::uint64_t dummy3;
+  //std::uint64_t dummy4;
+  //std::uint64_t dummy5;
+  //std::uint64_t dummy6;
 };
 
 // frame struct
@@ -607,7 +615,7 @@ int main() {
       0.08f, 2, false);*/
 
   // generate test data for other cluster sizes
-  generateRandomClusterFast<2>(
+  /*generateRandomClusterFast<2>(
       "/bigdata/hplsim/production/jungfrau-photoncounter/data_pool/synthetic/"
       "random_clusters_overlapping/cluster2.bin",
       0.0075f, 10000, true);
@@ -623,6 +631,10 @@ int main() {
       "/bigdata/hplsim/production/jungfrau-photoncounter/data_pool/synthetic/"
       "random_clusters_overlapping/cluster11.bin",
       0.0075f, 10000, true);
-
+  */
+  
+  generateRandomClusterFast<3>(
+      "/bigdata/hplsim/production/jungfrau-photoncounter/data_pool/synthetic/nonalign3.bin",
+      0.0075f, 10000, true);
   return 0;
 }

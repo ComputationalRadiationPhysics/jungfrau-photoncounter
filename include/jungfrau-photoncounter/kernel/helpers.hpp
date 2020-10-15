@@ -165,12 +165,6 @@ processInput(TAcc const &acc, TDetectorData const &detectorData,
   auto &gainStage = gainStageMap.data[id];
   gainStage = getGainStage(dataword);
 
-  // first thread copies frame header to output maps
-  if (id == 0) {
-    copyFrameHeader(detectorData, energyMap);
-    copyFrameHeader(detectorData, gainStageMap);
-  }
-
   const auto &pedestal =
       (pedestalFallback ? initPedestalMaps[gainStage][id].mean
                         : pedestalMaps[gainStage][id]);

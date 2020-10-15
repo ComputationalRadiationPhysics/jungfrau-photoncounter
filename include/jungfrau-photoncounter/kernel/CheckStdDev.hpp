@@ -1,4 +1,5 @@
 #pragma once
+#include "ForEach.hpp"
 #include "helpers.hpp"
 
 template <typename Config> struct CheckStdDevKernel {
@@ -8,21 +9,15 @@ template <typename Config> struct CheckStdDevKernel {
                                 TInitPedestalMap const *const initPedestalMap,
                                 TMaskMap *const mask,
                                 TRmsThreshold const threshold) const -> void {
-    auto globalId = getLinearIdx(acc);
-    auto elementsPerThread = getLinearElementExtent(acc);
-
-    // iterate over all elements in the thread
-    for (auto id = globalId * elementsPerThread;
-         id < (globalId + 1) * elementsPerThread; ++id) {
-
-      // check range
-      if (id >= Config::MAPSIZE)
-        break;
-
+    auto stddevCheckLambda = [&](const uint64_t id) {
       // check if measured RMS exceeds threshold
       if (initPedestalMap[0][id].stddev >
           threshold * threshold * Config::MOVING_STAT_WINDOW_SIZE)
         mask->data[id] = false;
-    }
+    };
+
+    // execute double loop to take advantage of SIMD
+    forEach(getLinearIdx(acc), getLinearElementExtent(acc), Config::MAPSIZE,
+            stddevCheckLambda);
   }
 };

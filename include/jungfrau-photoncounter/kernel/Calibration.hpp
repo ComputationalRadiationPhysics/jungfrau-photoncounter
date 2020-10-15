@@ -1,4 +1,5 @@
 #pragma once
+#include "ForEach.hpp"
 #include "helpers.hpp"
 
 template <typename Config> struct CalibrationKernel {
@@ -11,16 +12,7 @@ template <typename Config> struct CalibrationKernel {
              TNumFrames const numFrames) const -> void {
     constexpr auto PEDEMAPS = Config::PEDEMAPS;
 
-    auto globalId = getLinearIdx(acc);
-    auto elementsPerThread = getLinearElementExtent(acc);
-
-    // iterate over all elements in the thread
-    for (auto id = globalId * elementsPerThread;
-         id < (globalId + 1) * elementsPerThread; ++id) {
-      // check range
-      if (id >= Config::MAPSIZE)
-        break;
-
+    auto calibrationLambda = [&](const uint64_t id) {
       const std::size_t FRAMESPERSTAGE[] = {Config::FRAMESPERSTAGE_G0,
                                             Config::FRAMESPERSTAGE_G1,
                                             Config::FRAMESPERSTAGE_G2};
@@ -32,8 +24,8 @@ template <typename Config> struct CalibrationKernel {
           expectedGainStage = i;
           break;
         }
-      }      
-      
+      }
+
       // determine expected gain stage
       for (TNumFrames i = 0; i < numFrames; ++i) {
         if (initPedestalMap[expectedGainStage][id].count ==
@@ -68,6 +60,10 @@ template <typename Config> struct CalibrationKernel {
           mask->data[id] = false;
         }
       }
-    }
+    };
+
+    // execute double loop to take advantage of SIMD
+    forEach(getLinearIdx(acc), getLinearElementExtent(acc), Config::MAPSIZE,
+            calibrationLambda);
   }
 };
