@@ -62,8 +62,22 @@ template <typename Config> struct CalibrationKernel {
       }
     };
 
+    // doesn't work with SIMD because of dependencies between frames
     // execute double loop to take advantage of SIMD
-    forEach(getLinearIdx(acc), getLinearElementExtent(acc), Config::MAPSIZE,
-            calibrationLambda);
+    // forEach(getLinearIdx(acc), getLinearElementExtent(acc), Config::MAPSIZE,
+    //        calibrationLambda);
+
+    // iterate over whole extent
+    uint32_t const iterationExtent = std::min(
+        getLinearElementExtent(acc),
+        Config::MAPSIZE - getLinearIdx(acc) * getLinearElementExtent(acc));
+
+    for (uint32_t i = 0u; i < iterationExtent; ++i) {
+      uint32_t const localIdx =
+          getLinearIdx(acc) * getLinearElementExtent(acc) + i;
+
+      // call functor
+      calibrationLambda(localIdx);
+    }
   }
 };

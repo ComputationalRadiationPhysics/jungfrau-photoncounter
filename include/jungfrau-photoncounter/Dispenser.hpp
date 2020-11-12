@@ -343,34 +343,83 @@ public:
                typename TConfig::template ClusterArray<TAlpaka> *clusters,
                bool flushWhenFinished = true)
       -> std::tuple<std::size_t, std::future<bool>> {
-    // try uploading one data package
-    if (offset + TConfig::DEV_FRAMES <= data.numFrames) {
 
-      //! @todo: combine these two cases
-      auto dataView = data.getView(offset, TConfig::DEV_FRAMES);
+    uint32_t uploadOffset = offset;
+    // try uploading a data package to every device
+    for (uint32_t i = 0; i < devices.size() && uploadOffset < data.numFrames;
+         ++i) {
 
-      auto result = processData(dataView, TConfig::DEV_FRAMES, flags, energy,
-                                photon, sum, maxValues, clusters);
-      offset += std::get<0>(result);
-      DEBUG(offset, "/", data.numFrames, "frames uploaded");
+      // create data view
+      uint32_t framesToProcess =
+          std::min(TConfig::DEV_FRAMES, data.numFrames - uploadOffset);
+      auto dataView = data.getView(uploadOffset, framesToProcess);
 
-      return std::make_tuple(std::move(offset), std::move(std::get<1>(result)));
+      // get current device
+      uint32_t current_device = (nextFree + i) % devices.size();
+      DeviceData<TConfig, TAlpaka> *dev = &devices[current_device];
+
+      DEBUG("Uploading", framesToProcess, "frames to device", current_device);
+
+      // create a shadow buffer on the device and upload data if required
+      FramePackageDoubleBuffer<TAlpaka, decltype(dataView), decltype(dev->data)>
+          dataBuffer(dataView, dev->data, &dev->queue, framesToProcess);
+      dataBuffer.upload();
+
+      uploadOffset += framesToProcess;
     }
-    // upload remaining frames
-    else if (offset != data.numFrames) {
 
-      auto dataView =
-          data.getView(offset, data.numFrames % TConfig::DEV_FRAMES);
+    uint64_t sum_offset = 0;
+    uint64_t view_offset = 0;
+
+    // start processing
+    for (uint32_t i = 0; i < devices.size() && offset < data.numFrames; ++i) {
+      // create data view
+      uint32_t framesToProcess =
+          std::min(TConfig::DEV_FRAMES, data.numFrames - offset);
+      uint64_t sumFrames =
+          (framesToProcess + TConfig::SUM_FRAMES - 1) / TConfig::SUM_FRAMES;
+
+      // define views
+      auto dataView = data.getView(offset, framesToProcess);
+      auto energy_view([&]() -> tl::optional<TFramePackageEnergyMap> {
+        if (energy)
+          return energy->getView(view_offset, framesToProcess);
+        return tl::nullopt;
+      }());
+      auto photon_view([&]() -> tl::optional<TFramePackagePhotonMap> {
+        if (photon)
+          return photon->getView(view_offset, framesToProcess);
+        return tl::nullopt;
+      }());
+      auto sum_view([&]() -> tl::optional<TFramePackageSumMap> {
+        if (sum)
+          return sum->getView(sum_offset, sumFrames);
+        return tl::nullopt;
+      }());
+      auto maxValues_view([&]() -> tl::optional<TFramePackageEnergyValue> {
+        if (maxValues)
+          return maxValues->getView(view_offset, framesToProcess);
+        return tl::nullopt;
+      }());
+
+      DEBUG("Processing", framesToProcess, "frames");
+
+      // process data
       auto result =
-          processData(dataView, data.numFrames % TConfig::DEV_FRAMES, flags,
-                      energy, photon, sum, maxValues, clusters);
-      DEBUG(offset, "/", data.numFrames, "frames uploaded");
+          processData(dataView, framesToProcess, flags, energy_view,
+                      photon_view, sum_view, maxValues_view, clusters);
+
+      // update offsets
       offset += std::get<0>(result);
-      return std::make_tuple(std::move(offset), std::move(std::get<1>(result)));
+      view_offset += std::get<0>(result);
+      sum_offset +=
+          (std::get<0>(result) + TConfig::SUM_FRAMES - 1) / TConfig::SUM_FRAMES;
+      DEBUG(offset, "/", data.numFrames, "frames processed");
     }
+
     // force wait for one device to finish since there's no new data and
     // the user wants the data flushed
-    else if (flushWhenFinished) {
+    if (flushWhenFinished) {
       DEBUG("flushing ...");
 
       flush();
@@ -443,11 +492,22 @@ private:
     devices.reserve(deviceCount);
 
     for (std::size_t num = 0; num < deviceCount; ++num) {
+
+      DEBUG("Initializing device #", num);
+
       // initialize variables
       std::size_t selectedQueue = (num + moduleNumber * deviceCount);
       devices.emplace_back(
           selectedQueue,
           &deviceContainer[selectedQueue / TAlpaka::STREAMS_PER_DEV]);
+
+      // init cluster data to 0
+      alpakaMemSet(devices[num].queue, devices[num].cluster, 0,
+                   decltype(TConfig::MAX_CLUSTER_NUM_USER)(
+                       TConfig::MAX_CLUSTER_NUM_USER) *
+                       decltype(TConfig::DEV_FRAMES)(TConfig::DEV_FRAMES));
+
+      // copy gain maps to device
       alpakaCopy(devices[num].queue, devices[num].gain, gain.data,
                  decltype(TConfig::GAINMAPS)(TConfig::GAINMAPS));
 
@@ -456,15 +516,6 @@ private:
           getWorkDiv<TAlpaka>(), gainmapInversionKernel,
           alpakaNativePtr(devices[num].gain)));
       alpakaEnqueueKernel(devices[num].queue, gainmapInversion);
-
-      // init cluster data to 0
-      alpakaMemSet(devices[num].queue, devices[num].cluster, 0,
-                   decltype(TConfig::MAX_CLUSTER_NUM_USER)(
-                       TConfig::MAX_CLUSTER_NUM_USER) *
-                       decltype(TConfig::DEV_FRAMES)(TConfig::DEV_FRAMES));
-
-      // wait until everything is finished
-      alpakaWait(devices[num].queue);
 
       // place the initialized device into a ringbuffer
       if (!ringbuffer.push(&devices[num])) {
@@ -635,7 +686,7 @@ private:
     FramePackageDoubleBuffer<TAlpaka, TFramePackageDetectorData,
                              decltype(dev->data)>
         dataBuffer(data, dev->data, &dev->queue, numMaps);
-    dataBuffer.upload();
+    // dataBuffer.upload();
 
     // create shadow buffers on the device if required
     FramePackageDoubleBuffer<TAlpaka, TFramePackageEnergyMap,
@@ -645,7 +696,8 @@ private:
                              decltype(dev->photon)>
         photonBuffer(photon, dev->photon, &dev->queue, numMaps);
     FramePackageDoubleBuffer<TAlpaka, TFramePackageSumMap, decltype(dev->sum)>
-        sumBuffer(sum, dev->sum, &dev->queue, numMaps / TConfig::SUM_FRAMES);
+        sumBuffer(sum, dev->sum, &dev->queue,
+                  (numMaps + TConfig::SUM_FRAMES - 1) / TConfig::SUM_FRAMES);
     FramePackageDoubleBuffer<TAlpaka, TFramePackageEnergyValue,
                              decltype(dev->maxValues)>
         maxValuesBuffer(maxValues, dev->maxValues, &dev->queue, numMaps);
@@ -807,17 +859,10 @@ private:
       alpakaEnqueueKernel(dev->queue, photonFinder);
     } else {
       // clustering (and conversion to energy)
-      // DEBUG("enqueueing clustering kernel");
-
-      // synchronize();
-      // DEBUG("memset");
 
       // reset the number of clusters
       alpakaMemSet(dev->queue, usedClusters, 0,
                    decltype(TConfig::SINGLEMAP)(TConfig::SINGLEMAP));
-
-      // synchronize();
-      // DEBUG("start kernel");
 
       for (uint32_t i = 0; i < numMaps + 1; ++i) {
         // execute the clusterfinder with the pedestal update on every
@@ -831,13 +876,7 @@ private:
             alpakaNativePtr(energy), alpakaNativePtr(clusters),
             alpakaNativePtr(usedClusters), local_mask, dev->numMaps, i,
             pedestalFallback));
-
-        // DEBUG("enqueue");
-
         alpakaEnqueueKernel(dev->queue, clusterFinder);
-
-        // synchronize();
-        // DEBUG("ran");
       }
     }
 
