@@ -424,7 +424,7 @@ public:
 
     // force wait for one device to finish since there's no new data and
     // the user wants the data flushed
-    if (flushWhenFinished) {
+    if (flushWhenFinished && offset >= data.numFrames) {
       DEBUG("flushing ...");
 
       flush();
@@ -510,6 +510,10 @@ private:
 
       // initialize variables
       std::size_t selectedQueue = (num + moduleNumber * deviceCount);
+
+      // remap queues so that cosnequtives queues are not placed on the same
+      // device
+      selectedQueue = ((TAlpaka::STREAMS_PER_DEV + 1) * selectedQueue) % deviceCount;
       devices.emplace_back(
           selectedQueue,
           &deviceContainer[selectedQueue / TAlpaka::STREAMS_PER_DEV]);
