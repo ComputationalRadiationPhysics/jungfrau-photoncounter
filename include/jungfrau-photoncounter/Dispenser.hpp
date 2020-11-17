@@ -368,8 +368,12 @@ public:
       uploadOffset += framesToProcess;
     }
 
+    // initialize offsets
     uint64_t sum_offset = 0;
     uint64_t view_offset = 0;
+
+    // create vector for futures
+    std::vector<std::tuple<std::size_t, std::future<bool>>> results;
 
     // start processing
     for (uint32_t i = 0; i < devices.size() && offset < data.numFrames; ++i) {
@@ -405,15 +409,16 @@ public:
       DEBUG("Processing", framesToProcess, "frames");
 
       // process data
-      auto result =
-          processData(dataView, framesToProcess, flags, energy_view,
-                      photon_view, sum_view, maxValues_view, clusters);
+      results.emplace_back(processData(dataView, framesToProcess, flags,
+                                       energy_view, photon_view, sum_view,
+                                       maxValues_view, clusters));
 
       // update offsets
-      offset += std::get<0>(result);
-      view_offset += std::get<0>(result);
+      uint64_t new_offset = std::get<0>(*results.rbegin());
+      offset += new_offset;
+      view_offset += new_offset;
       sum_offset +=
-          (std::get<0>(result) + TConfig::SUM_FRAMES - 1) / TConfig::SUM_FRAMES;
+          (new_offset + TConfig::SUM_FRAMES - 1) / TConfig::SUM_FRAMES;
       DEBUG(offset, "/", data.numFrames, "frames processed");
     }
 
@@ -425,8 +430,16 @@ public:
       flush();
     }
 
-    return std::make_tuple(
-        offset, std::async(std::launch::async, []() { return true; }));
+    // work around CUDA bug that doesn't let me move capture objects
+    auto shared_results = std::make_shared<
+        std::vector<std::tuple<std::size_t, std::future<bool>>>>(
+        std::move(results));
+
+    return std::make_tuple(offset,
+                           std::async(std::launch::async, [shared_results]() {
+                             shared_results->clear();
+                             return true;
+                           }));
   }
 
   /**
