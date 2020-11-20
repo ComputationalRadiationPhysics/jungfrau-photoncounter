@@ -26,8 +26,8 @@
 #include <alpaka/alpaka.hpp>
 
 // Defines workdiv.
-using WorkDiv = alpaka::workdiv::WorkDivMembers<Dim, Size>;
-using CpuSyncQueue = alpaka::queue::QueueCpuBlocking;
+using WorkDiv = alpaka::WorkDivMembers<Dim, Size>;
+using CpuSyncQueue = alpaka::QueueCpuBlocking;
 
 template <typename TAccelerator> WorkDiv getWorkDiv() {
   return WorkDiv(
@@ -67,22 +67,22 @@ struct CpuOmp2Threads {};
 //!
 //! Defines Host, Device, etc. for the Intel TBB accelerator.
 template <std::size_t MAPSIZE> struct CpuTbbBlocks {
-  using Host = alpaka::acc::AccCpuTbbBlocks<Dim, Size>;
-  using Acc = alpaka::acc::AccCpuTbbBlocks<Dim, Size>;
-  using Queue = alpaka::queue::QueueCpuNonBlocking;
-  using DevHost = alpaka::dev::Dev<Host>;
-  using DevAcc = alpaka::dev::Dev<Acc>;
-  using PltfHost = alpaka::pltf::Pltf<DevHost>;
-  using PltfAcc = alpaka::pltf::Pltf<DevAcc>;
-  using Event = alpaka::event::Event<Queue>;
+  using Host = alpaka::AccCpuTbbBlocks<Dim, Size>;
+  using Acc = alpaka::AccCpuTbbBlocks<Dim, Size>;
+  using Queue = alpaka::QueueCpuNonBlocking;
+  using DevHost = alpaka::Dev<Host>;
+  using DevAcc = alpaka::Dev<Acc>;
+  using PltfHost = alpaka::Pltf<DevHost>;
+  using PltfAcc = alpaka::Pltf<DevAcc>;
+  using Event = alpaka::Event<Queue>;
   template <typename T>
-  using AccBuf = alpaka::mem::buf::Buf<DevAcc, T, Dim, Size>;
+  using AccBuf = alpaka::Buf<DevAcc, T, Dim, Size>;
   template <typename T>
-  using HostBuf = alpaka::mem::buf::Buf<DevHost, T, Dim, Size>;
+  using HostBuf = alpaka::Buf<DevHost, T, Dim, Size>;
   template <typename T>
-  using AccView = alpaka::mem::view::ViewSubView<DevAcc, T, Dim, Size>;
+  using AccView = alpaka::ViewSubView<DevAcc, T, Dim, Size>;
   template <typename T>
-  using HostView = alpaka::mem::view::ViewSubView<DevHost, T, Dim, Size>;
+  using HostView = alpaka::ViewSubView<DevHost, T, Dim, Size>;
 
   static constexpr std::size_t STREAMS_PER_DEV = 1u;
   static constexpr Size elementsPerThread = 8u;
@@ -92,8 +92,8 @@ template <std::size_t MAPSIZE> struct CpuTbbBlocks {
 };
 
 template <typename T, typename TBuf, typename... TArgs>
-struct GetIterator<T, TBuf, alpaka::acc::AccCpuTbbBlocks<TArgs...>> {
-  using Iterator = IteratorCpu<alpaka::acc::AccCpuTbbBlocks<TArgs...>, T, TBuf>;
+struct GetIterator<T, TBuf, alpaka::AccCpuTbbBlocks<TArgs...>> {
+  using Iterator = IteratorCpu<alpaka::AccCpuTbbBlocks<TArgs...>, T, TBuf>;
 };
 #endif
 #endif
@@ -103,17 +103,17 @@ template <typename THost, typename TAcc, typename TQueue> struct AccTraits {
     using Host = THost;
     using Acc = TAcc;
     using Queue = TQueue;
-    using DevHost = alpaka::dev::Dev<THost>;
-    using DevAcc = alpaka::dev::Dev<TAcc>;
-    using PltfHost = alpaka::pltf::Pltf<DevHost>;
-    using PltfAcc = alpaka::pltf::Pltf<DevAcc>;
-    using Event = alpaka::event::Event<TQueue>;
+    using DevHost = alpaka::Dev<THost>;
+    using DevAcc = alpaka::Dev<TAcc>;
+    using PltfHost = alpaka::Pltf<DevHost>;
+    using PltfAcc = alpaka::Pltf<DevAcc>;
+    using Event = alpaka::Event<TQueue>;
     template <typename T>
-    using AccBuf = alpaka::mem::buf::Buf<DevAcc, T, Dim, Size>;
+    using AccBuf = alpaka::Buf<DevAcc, T, Dim, Size>;
     template <typename T>
-    using HostBuf = alpaka::mem::buf::Buf<DevHost, T, Dim, Size>;
+    using HostBuf = alpaka::Buf<DevHost, T, Dim, Size>;
     template <typename T>
-    using HostView = alpaka::mem::view::ViewSubView<DevHost, T, Dim, Size>;
+    using HostView = alpaka::ViewSubView<DevHost, T, Dim, Size>;
 };
 */
 
@@ -124,22 +124,22 @@ template <typename THost, typename TAcc, typename TQueue> struct AccTraits {
 //!
 //! Defines Host, Device, etc. for the OpenMP 2 Blocks accelerator.
 template <std::size_t MAPSIZE> struct CpuOmp2Blocks {
-  using Host = alpaka::acc::AccCpuSerial<Dim, Size>;
-  using Acc = alpaka::acc::AccCpuOmp2Blocks<Dim, Size>;
-  using Queue = alpaka::queue::QueueCpuBlocking;
-  using DevHost = alpaka::dev::Dev<Host>;
-  using DevAcc = alpaka::dev::Dev<Acc>;
-  using PltfHost = alpaka::pltf::Pltf<DevHost>;
-  using PltfAcc = alpaka::pltf::Pltf<DevAcc>;
-  using Event = alpaka::event::Event<Queue>;
+  using Host = alpaka::AccCpuSerial<Dim, Size>;
+  using Acc = alpaka::AccCpuOmp2Blocks<Dim, Size>;
+  using Queue = alpaka::QueueCpuBlocking;
+  using DevHost = alpaka::Dev<Host>;
+  using DevAcc = alpaka::Dev<Acc>;
+  using PltfHost = alpaka::Pltf<DevHost>;
+  using PltfAcc = alpaka::Pltf<DevAcc>;
+  using Event = alpaka::Event<Queue>;
   template <typename T>
-  using AccBuf = alpaka::mem::buf::Buf<DevAcc, T, Dim, Size>;
+  using AccBuf = alpaka::Buf<DevAcc, T, Dim, Size>;
   template <typename T>
-  using HostBuf = alpaka::mem::buf::Buf<DevHost, T, Dim, Size>;
+  using HostBuf = alpaka::Buf<DevHost, T, Dim, Size>;
   template <typename T>
-  using AccView = alpaka::mem::view::ViewSubView<DevAcc, T, Dim, Size>;
+  using AccView = alpaka::ViewSubView<DevAcc, T, Dim, Size>;
   template <typename T>
-  using HostView = alpaka::mem::view::ViewSubView<DevHost, T, Dim, Size>;
+  using HostView = alpaka::ViewSubView<DevHost, T, Dim, Size>;
 
   static constexpr std::size_t STREAMS_PER_DEV = 1;
   static constexpr Size elementsPerThread = 1920u;
@@ -149,9 +149,9 @@ template <std::size_t MAPSIZE> struct CpuOmp2Blocks {
 };
 
 template <typename T, typename TBuf, typename... TArgs>
-struct GetIterator<T, TBuf, alpaka::acc::AccCpuOmp2Blocks<TArgs...>> {
+struct GetIterator<T, TBuf, alpaka::AccCpuOmp2Blocks<TArgs...>> {
   using Iterator =
-      IteratorCpu<alpaka::acc::AccCpuOmp2Blocks<TArgs...>, T, TBuf>;
+      IteratorCpu<alpaka::AccCpuOmp2Blocks<TArgs...>, T, TBuf>;
 };
 #endif
 #endif
@@ -163,22 +163,22 @@ struct GetIterator<T, TBuf, alpaka::acc::AccCpuOmp2Blocks<TArgs...>> {
 //!
 //! Defines Host, Device, etc. for the OpenMP 4 accelerator.
 template <std::size_t MAPSIZE> struct CpuOmp4 {
-  using Host = alpaka::acc::AccCpuOmp4<Dim, Size>;
-  using Acc = alpaka::acc::AccCpuOmp4<Dim, Size>;
-  using Queue = alpaka::queue::QueueCpuNonBlocking;
-  using DevHost = alpaka::dev::Dev<Host>;
-  using DevAcc = alpaka::dev::Dev<Acc>;
-  using PltfHost = alpaka::pltf::Pltf<DevHost>;
-  using PltfAcc = alpaka::pltf::Pltf<DevAcc>;
-  using Event = alpaka::event::Event<Queue>;
+  using Host = alpaka::AccCpuOmp4<Dim, Size>;
+  using Acc = alpaka::AccCpuOmp4<Dim, Size>;
+  using Queue = alpaka::QueueCpuNonBlocking;
+  using DevHost = alpaka::Dev<Host>;
+  using DevAcc = alpaka::Dev<Acc>;
+  using PltfHost = alpaka::Pltf<DevHost>;
+  using PltfAcc = alpaka::Pltf<DevAcc>;
+  using Event = alpaka::Event<Queue>;
   template <typename T>
-  using AccBuf = alpaka::mem::buf::Buf<DevAcc, T, Dim, Size>;
+  using AccBuf = alpaka::Buf<DevAcc, T, Dim, Size>;
   template <typename T>
-  using HostBuf = alpaka::mem::buf::Buf<DevHost, T, Dim, Size>;
+  using HostBuf = alpaka::Buf<DevHost, T, Dim, Size>;
   template <typename T>
-  using AccView = alpaka::mem::view::ViewSubView<DevAcc, T, Dim, Size>;
+  using AccView = alpaka::ViewSubView<DevAcc, T, Dim, Size>;
   template <typename T>
-  using HostView = alpaka::mem::view::ViewSubView<DevHost, T, Dim, Size>;
+  using HostView = alpaka::ViewSubView<DevHost, T, Dim, Size>;
 
   static constexpr std::size_t STREAMS_PER_DEV = 1u;
   static constexpr Size elementsPerThread = 8u;
@@ -188,8 +188,8 @@ template <std::size_t MAPSIZE> struct CpuOmp4 {
 };
 
 template <typename T, typename TBuf, typename... TArgs>
-struct GetIterator<T, TBuf, alpaka::acc::AccCpuOmp4<TArgs...>> {
-  using Iterator = IteratorCpu<alpaka::acc::AccCpuOmp4<TArgs...>, T, TBuf>;
+struct GetIterator<T, TBuf, alpaka::AccCpuOmp4<TArgs...>> {
+  using Iterator = IteratorCpu<alpaka::AccCpuOmp4<TArgs...>, T, TBuf>;
 };
 #endif
 #endif
@@ -200,22 +200,22 @@ struct GetIterator<T, TBuf, alpaka::acc::AccCpuOmp4<TArgs...>> {
 //!
 //! Defines Host, Device, etc. for the serial CPU accelerator.
 template <std::size_t MAPSIZE> struct CpuSerial {
-  using Host = alpaka::acc::AccCpuSerial<Dim, Size>;
-  using Acc = alpaka::acc::AccCpuSerial<Dim, Size>;
-  using Queue = alpaka::queue::QueueCpuBlocking;
-  using DevHost = alpaka::dev::Dev<Host>;
-  using DevAcc = alpaka::dev::Dev<Acc>;
-  using PltfHost = alpaka::pltf::Pltf<DevHost>;
-  using PltfAcc = alpaka::pltf::Pltf<DevAcc>;
-  using Event = alpaka::event::Event<Queue>;
+  using Host = alpaka::AccCpuSerial<Dim, Size>;
+  using Acc = alpaka::AccCpuSerial<Dim, Size>;
+  using Queue = alpaka::QueueCpuBlocking;
+  using DevHost = alpaka::Dev<Host>;
+  using DevAcc = alpaka::Dev<Acc>;
+  using PltfHost = alpaka::Pltf<DevHost>;
+  using PltfAcc = alpaka::Pltf<DevAcc>;
+  using Event = alpaka::Event<Queue>;
   template <typename T>
-  using AccBuf = alpaka::mem::buf::Buf<DevAcc, T, Dim, Size>;
+  using AccBuf = alpaka::Buf<DevAcc, T, Dim, Size>;
   template <typename T>
-  using HostBuf = alpaka::mem::buf::Buf<DevHost, T, Dim, Size>;
+  using HostBuf = alpaka::Buf<DevHost, T, Dim, Size>;
   template <typename T>
-  using AccView = alpaka::mem::view::ViewSubView<DevAcc, T, Dim, Size>;
+  using AccView = alpaka::ViewSubView<DevAcc, T, Dim, Size>;
   template <typename T>
-  using HostView = alpaka::mem::view::ViewSubView<DevHost, T, Dim, Size>;
+  using HostView = alpaka::ViewSubView<DevHost, T, Dim, Size>;
 
   static constexpr std::size_t STREAMS_PER_DEV = 1;
   static constexpr Size elementsPerThread = 1920u;
@@ -225,8 +225,8 @@ template <std::size_t MAPSIZE> struct CpuSerial {
 };
 
 template <typename T, typename TBuf, typename... TArgs>
-struct GetIterator<T, TBuf, alpaka::acc::AccCpuSerial<TArgs...>> {
-  using Iterator = IteratorCpu<alpaka::acc::AccCpuSerial<TArgs...>, T, TBuf>;
+struct GetIterator<T, TBuf, alpaka::AccCpuSerial<TArgs...>> {
+  using Iterator = IteratorCpu<alpaka::AccCpuSerial<TArgs...>, T, TBuf>;
 };
 #endif
 
@@ -237,22 +237,22 @@ struct GetIterator<T, TBuf, alpaka::acc::AccCpuSerial<TArgs...>> {
 //!
 //! Defines Host, Device, etc. for the CPU Threads accelerator.
 template <std::size_t MAPSIZE> struct CpuThreads {
-  using Host = alpaka::acc::AccCpuThreads<Dim, Size>;
-  using Acc = alpaka::acc::AccCpuThreads<Dim, Size>;
-  using Queue = alpaka::queue::QueueCpuNonBlocking;
-  using DevHost = alpaka::dev::Dev<Host>;
-  using DevAcc = alpaka::dev::Dev<Acc>;
-  using PltfHost = alpaka::pltf::Pltf<DevHost>;
-  using PltfAcc = alpaka::pltf::Pltf<DevAcc>;
-  using Event = alpaka::event::Event<Queue>;
+  using Host = alpaka::AccCpuThreads<Dim, Size>;
+  using Acc = alpaka::AccCpuThreads<Dim, Size>;
+  using Queue = alpaka::QueueCpuNonBlocking;
+  using DevHost = alpaka::Dev<Host>;
+  using DevAcc = alpaka::Dev<Acc>;
+  using PltfHost = alpaka::Pltf<DevHost>;
+  using PltfAcc = alpaka::Pltf<DevAcc>;
+  using Event = alpaka::Event<Queue>;
   template <typename T>
-  using AccBuf = alpaka::mem::buf::Buf<DevAcc, T, Dim, Size>;
+  using AccBuf = alpaka::Buf<DevAcc, T, Dim, Size>;
   template <typename T>
-  using HostBuf = alpaka::mem::buf::Buf<DevHost, T, Dim, Size>;
+  using HostBuf = alpaka::Buf<DevHost, T, Dim, Size>;
   template <typename T>
-  using AccView = alpaka::mem::view::ViewSubView<DevAcc, T, Dim, Size>;
+  using AccView = alpaka::ViewSubView<DevAcc, T, Dim, Size>;
   template <typename T>
-  using HostView = alpaka::mem::view::ViewSubView<DevHost, T, Dim, Size>;
+  using HostView = alpaka::ViewSubView<DevHost, T, Dim, Size>;
 
   static constexpr std::size_t STREAMS_PER_DEV = 1;
   static constexpr Size elementsPerThread = 8u;
@@ -262,8 +262,8 @@ template <std::size_t MAPSIZE> struct CpuThreads {
 };
 
 template <typename T, typename TBuf, typename... TArgs>
-struct GetIterator<T, TBuf, alpaka::acc::AccCpuThreads<TArgs...>> {
-  using Iterator = IteratorCpu<alpaka::acc::AccCpuThreads<TArgs...>, T, TBuf>;
+struct GetIterator<T, TBuf, alpaka::AccCpuThreads<TArgs...>> {
+  using Iterator = IteratorCpu<alpaka::AccCpuThreads<TArgs...>, T, TBuf>;
 };
 #endif
 #endif
@@ -275,22 +275,22 @@ struct GetIterator<T, TBuf, alpaka::acc::AccCpuThreads<TArgs...>> {
 //!
 //! Defines Host, Device, etc. for the CUDA accelerator.
 template <std::size_t MAPSIZE> struct GpuCudaRt {
-  using Host = alpaka::acc::AccCpuSerial<Dim, Size>;
-  using Acc = alpaka::acc::AccGpuCudaRt<Dim, Size>;
-  using Queue = alpaka::queue::QueueCudaRtNonBlocking;
-  using DevHost = alpaka::dev::Dev<Host>;
-  using DevAcc = alpaka::dev::Dev<Acc>;
-  using PltfHost = alpaka::pltf::Pltf<DevHost>;
-  using PltfAcc = alpaka::pltf::Pltf<DevAcc>;
-  using Event = alpaka::event::Event<Queue>;
+  using Host = alpaka::AccCpuSerial<Dim, Size>;
+  using Acc = alpaka::AccGpuCudaRt<Dim, Size>;
+  using Queue = alpaka::QueueCudaRtNonBlocking;
+  using DevHost = alpaka::Dev<Host>;
+  using DevAcc = alpaka::Dev<Acc>;
+  using PltfHost = alpaka::Pltf<DevHost>;
+  using PltfAcc = alpaka::Pltf<DevAcc>;
+  using Event = alpaka::Event<Queue>;
   template <typename T>
-  using AccBuf = alpaka::mem::buf::Buf<DevAcc, T, Dim, Size>;
+  using AccBuf = alpaka::Buf<DevAcc, T, Dim, Size>;
   template <typename T>
-  using HostBuf = alpaka::mem::buf::Buf<DevHost, T, Dim, Size>;
+  using HostBuf = alpaka::Buf<DevHost, T, Dim, Size>;
   template <typename T>
-  using AccView = alpaka::mem::view::ViewSubView<DevAcc, T, Dim, Size>;
+  using AccView = alpaka::ViewSubView<DevAcc, T, Dim, Size>;
   template <typename T>
-  using HostView = alpaka::mem::view::ViewSubView<DevHost, T, Dim, Size>;
+  using HostView = alpaka::ViewSubView<DevHost, T, Dim, Size>;
 
   static constexpr std::size_t STREAMS_PER_DEV = 3;
   static constexpr Size elementsPerThread = 1u;
@@ -300,27 +300,27 @@ template <std::size_t MAPSIZE> struct GpuCudaRt {
 };
 
 template <typename T, typename TBuf, typename... TArgs>
-struct GetIterator<T, TBuf, alpaka::acc::AccGpuCudaRt<TArgs...>> {
-  using Iterator = IteratorGpu<alpaka::acc::AccGpuCudaRt<TArgs...>, T, TBuf>;
+struct GetIterator<T, TBuf, alpaka::AccGpuCudaRt<TArgs...>> {
+  using Iterator = IteratorGpu<alpaka::AccGpuCudaRt<TArgs...>, T, TBuf>;
 };
 
 template <std::size_t MAPSIZE> struct GpuCudaRtSync {
-  using Host = alpaka::acc::AccCpuSerial<Dim, Size>;
-  using Acc = alpaka::acc::AccGpuCudaRt<Dim, Size>;
-  using Queue = alpaka::queue::QueueCudaRtBlocking;
-  using DevHost = alpaka::dev::Dev<Host>;
-  using DevAcc = alpaka::dev::Dev<Acc>;
-  using PltfHost = alpaka::pltf::Pltf<DevHost>;
-  using PltfAcc = alpaka::pltf::Pltf<DevAcc>;
-  using Event = alpaka::event::Event<Queue>;
+  using Host = alpaka::AccCpuSerial<Dim, Size>;
+  using Acc = alpaka::AccGpuCudaRt<Dim, Size>;
+  using Queue = alpaka::QueueCudaRtBlocking;
+  using DevHost = alpaka::Dev<Host>;
+  using DevAcc = alpaka::Dev<Acc>;
+  using PltfHost = alpaka::Pltf<DevHost>;
+  using PltfAcc = alpaka::Pltf<DevAcc>;
+  using Event = alpaka::Event<Queue>;
   template <typename T>
-  using AccBuf = alpaka::mem::buf::Buf<DevAcc, T, Dim, Size>;
+  using AccBuf = alpaka::Buf<DevAcc, T, Dim, Size>;
   template <typename T>
-  using HostBuf = alpaka::mem::buf::Buf<DevHost, T, Dim, Size>;
+  using HostBuf = alpaka::Buf<DevHost, T, Dim, Size>;
   template <typename T>
-  using AccView = alpaka::mem::view::ViewSubView<DevAcc, T, Dim, Size>;
+  using AccView = alpaka::ViewSubView<DevAcc, T, Dim, Size>;
   template <typename T>
-  using HostView = alpaka::mem::view::ViewSubView<DevHost, T, Dim, Size>;
+  using HostView = alpaka::ViewSubView<DevHost, T, Dim, Size>;
 
   static constexpr std::size_t STREAMS_PER_DEV = 1;
   static constexpr Size elementsPerThread = 1u;

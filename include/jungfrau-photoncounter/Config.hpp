@@ -220,10 +220,10 @@ private:
 template <typename TAccelerator, typename TBufferHost, typename TBufferDevice>
 struct GetDoubleBuffer {
   using Buffer = DoubleBuffer<
-      typename alpaka::elem::traits::ElemType<TBufferDevice>::type,
+      typename alpaka::traits::ElemType<TBufferDevice>::type,
       TAccelerator, TBufferHost, TBufferDevice,
-      std::is_same<alpaka::dev::Dev<typename TAccelerator::Acc>,
-                   alpaka::dev::Dev<typename TAccelerator::Host>>::value>;
+      std::is_same<alpaka::Dev<typename TAccelerator::Acc>,
+                   alpaka::Dev<typename TAccelerator::Host>>::value>;
 };
 
 // extend the double buffer to FramePackages

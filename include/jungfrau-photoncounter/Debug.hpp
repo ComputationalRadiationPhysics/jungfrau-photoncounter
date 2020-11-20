@@ -15,7 +15,7 @@ void saveClusters(std::string path,
   clusterFile.open(path);
   clusterFile << clusters.used << "\n";
   typename TConfig::Cluster *clusterPtr =
-      alpaka::mem::view::getPtrNative(clusters.clusters);
+      alpaka::getPtrNative(clusters.clusters);
 
   DEBUG("writing", clusters.used, "clusters to", path);
 
@@ -89,7 +89,7 @@ void saveClusterArray(
 
   for (auto &clusterArray : clusters) {
     typename TConfig::Cluster *clusterPtr =
-        alpaka::mem::view::getPtrNative(clusterArray.clusters);
+        alpaka::getPtrNative(clusterArray.clusters);
 
     for (uint64_t i = 0; i < clusterArray.used; ++i) {
       // write cluster information
@@ -122,7 +122,7 @@ void saveClustersBin(
 //#if (NDEBUG)
   std::ofstream clusterFile(path.c_str(), std::ios::binary);
   typename TConfig::Cluster *clusterPtr =
-      alpaka::mem::view::getPtrNative(clusters.clusters);
+      alpaka::getPtrNative(clusters.clusters);
 
   DEBUG("writing", clusters.used, "clusters to", path);
 
@@ -204,26 +204,26 @@ public:
       size_t offset) {
     for (int i = 0; i < input.size(); ++i) {
       input[i].push_back(
-          alpaka::mem::view::getPtrNative(raw_input.data)[offset]
+          alpaka::getPtrNative(raw_input.data)[offset]
               .data[positions[i].y * TConfig::DIMX + positions[i].x]);
       DEBUG("input",
-            alpaka::mem::view::getPtrNative(raw_input.data)[offset]
+            alpaka::getPtrNative(raw_input.data)[offset]
                 .data[positions[i].y * TConfig::DIMX + positions[i].x]);
       for (std::size_t p = 0; p < TConfig::PEDEMAPS; ++p) {
-        pedestal[p][i].push_back(alpaka::mem::view::getPtrNative(
+        pedestal[p][i].push_back(alpaka::getPtrNative(
             raw_pedestals
                 .data)[p][positions[i].y * TConfig::DIMX + positions[i].x]);
         DEBUG("pede[", p, "][", i, "]",
-              alpaka::mem::view::getPtrNative(
+              alpaka::getPtrNative(
                   raw_pedestals.data)[p][positions[i].y * TConfig::DIMX +
                                          positions[i].x]);
         stddev[p][i].push_back(
-            alpaka::mem::view::getPtrNative(
+            alpaka::getPtrNative(
                 init_pedestals
                     .data)[p][positions[i].y * TConfig::DIMX + positions[i].x]
                 .stddev);
         DEBUG("stddev[", p, "][", i, "]",
-              alpaka::mem::view::getPtrNative(
+              alpaka::getPtrNative(
                   init_pedestals
                       .data)[p][positions[i].y * TConfig::DIMX + positions[i].x]
                   .stddev);

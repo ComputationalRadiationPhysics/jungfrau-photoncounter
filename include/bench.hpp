@@ -140,13 +140,19 @@ auto calibrate(const BenchmarkingInput<Config, Accelerator<Config::MAPSIZE>>
                    &benchmarkingConfig,
                unsigned int moduleNumber = 0, unsigned int moduleCount = 1)
     -> Dispenser<Config, Accelerator> {
+
+    DEBUG("Creating a dispenser");
+
   Dispenser<Config, Accelerator> dispenser(
       benchmarkingConfig.gain, benchmarkingConfig.beamConst,
       benchmarkingConfig.maskPtr, moduleNumber, moduleCount);
 
   // reset dispenser to get rid of artefacts from previous runs
-  dispenser.reset();
+  DEBUG("Reset data");
+  dispenser.reset()
+          ;
   // upload and calculate pedestal data
+  DEBUG("Start pedestal initialization");
   dispenser.uploadPedestaldata(benchmarkingConfig.pedestalData);
   dispenser.synchronize();
 

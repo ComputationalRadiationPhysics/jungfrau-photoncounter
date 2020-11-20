@@ -100,30 +100,20 @@ std::vector<Duration> benchmark(unsigned int iterations, ExecutionFlags flags,
       benchmarkingInput.clusters->used = 0;
       alpakaNativePtr(benchmarkingInput.clusters->usedPinned)[0] = 0;
     }
+
+    DEBUG("Start calibration");
+
     auto dispenser = calibrate(benchmarkingInput);
 
-    // save pedestals
-    auto ipede = dispenser.downloadPedestaldata();
-    std::ofstream ipede_file("ipede.bin", std::ios_base::binary);
-    ipede_file.write(
-        reinterpret_cast<char *>(alpakaNativePtr(ipede.data)),
-        sizeof(typename Config::PedestalMap) * ipede.numFrames);
-    ipede_file.flush();
-    ipede_file.close();
+    DEBUG("Start run", i);
 
     auto t0 = Timer::now();
     bench(dispenser, benchmarkingInput);
     auto t1 = Timer::now();
-    results.push_back(std::chrono::duration_cast<Duration>(t1 - t0));
 
-    // save pedestals
-    auto pede = dispenser.downloadPedestaldata();
-    std::ofstream pede_file("pede.bin", std::ios_base::binary);
-    pede_file.write(
-        reinterpret_cast<char *>(alpakaNativePtr(pede.data)),
-        sizeof(typename Config::PedestalMap) * pede.numFrames);
-    pede_file.flush();
-    pede_file.close();
+    DEBUG("Finishing run", i);
+
+    results.push_back(std::chrono::duration_cast<Duration>(t1 - t0));
   }
 
   // check result if requested

@@ -38,7 +38,7 @@ bool checkResult(tl::optional<T> result, std::string referencePath) {
 
   // determine read size
   using TData =
-      typename alpaka::elem::traits::ElemType<decltype(result->data)>::type;
+      typename alpaka::traits::ElemType<decltype(result->data)>::type;
   std::size_t dataTypeSize = sizeof(TData);
   std::size_t extent = alpakaGetExtent<0>(result->data);
 
@@ -150,7 +150,7 @@ bool checkResultRaw(tl::optional<T> result, std::string referencePath) {
 
   // determine read size
   using TData =
-      typename alpaka::elem::traits::ElemType<decltype(result->data)>::type;
+      typename alpaka::traits::ElemType<decltype(result->data)>::type;
   std::size_t dataTypeSize = sizeof(TData);
   std::size_t extent = alpakaGetExtent<0>(result->data);
 
@@ -228,7 +228,7 @@ template <class TClusterArray> struct ClusterFrame {
 template <class TClusterArray, unsigned CLUSTER_SIZE>
 std::vector<ClusterFrame<TClusterArray>> readClusters(const char *path,
                                                       std::size_t maxClusters) {
-  using Cluster = typename alpaka::elem::traits::ElemType<decltype(
+  using Cluster = typename alpaka::traits::ElemType<decltype(
       TClusterArray::clusters)>::type;
 
   // allocate space
@@ -335,11 +335,11 @@ bool checkCommonFrames(const std::vector<ClusterFrame> &v1,
 template <class TClusterArray, unsigned CLUSTER_SIZE>
 std::vector<ClusterFrame<TClusterArray>>
 convertClusters(TClusterArray &clusters, std::size_t maxClusters) {
-  using Cluster = typename alpaka::elem::traits::ElemType<decltype(
+  using Cluster = typename alpaka::traits::ElemType<decltype(
       TClusterArray::clusters)>::type;
 
   // get cluster pointer
-  Cluster *inputClusterPtr = alpaka::mem::view::getPtrNative(clusters.clusters);
+  Cluster *inputClusterPtr = alpaka::getPtrNative(clusters.clusters);
   Cluster *clusterPtr = nullptr;
 
   // allocate space

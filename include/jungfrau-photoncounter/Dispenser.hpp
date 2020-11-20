@@ -495,6 +495,9 @@ private:
    * @param vector with devices to be initialized
    */
   auto initDevices() -> void {
+
+    DEBUG("Starting device initialization");
+
     const GainmapInversionKernel<TConfig> gainmapInversionKernel{};
     std::size_t maxQueues =
         alpakaGetDevCount<TAlpaka>() * TAlpaka::STREAMS_PER_DEV;
@@ -513,7 +516,12 @@ private:
 
       // remap queues so that cosnequtives queues are not placed on the same
       // device
-      selectedQueue = ((TAlpaka::STREAMS_PER_DEV + 1) * selectedQueue) % deviceCount;
+      selectedQueue =
+          ((TAlpaka::STREAMS_PER_DEV + 1) * selectedQueue) % deviceCount;
+
+      DEBUG("Initializing queue", selectedQueue, "on device",
+            selectedQueue / TAlpaka::STREAMS_PER_DEV);
+
       devices.emplace_back(
           selectedQueue,
           &deviceContainer[selectedQueue / TAlpaka::STREAMS_PER_DEV]);
