@@ -514,10 +514,17 @@ private:
       // initialize variables
       std::size_t selectedQueue = (num + moduleNumber * deviceCount);
 
-      // remap queues so that cosnequtives queues are not placed on the same
-      // device
-      selectedQueue =
-          ((TAlpaka::STREAMS_PER_DEV + 1) * selectedQueue) % deviceCount;
+      /* // performs poorly on GPUs
+      DEBUG("Initializing queue", selectedQueue, "on device",
+            selectedQueue % ((alpakaGetDevCount<TAlpaka>() + moduleCount - 1) /
+                             moduleCount));
+
+      devices.emplace_back(
+          selectedQueue,
+          &deviceContainer[selectedQueue %
+                           ((alpakaGetDevCount<TAlpaka>() + moduleCount - 1) /
+                            moduleCount)]);
+      */
 
       DEBUG("Initializing queue", selectedQueue, "on device",
             selectedQueue / TAlpaka::STREAMS_PER_DEV);
