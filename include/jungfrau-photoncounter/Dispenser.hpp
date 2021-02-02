@@ -371,12 +371,19 @@ public:
     // initialize offsets
     uint64_t sum_offset = 0;
     uint64_t view_offset = 0;
+    uint64_t max_view_offset = 0;
+    if (energy)
+      max_view_offset = energy->numFrames;
+    else if (photon)
+      max_view_offset = photon->numFrames;
 
     // create vector for futures
     std::vector<std::tuple<std::size_t, std::future<bool>>> results;
 
     // start processing
-    for (uint32_t i = 0; i < devices.size() && offset < data.numFrames; ++i) {
+    for (uint32_t i = 0; i < devices.size() && offset < data.numFrames &&
+                         view_offset < max_view_offset;
+         ++i) {
       // create data view
       uint32_t framesToProcess =
           std::min(TConfig::DEV_FRAMES, data.numFrames - offset);

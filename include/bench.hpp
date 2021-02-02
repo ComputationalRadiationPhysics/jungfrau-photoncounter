@@ -141,7 +141,7 @@ auto calibrate(const BenchmarkingInput<Config, Accelerator<Config::MAPSIZE>>
                unsigned int moduleNumber = 0, unsigned int moduleCount = 1)
     -> Dispenser<Config, Accelerator> {
 
-    DEBUG("Creating a dispenser");
+  DEBUG("Creating a dispenser");
 
   Dispenser<Config, Accelerator> dispenser(
       benchmarkingConfig.gain, benchmarkingConfig.beamConst,
@@ -149,8 +149,7 @@ auto calibrate(const BenchmarkingInput<Config, Accelerator<Config::MAPSIZE>>
 
   // reset dispenser to get rid of artefacts from previous runs
   DEBUG("Reset data");
-  dispenser.reset()
-          ;
+  dispenser.reset();
   // upload and calculate pedestal data
   DEBUG("Start pedestal initialization");
   dispenser.uploadPedestaldata(benchmarkingConfig.pedestalData);
@@ -200,7 +199,9 @@ auto bench(
     auto sum([&]() -> tl::optional<SumPackageView> {
       if (benchmarkingConfig.sum)
         return benchmarkingConfig.sum->getView(
-            sum_offset, (benchmarkingConfig.data.numFrames - offset + Config::SUM_FRAMES - 1) / Config::SUM_FRAMES);
+            sum_offset, (benchmarkingConfig.data.numFrames - offset +
+                         Config::SUM_FRAMES - 1) /
+                            Config::SUM_FRAMES);
       return tl::nullopt;
     }());
     auto maxValues([&]() -> tl::optional<MaxValuePackageView> {
@@ -250,11 +251,6 @@ auto setUpMultiple(uint64_t detectorCount, ExecutionFlags flags,
           pedestalPath, true));
   DEBUG(pedestalData.numFrames, "pedestaldata maps loaded");
 
-  FramePackage<typename Config::DetectorData, ConcreteAcc> data(
-      fc.template loadMaps<typename Config::DetectorData, ConcreteAcc>(dataPath,
-                                                                       true));
-  DEBUG(data.numFrames, "data maps loaded");
-
   FramePackage<typename Config::GainMap, ConcreteAcc> gain(
       fc.template loadMaps<typename Config::GainMap, ConcreteAcc>(gainPath));
   DEBUG(gain.numFrames, "gain maps loaded");
@@ -275,64 +271,59 @@ auto setUpMultiple(uint64_t detectorCount, ExecutionFlags flags,
   if (mask.numFrames == Config::SINGLEMAP)
     maskPtr = mask.data;
 
-  // allocate space for output data
-  FramePackage<typename Config::EnergyMap, ConcreteAcc> energy_data(
-      data.numFrames);
-  FramePackage<typename Config::PhotonMap, ConcreteAcc> photon_data(
-      data.numFrames);
-  FramePackage<typename Config::SumMap, ConcreteAcc> sum_data(
-      (data.numFrames + Config::SUM_FRAMES - 1) / Config::SUM_FRAMES);
-  FramePackage<EnergyValue, ConcreteAcc> maxValues_data(data.numFrames);
-
-  // create optional values
-  std::vector<
-      tl::optional<FramePackage<typename Config::EnergyMap, ConcreteAcc>>>
-      energies(detectorCount);
-  std::vector<
-      tl::optional<FramePackage<typename Config::PhotonMap, ConcreteAcc>>>
-      photons(detectorCount);
-  std::vector<tl::optional<FramePackage<typename Config::SumMap, ConcreteAcc>>>
-      sums(detectorCount);
-  std::vector<typename Config::template ClusterArray<ConcreteAcc> *>
-      cluster_vector(detectorCount, nullptr);
-  std::vector<tl::optional<FramePackage<EnergyValue, ConcreteAcc>>>
-      maxValue_vector(detectorCount);
-
-  // set optional values according to supplied flags
-  if (flags.mode == 0) {
-    for (auto &e : energies)
-      e = energy_data;
-  } else if (flags.mode == 1) {
-    for (auto &p : photons)
-      p = photon_data;
-  } else if (flags.mode == 2) {
-    auto clusterPtr = new typename Config::template ClusterArray<ConcreteAcc>(
-        maxClusterCount * data.numFrames);
-    for (auto &c : cluster_vector)
-      c = clusterPtr;
-  } else {
-    for (auto &e : energies)
-      e = energy_data;
-    auto clusterPtr = new typename Config::template ClusterArray<ConcreteAcc>(
-        maxClusterCount * data.numFrames);
-    for (auto &c : cluster_vector)
-      c = clusterPtr;
-  }
-
-  if (flags.summation)
-    for (auto &s : sums)
-      s = sum_data;
-  if (flags.maxValue)
-    for (auto &m : maxValue_vector)
-      m = maxValues_data;
-
   std::vector<BenchmarkingInput<Config, ConcreteAcc>> results;
   results.reserve(detectorCount);
 
-  for (uint64_t i = 0; i < detectorCount; ++i)
-    results.emplace_back(pedestalData, data, gain, beamConst, maskPtr,
-                         energies[i], photons[i], sums[i], cluster_vector[i],
-                         maxValue_vector[i], flags);
+  for (uint64_t i = 0; i < detectorCount; ++i) {
+    FramePackage<typename Config::DetectorData, ConcreteAcc> data(
+        fc.template loadMaps<typename Config::DetectorData, ConcreteAcc>(
+            dataPath, true));
+    DEBUG(data.numFrames, "data maps loaded");
+
+    // allocate space for output data
+    FramePackage<typename Config::EnergyMap, ConcreteAcc> energy_data(
+        Config::DEV_FRAMES * 3 * 4);
+    FramePackage<typename Config::PhotonMap, ConcreteAcc> photon_data(
+        Config::DEV_FRAMES * 3 * 4);
+    FramePackage<typename Config::SumMap, ConcreteAcc> sum_data(
+        (data.numFrames + Config::SUM_FRAMES - 1) / Config::SUM_FRAMES);
+    FramePackage<EnergyValue, ConcreteAcc> maxValues_data(Config::DEV_FRAMES *
+                                                          3 * 4);
+
+    // create optional values
+
+    tl::optional<FramePackage<typename Config::EnergyMap, ConcreteAcc>> energy;
+    tl::optional<FramePackage<typename Config::PhotonMap, ConcreteAcc>> photon;
+    tl::optional<FramePackage<typename Config::SumMap, ConcreteAcc>> sum;
+    typename Config::template ClusterArray<ConcreteAcc> *clusters = nullptr;
+    tl::optional<FramePackage<EnergyValue, ConcreteAcc>> maxValues;
+
+    // set optional values according to supplied flags
+    if (flags.mode == 0) {
+      energy = energy_data;
+    } else if (flags.mode == 1) {
+      photon = photon_data;
+    } else if (flags.mode == 2) {
+      auto clusterPtr = new typename Config::template ClusterArray<ConcreteAcc>(
+          maxClusterCount * data.numFrames / 6);
+      clusters = clusterPtr;
+    } else {
+      energy = energy_data;
+      auto clusterPtr = new typename Config::template ClusterArray<ConcreteAcc>(
+          maxClusterCount * data.numFrames / 6);
+      clusters = clusterPtr;
+    }
+
+    if (flags.summation)
+      sum = sum_data;
+    if (flags.maxValue)
+      maxValues = maxValues_data;
+
+    results.emplace_back(pedestalData, std::move(data), gain, beamConst,
+                         maskPtr, std::move(energy), std::move(photon),
+                         std::move(sum), std::move(clusters),
+                         std::move(maxValues), flags);
+  }
 
   return results;
 }
@@ -354,10 +345,8 @@ auto benchMultiple(
 
   std::vector<std::size_t> offsets(dispensers.size(), 0);
   std::vector<std::size_t> sum_offsets(dispensers.size(), 0);
-  ;
   std::vector<std::vector<std::tuple<std::size_t, std::future<bool>>>> futures(
       dispensers.size());
-  ;
 
   uint64_t minOffset = 0;
   uint64_t numFrames = benchmarkingConfigs[0].data.numFrames;
@@ -372,25 +361,22 @@ auto benchMultiple(
 
       auto energy([&]() -> tl::optional<EnergyPackageView> {
         if (benchmarkingConfigs[i].energy)
-          return benchmarkingConfigs[i].energy->getView(offsets[i],
-                                                        Config::DEV_FRAMES);
+          return benchmarkingConfigs[i].energy->getView(0, Config::DEV_FRAMES);
         return tl::nullopt;
       }());
       auto photons([&]() -> tl::optional<PhotonPackageView> {
         if (benchmarkingConfigs[i].photons)
-          return benchmarkingConfigs[i].photons->getView(offsets[i],
-                                                         Config::DEV_FRAMES);
+          return benchmarkingConfigs[i].photons->getView(0, Config::DEV_FRAMES);
         return tl::nullopt;
       }());
       auto sum([&]() -> tl::optional<SumPackageView> {
         if (benchmarkingConfigs[i].sum)
-          return benchmarkingConfigs[i].sum->getView(sum_offsets[i],
-                                                     Config::SUM_FRAMES);
+          return benchmarkingConfigs[i].sum->getView(0, Config::SUM_FRAMES);
         return tl::nullopt;
       }());
       auto maxValues([&]() -> tl::optional<MaxValuePackageView> {
         if (benchmarkingConfigs[i].maxValues)
-          return benchmarkingConfigs[i].maxValues->getView(offsets[i],
+          return benchmarkingConfigs[i].maxValues->getView(0,
                                                            Config::DEV_FRAMES);
         return tl::nullopt;
       }());
@@ -406,7 +392,6 @@ auto benchMultiple(
           (offset_diff + Config::SUM_FRAMES - 1) / Config::SUM_FRAMES;
 
       DEBUG(offsets[i], "/", benchmarkingConfigs[i].data.numFrames, "enqueued");
-      ;
     }
 
     minOffset = *std::min_element(offsets.begin(), offsets.end());

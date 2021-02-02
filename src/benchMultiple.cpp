@@ -37,15 +37,27 @@ constexpr auto framesPerStageG2 = Values<std::size_t, 999>();
 constexpr auto dimX = Values<std::size_t, 1024>();
 constexpr auto dimY = Values<std::size_t, 512>();
 constexpr auto sumFrames = Values<std::size_t, 10>(); // 2, 10, 20, 100>();
+constexpr auto allSumFrames = Values<std::size_t, 2, 10, 20, 100>();
 constexpr auto devFrames =
     Values<std::size_t, 100>(); // 10, 100>(); // , 1000>();
+constexpr auto allDevFrames = Values<std::size_t, 10, 100>(); // , 1000>();
 constexpr auto movingStatWindowSize = Values<std::size_t, 100>();
 constexpr auto clusterSize = Values<std::size_t, 3>(); // 2, 3, 7, 11>();
-constexpr auto cs = Values<std::size_t, 5>();
+constexpr auto allClusterSize = Values<std::size_t, 2, 3, 7, 11>();
+constexpr auto cs = Values<std::size_t, 2>();
 
 constexpr auto parameterSpace =
     framesPerStageG0 * framesPerStageG1 * framesPerStageG2 * dimX * dimY *
     sumFrames * devFrames * movingStatWindowSize * clusterSize * cs;
+constexpr auto parameterSpaceSum =
+    framesPerStageG0 * framesPerStageG1 * framesPerStageG2 * dimX * dimY *
+    allSumFrames * devFrames * movingStatWindowSize * clusterSize * cs;
+constexpr auto parameterSpaceDevFrames =
+    framesPerStageG0 * framesPerStageG1 * framesPerStageG2 * dimX * dimY *
+    sumFrames * allDevFrames * movingStatWindowSize * clusterSize * cs;
+constexpr auto parameterSpaceCluster =
+    framesPerStageG0 * framesPerStageG1 * framesPerStageG2 * dimX * dimY *
+    sumFrames * devFrames * movingStatWindowSize * allClusterSize * cs;
 
 template <class Tuple> struct ConfigFrom {
   using G0 = Get_t<0, Tuple>;
@@ -125,20 +137,43 @@ template <class List> void registerBenchmarks(int x, const List &) {
   registerBenchmarks(x + 1, T{});
 }
 
+enum RunConfig { NORMAL, SUM_FRAMES, DEV_FRAMES, CLUSTER_SIZES };
+
 int main(int argc, char *argv[]) {
   // check command line parameters
-  if (argc < 11 || argc > 17) {
-    std::cerr << "Usage: bench <benchmark id> <iteration count> "
-                 "<beamConst> <mode> <masking> <max values> <summation> "
-                 "<pedestal path> <gain path> <data path> [output prefix] "
-                 "[energy reference result path] [photon reference result "
-                 "path] [max value reference result path] [sum reference "
-                 "result path] [cluster reference result path]\n";
+  if (argc < 12 || argc > 17) {
+    std::cerr << "Usage: benchMultiple <benchmark id> <detector count> "
+                 "<iteration count> <beamConst> <mode> <masking> <max values> "
+                 "<summation> <pedestal path> <gain path> <data path> [output "
+                 "prefix] [energy reference result path] [photon reference "
+                 "result path] [max value reference result path] [sum "
+                 "reference result path] [cluster reference result path]\n";
     abort();
   }
 
   // initialize parameters
-  int benchmarkID = std::atoi(argv[1]);
+  RunConfig config;
+  int benchmarkID;
+
+  switch (argv[1][0]) {
+  case 's':
+    config = SUM_FRAMES;
+    benchmarkID = std::atoi(&(argv[1][1]));
+    break;
+  case 'd':
+    config = DEV_FRAMES;
+    benchmarkID = std::atoi(&(argv[1][1]));
+    break;
+  case 'c':
+    config = CLUSTER_SIZES;
+    benchmarkID = std::atoi(&(argv[1][1]));
+    break;
+  default:
+    config = NORMAL;
+    benchmarkID = std::atoi(argv[1]);
+    break;
+  }
+
   uint64_t detectorCount = std::atoi(argv[2]);
   unsigned int iterationCount = static_cast<unsigned int>(std::atoi(argv[3]));
   double beamConst = std::atof(argv[4]);
@@ -165,7 +200,20 @@ int main(int argc, char *argv[]) {
                  [](char c) -> char { return (c == '/') ? ' ' : c; });
 
   // register benchmarks
-  registerBenchmarks(0, parameterSpace);
+  if (config == SUM_FRAMES) {
+    std::cout << "Running sumFrames configuration. \n";
+    registerBenchmarks(0, parameterSpaceSum);
+  } else if (config == DEV_FRAMES) {
+    std::cout << "Running dumFrames configuration. \n";
+    registerBenchmarks(0, parameterSpaceDevFrames);
+  } else if (config == CLUSTER_SIZES) {
+    std::cout << "Running clusterSize configuration. \n";
+    registerBenchmarks(0, parameterSpaceCluster);
+  } else {
+    std::cout << "Running standard configuration. \n";
+    registerBenchmarks(0, parameterSpace);
+  }
+
   std::cout << "Registered " << benchmarks.size() << " benchmarks. \n";
 
   // check benchmark ID

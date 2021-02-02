@@ -4,7 +4,7 @@ project("jungfrau-photoncounter")
 # use CUDA_ROOT variable to find the CUDA root directory
 cmake_policy(SET CMP0074 NEW)
 
-set(ALPAKA_CXX_STANDARD "14" CACHE STRING "Force C++ version to 14. ")
+set(ALPAKA_CXX_STANDARD "17" CACHE STRING "Force C++ version to 17. ")
 set(ALPAKA_CUDA_NVCC_EXPT_RELAXED_CONSTEXPR OFF CACHE STRING "Turn expt-relaxed-contexpr off. ")
 
 find_package(alpaka REQUIRED)

@@ -349,5 +349,5 @@ struct DetectorConfig {
 
 // predefine detector configurations
 using JungfrauConfig =
-    DetectorConfig<1000, 1000, 999, 1024, 512, 2, 1, 100, 2, 5>;
-using MoenchConfig = DetectorConfig<1000, 0, 0, 400, 400, 10, 300, 100, 3, 5>;
+    DetectorConfig<1000, 1000, 999, 1024, 512, 2, 1, 100, 2, 2>;
+using MoenchConfig = DetectorConfig<1000, 0, 0, 400, 400, 10, 300, 100, 3, 2>;

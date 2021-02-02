@@ -68,7 +68,7 @@ public:
                    dataBuf, alpakaGetHost<TAlpaka>(), numFrames),
                numFrames);
 
-    bufferPointer += fileSize;
+    //bufferPointer += fileSize;
 
     return maps;
   }
