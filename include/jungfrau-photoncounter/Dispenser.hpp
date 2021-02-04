@@ -591,7 +591,7 @@ private:
                numMaps);
 
     // copy offset data from last initialized device (if needed)
-    if (init & devices.size() > 1) {
+    if (init && devices.size() > 1) {
       auto prevDevice = (nextFull + devices.size() - 1) % devices.size();
       alpakaWait(devices[prevDevice].queue);
 
