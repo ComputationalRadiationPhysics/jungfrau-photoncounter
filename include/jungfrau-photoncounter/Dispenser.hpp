@@ -591,7 +591,7 @@ private:
                numMaps);
 
     // copy offset data from last initialized device (if needed)
-    if (init && devices.size() > 1) {
+    if (init & devices.size() > 1) {
       auto prevDevice = (nextFull + devices.size() - 1) % devices.size();
       alpakaWait(devices[prevDevice].queue);
 
@@ -685,6 +685,10 @@ private:
     uint64_t source = (nextFull + devices.size() - 1) % devices.size();
     DEBUG("distribute initial pedestal maps (from", source, ")");
     for (uint64_t i = 0; i < devices.size(); ++i) {
+      // skip if copy operation is not required
+      if (source == i)
+        continue;
+
       // distribute initial pedestal map (containing statistics etc.)
       alpakaCopy(devices[source].queue, devices[i].initialPedestal,
                  devices[source].initialPedestal,
