@@ -591,7 +591,7 @@ private:
                numMaps);
 
     // copy offset data from last initialized device (if needed)
-    if (init) {
+    if (init & devices.size() > 1) {
       auto prevDevice = (nextFull + devices.size() - 1) % devices.size();
       alpakaWait(devices[prevDevice].queue);
 
@@ -771,13 +771,16 @@ private:
         clustersUsedBuffer(optionalNumClusters, dev->numClusters, &dev->queue,
                            TConfig::SINGLEMAP);
 
-    // copy offset data from last device uploaded to current device
-    alpakaWait(dev->queue, devices[prevDevice].event);
-    DEBUG("device", devices[prevDevice].id, "finished");
+    // copy offset data from last device uploaded to current device (if needed)
+    if (devices.size() > 1) {
+      alpakaWait(dev->queue, devices[prevDevice].event);
 
+      alpakaCopy(dev->queue, dev->pedestal, devices[prevDevice].pedestal,
+                 decltype(TConfig::PEDEMAPS)(TConfig::PEDEMAPS));
+    }
+
+    DEBUG("device", devices[prevDevice].id, "finished");
     devices[prevDevice].state = READY;
-    alpakaCopy(dev->queue, dev->pedestal, devices[prevDevice].pedestal,
-               decltype(TConfig::PEDEMAPS)(TConfig::PEDEMAPS));
 
     nextFull = (nextFull + 1) % devices.size();
 
