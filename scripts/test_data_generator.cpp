@@ -23,8 +23,8 @@ struct DetectorValue {
 };
 
 // define values to fill clusters with
-constexpr DetectorValue value{1015u, 0u};
-constexpr DetectorValue centerValue{1020u, 0u};
+constexpr DetectorValue value{1300u, 0u};
+constexpr DetectorValue centerValue{1975u, 0u};
 constexpr DetectorValue empty{1000u, 0u};
 
 // frame header struct
@@ -33,12 +33,12 @@ struct FrameHeader {
   std::uint64_t bunchId;
 
   //! @todo: remove this later; only for alignment performance tests
-  //std::uint64_t dummy1;
-  //std::uint64_t dummy2;
-  //std::uint64_t dummy3;
-  //std::uint64_t dummy4;
-  //std::uint64_t dummy5;
-  //std::uint64_t dummy6;
+  // std::uint64_t dummy1;
+  // std::uint64_t dummy2;
+  // std::uint64_t dummy3;
+  // std::uint64_t dummy4;
+  // std::uint64_t dummy5;
+  // std::uint64_t dummy6;
 };
 
 // frame struct
@@ -92,6 +92,51 @@ void generateCalibration(std::string path) {
         for (unsigned int x = 0; x < Frame::height; ++x) {
           // write value
           DetectorValue value{static_cast<uint16_t>(1000 * (gainStage + 1)),
+                              gainStage};
+          out.write(reinterpret_cast<char *>(&value), sizeof(value));
+        }
+      }
+    }
+  }
+
+  // close file
+  out.flush();
+  out.close();
+}
+
+// calibration data calibrator
+void generateCalibrationStdDev(std::string path) {
+  // open output file
+  std::ofstream out(path.c_str(), std::ios::binary);
+  if (!out.is_open()) {
+    std::cerr << "Couldn't open pedestal output file!\n";
+    return;
+  }
+
+  // create normal distribution RNG engine
+  std::random_device rd{};
+  std::mt19937 gen{rd()};
+  std::normal_distribution<> d(1000, 9);
+
+  // iterate over gain stages
+  for (uint8_t gainStage = 0; gainStage < 3; ++gainStage) {
+    // convert gain stage
+    if (gainStage == 2)
+      gainStage = 3;
+
+    // iterate over frames for each gain stage
+    for (uint64_t frame = 0; frame < ((gainStage == 3) ? 999 : 1000); ++frame) {
+      // write frame number and bunch ID
+      uint64_t bunchID = 0;
+      out.write(reinterpret_cast<char *>(&frame), sizeof(frame));
+      out.write(reinterpret_cast<char *>(&bunchID), sizeof(bunchID));
+
+      // iterate over rows
+      for (unsigned int y = 0; y < Frame::width; ++y) {
+        // iterate over cells
+        for (unsigned int x = 0; x < Frame::height; ++x) {
+          // write value
+          DetectorValue value{static_cast<uint16_t>(d(gen) * (gainStage + 1)),
                               gainStage};
           out.write(reinterpret_cast<char *>(&value), sizeof(value));
         }
@@ -316,8 +361,8 @@ void addClusters(Frame &frame, const std::vector<Point> &centers,
   cluster.frameNumber = frame.header.frameNumber;
 
   // clear the frame
-  std::fill(std::begin(cluster.data), std::end(cluster.data), 1010u);
-  cluster.data[(N / 2) * N + N / 2] = 1012u;
+  // std::fill(std::begin(cluster.data), std::end(cluster.data), 1010u);
+  // cluster.data[(N / 2) * N + N / 2] = 1012u;
 
   // insert clusters around centers
   for (auto &p : centers) {
@@ -566,6 +611,8 @@ int main() {
   // generateCluster<3>("/bigdata/hplsim/production/jungfrau-photoncounter/data_pool/synthetic/cluster_8.bin",
   // 0.08f, 10000);
 
+  // generateCalibrationStdDev("./pede.bin");
+
   // generate random overlapping clusters
   /*generateRandomClusterFast<3>(
       "/bigdata/hplsim/production/jungfrau-photoncounter/data_pool/synthetic/"
@@ -632,9 +679,17 @@ int main() {
       "random_clusters_overlapping/cluster11.bin",
       0.0075f, 10000, true);
   */
-  
-  generateRandomClusterFast<3>(
-      "/bigdata/hplsim/production/jungfrau-photoncounter/data_pool/synthetic/nonalign3.bin",
+
+  generateRandomClusterFast<2>(
+      "/bigdata/hplsim/production/jungfrau-photoncounter/data_pool/synthetic/"
+      "random_clusters_overlapping/cluster2.bin",
       0.0075f, 10000, true);
+
+  // generateRandomClusterFast<2>("../../build_cuda_1/cl2.bin", 0.0075f, 10,
+  // false);
+
+  // generateRandomClusterFast<3>(
+  //    "/bigdata/hplsim/production/jungfrau-photoncounter/data_pool/synthetic/nonalign3.bin",
+  //    0.0075f, 10000, true);
   return 0;
 }

@@ -7,7 +7,7 @@
 #SBATCH --ntasks=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --gres=gpu:2
-#SBATCH --mem=200000
+#SBATCH --mem=370G
 #SBATCH --cpus-per-task=24
 #SBATCH --exclusive
 #SBATCH --array=0-3
@@ -30,4 +30,4 @@ export OMP_PROC_BIND=true
 CLUSTER_SIZES=("2" "3" "7" "11")
 
 cd ../build_cuda_1
-./bench c$SLURM_ARRAY_TASK_ID 100 12.4 2 1 0 0 ../../../data_pool/synthetic/pede.bin ../../../data_pool/px_101016/gainMaps_M022.bin ../../../data_pool/synthetic/random_clusters_overlapping/cluster${CLUSTER_SIZES[${SLURM_ARRAY_TASK_ID}]}.bin clustersizes${CLUSTER_SIZES[${SLURM_ARRAY_TASK_ID}]}
+./bench c$SLURM_ARRAY_TASK_ID 3 12.4 2 1 0 0 ../../../data_pool/synthetic/pede.bin ../../../data_pool/px_101016/gainMaps_M022.bin ../../../data_pool/synthetic/random_clusters_overlapping/cluster${CLUSTER_SIZES[${SLURM_ARRAY_TASK_ID}]}.bin clustersizes${CLUSTER_SIZES[${SLURM_ARRAY_TASK_ID}]}
