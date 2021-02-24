@@ -344,9 +344,31 @@ public:
                bool flushWhenFinished = true)
       -> std::tuple<std::size_t, std::future<bool>> {
 
+    // initialize offsets
+    uint64_t view_offset = 0;
+    uint64_t sum_offset = 0;
+    uint64_t max_view_offset = 0;
+    uint64_t max_sum_offset = 0;
+    if (energy)
+      max_view_offset = energy->numFrames;
+    else if (photon)
+      max_view_offset = photon->numFrames;
+    else
+      // override max_view_offset condition if neither photon or energy results
+      // will be accessed
+      max_view_offset = 1;
+
+    if (sum)
+      max_sum_offset = sum->numFrames;
+    else
+      // override sum bounds check if sums are not downloaded
+      max_sum_offset = 1;
+
     uint32_t uploadOffset = offset;
     // try uploading a data package to every device
-    for (uint32_t i = 0; i < devices.size() && uploadOffset < data.numFrames;
+    for (uint32_t i = 0;
+         i < devices.size() && uploadOffset < data.numFrames &&
+         sum_offset < max_sum_offset && view_offset < max_view_offset;
          ++i) {
 
       // create data view
@@ -366,27 +388,13 @@ public:
       dataBuffer.upload();
 
       uploadOffset += framesToProcess;
+      sum_offset +=
+          (framesToProcess + TConfig::SUM_FRAMES - 1) / TConfig::SUM_FRAMES;
     }
 
-    // initialize offsets
-    uint64_t sum_offset = 0;
-    uint64_t view_offset = 0;
-    uint64_t max_view_offset = 0;
-    uint64_t max_sum_offset = 0;
-    if (energy)
-      max_view_offset = energy->numFrames;
-    else if (photon)
-      max_view_offset = photon->numFrames;
-    else
-      // override max_view_offset condition if neither photon or energy results
-      // will be accessed
-      max_view_offset = 1;
-
-    if (sum)
-      max_sum_offset = sum->numFrames;
-    else
-        // override sum bounds check if sums are not downloaded
-        max_sum_offset = 1;
+    // reinitialize offsets
+    sum_offset = 0;
+    view_offset = 0;
 
     // create vector for futures
     std::vector<std::tuple<std::size_t, std::future<bool>>> results;

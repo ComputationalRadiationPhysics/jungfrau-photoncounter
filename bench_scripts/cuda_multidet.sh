@@ -27,5 +27,5 @@ export OMP_PROC_BIND=true
 
 DETCOUNT=(1 2 4 8 16)
 
-cd ../build_cuda_4
+cd ../build_cuda_4_bu
 ./benchMultiple 0 ${DETCOUNT[${SLURM_ARRAY_TASK_ID}]} 100 12.4 1 1 0 0 ../../../data_pool/px_101016/allpede_250us_1243__B_000000.dat ../../../data_pool/px_101016/gainMaps_M022.bin ../../../data_pool/px_101016/Insu_6_tr_1_45d_250us__B_000000.dat detcount${DETCOUNT[${SLURM_ARRAY_TASK_ID}]}
