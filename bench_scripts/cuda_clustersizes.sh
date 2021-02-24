@@ -30,4 +30,4 @@ export OMP_PROC_BIND=true
 CLUSTER_SIZES=("2" "3" "7" "11")
 
 cd ../build_cuda_1
-./bench c$SLURM_ARRAY_TASK_ID 3 12.4 2 1 0 0 ../../../data_pool/synthetic/pede.bin ../../../data_pool/px_101016/gainMaps_M022.bin ../../../data_pool/synthetic/random_clusters_overlapping/cluster${CLUSTER_SIZES[${SLURM_ARRAY_TASK_ID}]}.bin clustersizes${CLUSTER_SIZES[${SLURM_ARRAY_TASK_ID}]}
+./bench c$SLURM_ARRAY_TASK_ID 100 12.4 2 1 0 0 ../../../data_pool/synthetic/pede_cl${CLUSTER_SIZES[${SLURM_ARRAY_TASK_ID}]}.bin ../../../data_pool/px_101016/gainMaps_M022.bin ../../../data_pool/synthetic/random_clusters_overlapping/cluster${CLUSTER_SIZES[${SLURM_ARRAY_TASK_ID}]}.bin clustersizes${CLUSTER_SIZES[${SLURM_ARRAY_TASK_ID}]}
