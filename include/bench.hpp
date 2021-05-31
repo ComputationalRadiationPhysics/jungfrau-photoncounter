@@ -397,6 +397,10 @@ auto benchMultiple(
     minOffset = *std::min_element(offsets.begin(), offsets.end());
   }
 
+  DEBUG("Waiting for devices to finish ...");
+
   for (auto &d : dispensers)
     d.synchronize();
+
+  DEBUG("Run completed!");
 }

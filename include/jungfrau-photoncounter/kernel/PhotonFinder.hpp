@@ -128,8 +128,9 @@ template <typename Config> struct PhotonFinderKernel {
         //! @todo: dark condition should only occur in gain stages > 0
 
         // check "dark pixel" condition
-        if (pedestal - c * stddev <= adc && pedestal + c * stddev >= adc &&
-            !pedestalFallback) {
+        //if (pedestal - /*c * */stddev <= adc && pedestal + /*c * */stddev >= adc &&
+                if (pedestal - stddev <= adc && pedestal + stddev >= adc &&
+            !pedestalFallback && gainStage == 0) {
           updatePedestal(adc, Config::MOVING_STAT_WINDOW_SIZE,
                          pedestalMaps[gainStage][id]);
         }

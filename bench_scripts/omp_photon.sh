@@ -1,7 +1,7 @@
 #!/bin/sh
 #SBATCH --job-name=omp_photon
 #SBATCH --partition=defq
-#SBATCH --time=5:00:00
+#SBATCH --time=10:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --ntasks-per-node=1

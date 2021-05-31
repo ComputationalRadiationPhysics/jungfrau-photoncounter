@@ -21,6 +21,7 @@ export alpaka_DIR=/home/schenk24/workspace/alpaka/
 module load git intel cmake boost python
 
 export KMP_AFFINITY="verbose,compact"
+export OMP_NUM_THREADS=40
 
 DATASET=("g0" "g13")
 

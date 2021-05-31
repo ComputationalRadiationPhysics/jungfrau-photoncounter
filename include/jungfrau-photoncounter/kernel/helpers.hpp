@@ -170,12 +170,14 @@ processInput(TAcc const &acc, TDetectorData const &detectorData,
                         : pedestalMaps[gainStage][id]);
   const auto &gain = gainMaps[gainStage][id];
 
+  energyMap.data[id] = isValid ? ((adc - pedestal) * gain) : 0.;
+
   // calculate energy of current channel
-  auto &energy = energyMap.data[id];
+  /*auto &energy = energyMap.data[id];
 
   energy = (adc - pedestal) * gain;
 
   // set energy to zero if masked out
   if (!isValid)
-    energy = 0;
+    energy = 0;*/
 }

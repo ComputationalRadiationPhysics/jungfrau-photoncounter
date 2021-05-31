@@ -40,11 +40,13 @@ constexpr auto sumFrames = Values<std::size_t, 10>(); // 2, 10, 20, 100>();
 constexpr auto allSumFrames = Values<std::size_t, 2, 10, 20, 100>();
 constexpr auto devFrames =
     Values<std::size_t, 100>(); // 10, 100>(); //, 1000>();
-constexpr auto allDevFrames = Values<std::size_t, 10, 100>(); // , 1000>();
+constexpr auto allDevFrames = Values<std::size_t, 10, 100, 200>(); // , 1000>();
 constexpr auto movingStatWindowSize = Values<std::size_t, 100>();
 constexpr auto clusterSize = Values<std::size_t, 3>(); // 2, 3, 7, 11>();
 constexpr auto allClusterSize = Values<std::size_t, 2, 3, 7, 11>();
 constexpr auto cs = Values<std::size_t, 2>();
+// legacy value for testing
+//constexpr auto cs = Values<std::size_t, 5>();
 
 constexpr auto parameterSpace =
     framesPerStageG0 * framesPerStageG1 * framesPerStageG2 * dimX * dimY *

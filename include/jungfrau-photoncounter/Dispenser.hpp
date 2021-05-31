@@ -15,6 +15,7 @@
 #include "kernel/MaxValueCopy.hpp"
 #include "kernel/PhotonFinder.hpp"
 #include "kernel/Reduction.hpp"
+#include "kernel/ScaleStdDev.hpp"
 #include "kernel/Summation.hpp"
 
 #include <optional.hpp>
@@ -304,7 +305,7 @@ public:
   auto downloadDriftMap() -> typename TConfig::DriftMap * {
     DEBUG("downloading drift map...");
 
-    //! @todo: find a more beautifil solution than this
+    //! @todo: find a more beautiful solution than this
     // get current device number
     uint64_t source = (nextFull + devices.size() - 1) % devices.size();
 
@@ -531,15 +532,15 @@ private:
     std::size_t deviceCount = static_cast<unsigned int>(std::ceil(
         static_cast<double>(maxQueues) / static_cast<double>(moduleCount)));
 
-    //! @todo: find all the other debug code
+    DEBUG("Allocating", deviceCount, "streams");
     devices.reserve(deviceCount);
 
     for (std::size_t num = 0; num < deviceCount; ++num) {
-
       DEBUG("Initializing device #", num);
 
       // initialize variables
-      std::size_t selectedQueue = (num + moduleNumber * deviceCount);
+      std::size_t selectedQueue =
+          (num + moduleNumber * deviceCount) % maxQueues;
 
       /* // performs poorly on GPUs
       DEBUG("Initializing queue", selectedQueue, "on device",
@@ -554,7 +555,9 @@ private:
       */
 
       DEBUG("Initializing queue", selectedQueue, "on device",
-            selectedQueue / TAlpaka::STREAMS_PER_DEV);
+            selectedQueue / TAlpaka::STREAMS_PER_DEV,
+            "(GPUs:", alpakaGetDevCount<TAlpaka>(), "MaxQueues:", maxQueues,
+            "devcount:", deviceCount, ")");
 
       devices.emplace_back(
           selectedQueue,
@@ -704,6 +707,15 @@ private:
   auto distributeInitialPedestalMaps() -> void {
     uint64_t source = (nextFull + devices.size() - 1) % devices.size();
     DEBUG("distribute initial pedestal maps (from", source, ")");
+
+    // pres-scale stddev by c
+    ScaleStdDevKernel<TConfig> scaleStdDevKernel{};
+    auto const scaleStdDev(alpakaCreateKernel<TAlpaka>(
+        getWorkDiv<TAlpaka>(), scaleStdDevKernel,
+        alpakaNativePtr(devices[source].initialPedestal)));
+
+    alpakaEnqueueKernel(devices[source].queue, scaleStdDev);
+
     for (uint64_t i = 0; i < devices.size(); ++i) {
       // skip if copy operation is not required
       if (source == i)
@@ -734,6 +746,7 @@ private:
                    tl::optional<TFramePackageEnergyMap> energy,
                    tl::optional<TFramePackagePhotonMap> photon,
                    tl::optional<TFramePackageSumMap> sum,
+
                    tl::optional<TFramePackageEnergyValue> maxValues,
                    typename TConfig::template ClusterArray<TAlpaka> *clusters)
       -> std::tuple<std::size_t, std::future<bool>> {

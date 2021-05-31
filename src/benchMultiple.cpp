@@ -118,6 +118,8 @@ benchmark(unsigned int iterations, uint64_t detectorCount, ExecutionFlags flags,
     results.push_back(std::chrono::duration_cast<Duration>(t1 - t0));
   }
 
+  DEBUG("Benchmark finished");
+
   return results;
 }
 
@@ -235,12 +237,16 @@ int main(int argc, char *argv[]) {
       benchmarks[benchmarkID](iterationCount, detectorCount, ef, pedestalPath,
                               gainPath, dataPath, beamConst);
 
+  DEBUG("Writing results ...");
+
   // store results
   for (const auto &r : results)
     outputFile << r.count() << " ";
 
   outputFile.flush();
   outputFile.close();
+
+  DEBUG("Finished!");
 
   return 0;
 }

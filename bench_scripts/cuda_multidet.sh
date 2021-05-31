@@ -20,12 +20,12 @@ set -x
 
 # load modules
 export alpaka_DIR=/home/schenk24/workspace/alpaka/
-module load git gcc cuda cmake boost python
+module load git gcc cuda/11.1 cmake boost python
 
 export GOMP_CPU_AFFINITY=0-11
 export OMP_PROC_BIND=true
 
 DETCOUNT=(1 2 4 8 16)
 
-cd ../build_cuda_4_bu
+cd ../build_cuda_4
 ./benchMultiple 0 ${DETCOUNT[${SLURM_ARRAY_TASK_ID}]} 100 12.4 1 1 0 0 ../../../data_pool/px_101016/allpede_250us_1243__B_000000.dat ../../../data_pool/px_101016/gainMaps_M022.bin ../../../data_pool/px_101016/Insu_6_tr_1_45d_250us__B_000000.dat detcount${DETCOUNT[${SLURM_ARRAY_TASK_ID}]}

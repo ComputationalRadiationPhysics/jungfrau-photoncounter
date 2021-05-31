@@ -33,13 +33,13 @@ template <typename Config, typename AccConfig> struct ClusterFinderKernel {
           findClusterSumAndMax<Config>(energyMaps[currentFrame - 1].data, id,
                                        sum, max);
           // check cluster conditions
-          if ((energy > c * stddev || sum > n * c * stddev) && id == max) {
+          if ((energy > /*c * */stddev || sum > n /* * c*/ * stddev) && id == max) {
             auto &cluster = getClusterBuffer(acc, clusterArray, numClusters);
             copyCluster<Config>(energyMaps[currentFrame - 1], id, cluster);
           }
           // check dark pixel condition
-          else if (-c * stddev <= energy && c * stddev >= energy &&
-                   !pedestalFallback) {
+          else if (-/*c * */stddev <= energy && /*c * */stddev >= energy &&
+                   !pedestalFallback && gainStage == 0) {
             updatePedestal(adc, Config::MOVING_STAT_WINDOW_SIZE,
                            pedestalMaps[gainStage][id]);
           }

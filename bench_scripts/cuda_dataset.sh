@@ -29,5 +29,5 @@ export OMP_PROC_BIND=true
 
 DATASET=("g0" "g13")
 
-cd ../build_omp
+cd ../build_cuda_1
 ./bench 0 100 12.4 1 1 0 0 ../../../data_pool/synthetic/pede.bin ../../../data_pool/px_101016/gainMaps_M022.bin ../../../data_pool/synthetic/${DATASET[${SLURM_ARRAY_TASK_ID}]}.bin dataset${DATASET[${SLURM_ARRAY_TASK_ID}]}

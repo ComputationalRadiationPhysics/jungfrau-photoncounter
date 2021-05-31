@@ -28,6 +28,42 @@ template <typename Config> struct ConversionKernel {
         copyFrameHeader(detectorData[i], gainStageMaps[i]);
       }
 
+      /*
+      uint32_t workerIdx = getLinearIdx(acc);
+      uint32_t domainSize = Config::MAPSIZE;
+
+      // iterate over whole extent
+      uint32_t const iterationExtent =
+          std::min(workerSize, domainSize - workerIdx * workerSize);
+
+//#pragma omp simd
+      for (uint32_t i = 0u; i < iterationExtent; ++i) {
+        uint32_t const id = workerIdx * workerSize + i;
+
+        // convert input data
+        processInput(acc, detectorData[i], gainMaps, pedestalMaps,
+                     initPedestalMaps, gainStageMaps[i], energyMaps[i], mask,
+                     id, pedestalFallback);
+
+        // read data from generated maps
+        auto dataword = detectorData[i].data[id];
+        auto adc = getAdc(dataword);
+        const auto &gainStage = gainStageMaps[i].data[id];
+        const auto &pedestal = pedestalMaps[gainStage][id];
+        const auto &stddev = initPedestalMaps[gainStage][id].stddev;
+
+        //! @todo: for all pixels in gain stage > 0 the dark pixel
+        //! condition should never be satisfied
+
+        // check "dark pixel" condition
+        // if (pedestal - c * stddev <= adc && pedestal + c * stddev >= adc &&
+        if (pedestal - stddev <= adc && pedestal + stddev >= adc &&
+            !pedestalFallback) {
+          updatePedestal(adc, Config::MOVING_STAT_WINDOW_SIZE,
+                         pedestalMaps[gainStage][id]);
+        }
+      }*/
+
       // execute double loop to take advantage of SIMD
       forEach(getLinearIdx(acc), workerSize, Config::MAPSIZE, [&](uint32_t id) {
         // convert input data
@@ -46,12 +82,45 @@ template <typename Config> struct ConversionKernel {
         //! condition should never be satisfied
 
         // check "dark pixel" condition
-        if (pedestal - c * stddev <= adc && pedestal + c * stddev >= adc &&
-            !pedestalFallback) {
+        // if (pedestal - c * stddev <= adc && pedestal + c * stddev >= adc &&
+        if (pedestal - stddev <= adc && pedestal + stddev >= adc &&
+            !pedestalFallback && gainStage == 0) {
           updatePedestal(adc, Config::MOVING_STAT_WINDOW_SIZE,
                          pedestalMaps[gainStage][id]);
         }
       });
+
+      /*uint32_t workerIdx = getLinearIdx(acc);
+      uint32_t domainSize = Config::MAPSIZE;
+        // iterate over whole extent
+        uint32_t const iterationExtent =
+            std::min(workerSize, domainSize - workerIdx * workerSize);
+
+      #pragma omp simd
+        for (uint32_t i = 0u; i < iterationExtent; ++i) {
+          uint32_t const id = workerIdx * workerSize + i;
+
+          // call functor// convert input data
+          processInput(acc, detectorData[i], gainMaps, pedestalMaps,
+                       initPedestalMaps, gainStageMaps[i], energyMaps[i], mask,
+                       id, pedestalFallback);
+
+          // read data from generated maps
+          auto dataword = detectorData[i].data[id];
+          auto adc = getAdc(dataword);
+          const auto &gainStage = gainStageMaps[i].data[id];
+          const auto &pedestal = pedestalMaps[gainStage][id];
+          const auto &stddev = initPedestalMaps[gainStage][id].stddev;
+
+          //! @todo: for all pixels in gain stage > 0 the dark pixel
+          //! condition should never be satisfied
+
+          // check "dark pixel" condition
+          if (pedestal - c_double * stddev <= adc && pedestal + c_double *
+      stddev >= adc && !pedestalFallback) { updatePedestal(adc,
+      Config::MOVING_STAT_WINDOW_SIZE, pedestalMaps[gainStage][id]);
+          }
+        }*/
     }
   }
 };
